@@ -28,8 +28,8 @@ class VisitModel(Base):
     os = Column(String, default="Unknown")
     device = Column(String, default="Desktop")
     browser = Column(String, default="Unknown")
-    country = Column(String, default="Unknown") # جديد
-    isp = Column(String, default="Unknown")     # جديد
+    country = Column(String, default="Unknown")
+    isp = Column(String, default="Unknown")
 
 class CostModel(Base):
     __tablename__ = "costs"
@@ -37,7 +37,7 @@ class CostModel(Base):
     zone_id = Column(String, unique=True, index=True)
     amount = Column(Float, default=0.0)
 
-# مسح الجدول القديم عشان نضيف الأعمدة الجديدة ونبني من جديد
+# مسح الجدول القديم عشان نضيف الأعمدة الجديدة ونبني من جديد (هيمسح البيانات الوهمية القديمة)
 Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
@@ -64,18 +64,21 @@ ip_cache = {}
 
 async def get_ip_info(ip: str):
     if ip in ip_cache: return ip_cache[ip]
-    if ip.startswith("127.") or ip.startswith("192.168."): return ("Local", "Local ISP")
+    if ip.startswith("127.") or ip.startswith("192.168.") or ip.startswith("10."):
+        return ("Local", "Local ISP")
     
     try:
         async with httpx.AsyncClient() as client:
-            res = await client.get(f"http://ip-api.com/json/{ip}?fields=country,isp", timeout=2.0)
+            # استخدام خدمة ipwho.is لأنها مش بتحظر السيرفرات المجانية
+            res = await client.get(f"https://ipwho.is/{ip}", timeout=3.0)
             data = res.json()
-            if data.get("status") == "success":
-                result = (data.get("country", "Unknown"), data.get("isp", "Unknown"))
+            if data.get("success") is True:
+                result = (data.get("country", "Unknown"), data.get("connection", {}).get("isp", "Unknown"))
                 ip_cache[ip] = result
                 return result
-    except:
-        pass
+    except Exception as e:
+        print(f"IP Error: {e}")
+    
     return ("Unknown", "Unknown")
 
 # ================= محرك تحليل الـ User-Agent =================
@@ -156,18 +159,14 @@ async def track_visit(payload: TrackPayload, request: Request):
     return {"status": "success"}
 
 @app.get("/api/stats")
-def get_stats(db: Session = Depends(get_db), zone: str = None, device: str = None):
-    query = db.query(VisitModel)
-    if zone: query = query.filter(VisitModel.zone_id == zone)
-    if device: query = query.filter(VisitModel.device == device)
-    
-    total = query.count()
-    valid = query.filter(VisitModel.verdict == "valid").count()
-    invalid = query.filter(VisitModel.verdict == "invalid").count()
-    suspicious = query.filter(VisitModel.verdict == "suspicious").count()
+def get_stats(db: Session = Depends(get_db)):
+    total = db.query(VisitModel).count()
+    valid = db.query(VisitModel).filter(VisitModel.verdict == "valid").count()
+    invalid = db.query(VisitModel).filter(VisitModel.verdict == "invalid").count()
+    suspicious = db.query(VisitModel).filter(VisitModel.verdict == "suspicious").count()
     total_cost = db.query(func.sum(CostModel.amount)).scalar() or 0.0
     
-    recent = query.order_by(VisitModel.id.desc()).limit(50).all()
+    recent = db.query(VisitModel).order_by(VisitModel.id.desc()).limit(50).all()
     recent_visits = [{
         "time": v.timestamp.strftime("%H:%M:%S"), "zone": v.zone_id, "verdict": v.verdict, 
         "device": v.device, "country": v.country, "isp": v.isp
@@ -260,6 +259,7 @@ def dashboard():
         <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>OVG Pro</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
         <style>body{font-family:'Cairo',sans-serif;background-color:#0f172a;color:#f8fafc;}</style>
     </head>
@@ -289,11 +289,19 @@ def dashboard():
             </div>
 
             <div id="tab-live" class="block">
-                <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-x-auto">
-                    <table class="w-full text-xs text-right">
-                        <thead class="bg-slate-900 text-slate-400"><tr><th class="p-2">الوقت</th><th class="p-2">Zone</th><th class="p-2">البلد</th><th class="p-2">الشركة (ISP)</th><th class="p-2">الحكم</th></tr></thead>
-                        <tbody id="live-table" class="divide-y divide-slate-700"></tbody>
-                    </table>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 col-span-1 hidden md:block">
+                        <h2 class="text-sm font-bold mb-2 text-slate-300">نسبة الترافيك</h2>
+                        <div class="relative h-48 flex justify-center">
+                            <canvas id="verdictChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-x-auto col-span-1 md:col-span-2">
+                        <table class="w-full text-xs text-right">
+                            <thead class="bg-slate-900 text-slate-400"><tr><th class="p-2">الوقت</th><th class="p-2">Zone</th><th class="p-2">البلد</th><th class="p-2">الشركة (ISP)</th><th class="p-2">الحكم</th></tr></thead>
+                            <tbody id="live-table" class="divide-y divide-slate-700"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -321,7 +329,9 @@ def dashboard():
         </div>
 
         <script>
+            let chartInstance = null;
             const getVal = (id) => document.getElementById(id).value;
+            
             function switchTab(tab) {
                 ['live', 'reports', 'costs'].forEach(t => {
                     document.getElementById('tab-'+t).classList.add('hidden');
@@ -349,6 +359,15 @@ def dashboard():
                     const c = v.verdict === 'valid' ? 'text-green-500' : v.verdict === 'invalid' ? 'text-red-500' : 'text-yellow-500';
                     tbody.innerHTML += `<tr><td class="p-2 text-slate-400">${v.time}</td><td class="p-2">${v.zone}</td><td class="p-2">${v.country}</td><td class="p-2 text-slate-400 text-xs">${v.isp}</td><td class="p-2 ${c}">${v.verdict}</td></tr>`;
                 });
+
+                if (chartInstance) chartInstance.destroy();
+                const ctx = document.getElementById('verdictChart').getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels: ['Valid', 'Suspicious', 'Invalid'], datasets: [{ data: [data.valid, data.suspicious, data.invalid], backgroundColor: ['#22c55e', '#eab308', '#ef4444'], borderWidth: 0 }] },
+                    options: { cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: {size: 10} } } } }
+                });
+
                 loadReports();
             }
 
