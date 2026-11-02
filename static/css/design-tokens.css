@@ -1,0 +1,45 @@
+:root {
+  /* ألوان الحالة */
+  --primary-500: #6366F1;
+  --primary-600: #8B5CF6;
+  --valid: #10B981;
+  --suspicious: #F59E0B;
+  --invalid: #F43F5E;
+  --critical: #DC2626;
+  
+  /* الخلفيات (Light Mode) */
+  --bg-page: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --border: #E2E8F0;
+  
+  /* النصوص */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+  
+  /* المسافات */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-5: 20px; --space-6: 24px;
+  
+  /* الحواف */
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+/* الوضع الليلي (Dark Mode) */
+[data-theme="dark"] {
+  --bg-page: #0F172A;
+  --bg-card: #1E293B;
+  --border: #334155;
+  --text-primary: #F1F5F9;
+  --text-secondary: #CBD5E1;
+  --text-muted: #64748B;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+  }
+  
