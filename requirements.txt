@@ -2,7 +2,7 @@ fastapi
 uvicorn
 sqlalchemy
 pydantic
-user-agents
 httpx
-python-dotenv
-jinja2
+python-multipart
+ua-extract
+identify-browser
