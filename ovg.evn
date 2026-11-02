@@ -1,0 +1,5 @@
+OVG_SECRET=a3f8b2e1c9d4f7a6b5c8e2d1f4a7b9c3e6d8f1a4b7c9e2d5f8a1b3c6d9e2f4a7
+OVG_DASHBOARD_KEY=sasa
+OVG_ORIGINS=*
+OVG_TRACK_RATE=120
+OVG_PUBLIC_URL=https://ovg-tracker.de1.netrun.io
