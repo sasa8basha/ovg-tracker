@@ -6,14 +6,15 @@ from utils import ip_cache, _is_private_ip
 
 async def get_ip_info(ip: str):
     if not ip or _is_private_ip(ip):
-        return {"country": "Local", "isp": "Local ISP", "type": "residential", "asn": "N/A", "security": {}}
+        return {"country": "Local", "isp": "Local ISP", "type": "residential", "asn": "N/A", "security": {}, "lat": 0.0, "lon": 0.0}
     cached = ip_cache.get(ip)
     if cached is not None:
         return cached
     try:
         async with httpx.AsyncClient() as c:
+            # ضفنا lat و lon هنا
             r = await c.get(
-                f"http://ip-api.com/json/{ip}?fields=status,country,isp,as,proxy,hosting",
+                f"http://ip-api.com/json/{ip}?fields=status,country,isp,as,proxy,hosting,lat,lon",
                 timeout=GEO_LOOKUP_TIMEOUT,
             )
             if r.status_code == 200:
@@ -26,12 +27,14 @@ async def get_ip_info(ip: str):
                         "type": "hosting" if is_vpn else "residential",
                         "asn": (d.get("as") or "Unknown").split()[0],
                         "security": {"vpn": is_vpn},
+                        "lat": d.get("lat", 0.0),
+                        "lon": d.get("lon", 0.0),
                     }
                     ip_cache.set(ip, out)
                     return out
     except Exception:
         pass
-    return {"country": "Unknown", "isp": "Unknown", "type": "Unknown", "asn": "Unknown", "security": {}}
+    return {"country": "Unknown", "isp": "Unknown", "type": "Unknown", "asn": "Unknown", "security": {}, "lat": 0.0, "lon": 0.0}
 
 def parse_ua(ua: str):
     u = (ua or "").lower()
@@ -74,7 +77,6 @@ def new_site_key() -> str:
     return secrets.token_hex(8)
 
 def analyze_visit(data: dict, ip_info: dict) -> dict:
-    # (هنا هننسخ نفس دالة analyze_visit القديمة بالكامل زي ما هي)
     score = 0
     evidence = []
     nav = data.get("nav") or {}
