@@ -5,7 +5,7 @@ from config import GEO_LOOKUP_TIMEOUT
 from utils import ip_cache, _is_private_ip
 
 # --- استيراد المكتبات الصحيحة ---
-from ua_extract import DeviceDetector, SoftwareDetector
+from ua_extract import DeviceDetector
 from identify_browser import identify_browser
 
 async def get_ip_info(ip: str):
@@ -26,12 +26,12 @@ async def get_ip_info(ip: str):
     except Exception: pass
     return {"country": "Unknown", "isp": "Unknown", "type": "Unknown", "asn": "Unknown", "security": {}, "lat": 0.0, "lon": 0.0}
 
-def parse_ua_advanced(ua: str, sec_ch_ua: str = "", sec_ch_platform: str = ""):
+def parse_ua_advanced(ua: str, headers: dict = None):
     """تحليل دقيق جداً باستخدام Matomo + Client Hints"""
     try:
-        # 1. استخدام Matomo (ua_extract) كقاعدة أساسية
-        detector = DeviceDetector(ua)
-        parsed = detector.parse() # <-- هذا هو السطر الصحيح
+        # 1. استخدام Matomo (ua_extract) مع تمرير الهيدرات (مهم جداً لاكتشاف Client Hints)
+        detector = DeviceDetector(ua, headers=headers)
+        parsed = detector.parse()
         
         browser_name = parsed.client_name() or 'Unknown'
         browser_version = parsed.client_version() or 'Unknown'
@@ -42,6 +42,9 @@ def parse_ua_advanced(ua: str, sec_ch_ua: str = "", sec_ch_platform: str = ""):
         device_model = parsed.device_model() or 'Unknown'
 
         # 2. استخدام Client Hints لتصحيح الأخطاء (مثل Brave)
+        sec_ch_ua = headers.get('sec-ch-ua', '') if headers else ''
+        sec_ch_platform = headers.get('sec-ch-ua-platform', '') if headers else ''
+        
         if sec_ch_ua or sec_ch_platform:
             hints = identify_browser(ua, sec_ch_ua, sec_ch_platform)
             if hints.get('name') and hints['name'] != 'Unknown': browser_name = hints['name']
@@ -53,8 +56,8 @@ def parse_ua_advanced(ua: str, sec_ch_ua: str = "", sec_ch_platform: str = ""):
             "device_type": device_type, "device_brand": device_brand, "device_model": device_model,
             "browser": browser_name, "browser_version": browser_version
         }
-    except Exception:
-        # خطة احتياطية في حال فشل المكتبات
+    except Exception as e:
+        # خطة احتياطية في حال فشل المكتبات (طبعاً مع طباعة الخطأ في اللوجز لو أردت)
         return {"os": "Unknown", "os_version": "Unknown", "device_type": "Unknown", "device_brand": "Unknown", "device_model": "Unknown", "browser": "Unknown", "browser_version": "Unknown"}
 
 def extract_zone_id(url: str) -> str:
