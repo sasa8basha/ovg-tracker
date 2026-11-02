@@ -49,6 +49,11 @@ class VisitModel(Base):
     asn = Column(String, default="Unknown")
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
+    
+    # الأعمدة الجديدة للتحليل العميق
+    time_on_page = Column(Integer, default=0) # بالملي ثانية
+    clicks = Column(Integer, default=0)
+    scrolls = Column(Integer, default=0)
 
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
