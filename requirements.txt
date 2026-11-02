@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+user-agents
+httpx
+python-dotenv
+jinja2
