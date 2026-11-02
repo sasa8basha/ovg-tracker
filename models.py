@@ -50,14 +50,19 @@ class VisitModel(Base):
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
     
-    # التحليل السلوكي
-    time_on_page = Column(Integer, default=0) # بالملي ثانية
+    # التحليل السلوكي البسيط (للجدول)
+    time_on_page = Column(Integer, default=0) 
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
     
     # إحداثيات الخريطة
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
+
+    # الأعمدة الجديدة (Enterprise Engine)
+    confidence = Column(Float, default=0.0)           # مستوى الثقة في القرار
+    threat_types = Column(JSON, default=list)         # تصنيف التهديد (مثلاً: bot_farm)
+    behavior_meta = Column(JSON, default=dict)        # بيانات الماوس والتوقيت المعمقة
 
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
