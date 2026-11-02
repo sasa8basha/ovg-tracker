@@ -3,8 +3,6 @@ import httpx
 from urllib.parse import urlparse, parse_qs
 from config import GEO_LOOKUP_TIMEOUT
 from utils import ip_cache, _is_private_ip
-
-# --- استيراد المكتبات الصحيحة ---
 from ua_extract import DeviceDetector
 from identify_browser import identify_browser
 
@@ -27,24 +25,22 @@ async def get_ip_info(ip: str):
     return {"country": "Unknown", "isp": "Unknown", "type": "Unknown", "asn": "Unknown", "security": {}, "lat": 0.0, "lon": 0.0}
 
 def parse_ua_advanced(ua: str, headers: dict = None):
-    """تحليل دقيق جداً باستخدام Matomo + Client Hints"""
     try:
-        # 1. استخدام Matomo (ua_extract) مع تمرير الهيدرات (مهم جداً لاكتشاف Client Hints)
-        detector = DeviceDetector(ua, headers=headers)
-        parsed = detector.parse()
+        # الطريقة الصحيحة للتعامل مع مكتبة ua_extract (ترجع Dictionary)
+        dd = DeviceDetector()
+        parsed = dd.parse(ua)
         
-        browser_name = parsed.client_name() or 'Unknown'
-        browser_version = parsed.client_version() or 'Unknown'
-        os_name = parsed.os_name() or 'Unknown'
-        os_version = parsed.os_version() or 'Unknown'
-        device_type = parsed.device_type() or 'Unknown'
-        device_brand = parsed.device_brand_name() or 'Unknown'
-        device_model = parsed.device_model() or 'Unknown'
+        browser_name = parsed.get('client', {}).get('name', 'Unknown')
+        browser_version = parsed.get('client', {}).get('version', 'Unknown')
+        os_name = parsed.get('os', {}).get('name', 'Unknown')
+        os_version = parsed.get('os', {}).get('version', 'Unknown')
+        device_type = parsed.get('device', {}).get('type', 'Desktop')
+        device_brand = parsed.get('device', {}).get('brand', 'Unknown')
+        device_model = parsed.get('device', {}).get('model', 'Unknown')
 
-        # 2. استخدام Client Hints لتصحيح الأخطاء (مثل Brave)
+        # تصحيح إضافي باستخدام Client Hints (للمتصفحات المخفية)
         sec_ch_ua = headers.get('sec-ch-ua', '') if headers else ''
         sec_ch_platform = headers.get('sec-ch-ua-platform', '') if headers else ''
-        
         if sec_ch_ua or sec_ch_platform:
             hints = identify_browser(ua, sec_ch_ua, sec_ch_platform)
             if hints.get('name') and hints['name'] != 'Unknown': browser_name = hints['name']
@@ -57,7 +53,7 @@ def parse_ua_advanced(ua: str, headers: dict = None):
             "browser": browser_name, "browser_version": browser_version
         }
     except Exception as e:
-        # خطة احتياطية في حال فشل المكتبات (طبعاً مع طباعة الخطأ في اللوجز لو أردت)
+        print(f"UA Parse Error: {e}")
         return {"os": "Unknown", "os_version": "Unknown", "device_type": "Unknown", "device_brand": "Unknown", "device_model": "Unknown", "browser": "Unknown", "browser_version": "Unknown"}
 
 def extract_zone_id(url: str) -> str:
