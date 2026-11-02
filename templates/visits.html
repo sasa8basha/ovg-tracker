@@ -11,8 +11,8 @@
     body{font-family:'Cairo',sans-serif;background:var(--bg-page);color:var(--text-primary)}
     .table-row { border-right: 4px solid transparent; transition: all 0.2s; }
     .table-row:hover { background: rgba(255,255,255,0.03) !important; transform: scale(1.002); }
-    .row-valid { border-right-color: var(--valid); }
-    .row-invalid { border-right-color: var(--invalid); }
+    .row-clean, .row-valid { border-right-color: var(--valid); }
+    .row-invalid, .row-high_risk { border-right-color: var(--invalid); }
     .row-suspicious { border-right-color: var(--suspicious); }
     .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
   </style>
@@ -35,9 +35,11 @@
     <div class="glass rounded-2xl p-4 mb-6 flex gap-4 flex-wrap">
       <select id="filterVerdict" class="bg-black/20 border border-white/10 text-white rounded-xl px-4 py-2 outline-none text-sm" onchange="loadVisits(1)">
         <option value="">كل الأحكام</option>
+        <option value="clean">نظيف (Clean)</option>
         <option value="valid">سليم (Valid)</option>
-        <option value="invalid">بوت (Invalid)</option>
         <option value="suspicious">مشبوه (Suspicious)</option>
+        <option value="high_risk">خطر عالي (High Risk)</option>
+        <option value="invalid">بوت (Invalid)</option>
       </select>
       <div class="flex-1"></div>
       <div class="text-slate-400 text-sm flex items-center">إجمالي الزيارات: <span id="totalCount" class="text-white font-bold mr-2">0</span></div>
@@ -54,6 +56,7 @@
               <th class="px-4 py-4 text-center">مدة المكوث</th>
               <th class="px-4 py-4 text-center">تفاعل (نقرات/سكرول)</th>
               <th class="px-4 py-4 text-center">Score</th>
+              <th class="px-4 py-4 text-center">الثقة</th>
               <th class="px-4 py-4 text-center">الحكم</th>
               <th class="px-4 py-4"></th>
             </tr>
@@ -99,14 +102,20 @@
 
       const tb = document.getElementById('visitsTable');
       if (!d.items.length) {
-        tb.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-500">لا توجد زيارات مطابقة</td></tr>`;
+        tb.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-500">لا توجد زيارات مطابقة</td></tr>`;
         return;
       }
 
       tb.innerHTML = d.items.map(v => {
-        const badgeClass = v.verdict === 'valid' ? 'bg-emerald-500/10 text-emerald-400' : v.verdict === 'invalid' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400';
-        const rowClass = v.verdict === 'valid' ? 'row-valid' : v.verdict === 'invalid' ? 'row-invalid' : 'row-suspicious';
-        const scoreColor = v.score > 80 ? 'text-rose-400' : v.score > 40 ? 'text-amber-400' : 'text-emerald-400';
+        let badgeClass = '', rowClass = '', scoreColor = '';
+        
+        if (v.verdict === 'clean' || v.verdict === 'valid') {
+           badgeClass = 'bg-emerald-500/10 text-emerald-400'; rowClass = 'row-clean'; scoreColor = 'text-emerald-400';
+        } else if (v.verdict === 'invalid' || v.verdict === 'high_risk') {
+           badgeClass = 'bg-rose-500/10 text-rose-400'; rowClass = 'row-invalid'; scoreColor = 'text-rose-400';
+        } else {
+           badgeClass = 'bg-amber-500/10 text-amber-400'; rowClass = 'row-suspicious'; scoreColor = 'text-amber-400';
+        }
         
         return `<tr class="table-row ${rowClass} cursor-pointer hover:bg-white/5" onclick="window.location.href='/visits/${v.id}'">
           <td class="px-4 py-4 font-mono text-indigo-300 text-xs">#${v.id}</td>
@@ -122,6 +131,7 @@
             <span class="text-slate-300">🖱️ ${v.clicks}</span> | <span class="text-slate-300">📜 ${v.scrolls}</span>
           </td>
           <td class="px-4 py-4 text-center font-bold font-mono ${scoreColor}">${v.score}</td>
+          <td class="px-4 py-4 text-center font-mono text-xs text-indigo-300">${v.confidence}%</td>
           <td class="px-4 py-4 text-center"><span class="${badgeClass} px-2.5 py-1 rounded-md text-[10px] font-bold border border-white/5">${v.verdict.toUpperCase()}</span></td>
           <td class="px-4 py-4 text-center text-indigo-400">←</td>
         </tr>`;
@@ -131,4 +141,4 @@
     loadVisits(1);
   </script>
 </body>
-          </html>
+</html>
