@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    JSON, Boolean, Column, DateTime, ForeignKey, Index, Integer, String
+    JSON, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Float
 )
 from sqlalchemy.orm import relationship
 from database import Base
@@ -50,10 +50,14 @@ class VisitModel(Base):
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
     
-    # الأعمدة الجديدة للتحليل العميق
+    # التحليل السلوكي
     time_on_page = Column(Integer, default=0) # بالملي ثانية
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
+    
+    # إحداثيات الخريطة
+    latitude = Column(Float, default=0.0)
+    longitude = Column(Float, default=0.0)
 
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
