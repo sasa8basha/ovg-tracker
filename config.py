@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # لو غيرت اسم الملف لـ .env
+# أو لو سايبه ovg.txt اكتب: load_dotenv("ovg.txt")
 import os
 import re
 import secrets
