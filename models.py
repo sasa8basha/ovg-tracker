@@ -37,9 +37,17 @@ class VisitModel(Base):
     score = Column(Integer)
     verdict = Column(String, index=True)
     evidence = Column(JSON)
+    
+    # --- حقول الجهاز والمتصفح الدقيقة جداً ---
     os = Column(String, default="Unknown")
+    os_version = Column(String, default="Unknown")
     device = Column(String, default="Unknown")
+    device_brand = Column(String, default="Unknown")
+    device_model = Column(String, default="Unknown")
     browser = Column(String, default="Unknown")
+    browser_version = Column(String, default="Unknown")
+    # -------------------------------------
+
     country = Column(String, default="Unknown")
     isp = Column(String, default="Unknown")
     timezone = Column(String, default="Unknown")
@@ -50,19 +58,16 @@ class VisitModel(Base):
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
     
-    # التحليل السلوكي البسيط (للجدول)
-    time_on_page = Column(Integer, default=0) 
+    time_on_page = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
     
-    # إحداثيات الخريطة
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
 
-    # الأعمدة الجديدة (Enterprise Engine)
-    confidence = Column(Float, default=0.0)           # مستوى الثقة في القرار
-    threat_types = Column(JSON, default=list)         # تصنيف التهديد (مثلاً: bot_farm)
-    behavior_meta = Column(JSON, default=dict)        # بيانات الماوس والتوقيت المعمقة
+    confidence = Column(Float, default=0.0)
+    threat_types = Column(JSON, default=list)
+    behavior_meta = Column(JSON, default=dict)
 
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
