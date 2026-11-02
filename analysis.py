@@ -4,9 +4,6 @@ from urllib.parse import urlparse, parse_qs
 from config import GEO_LOOKUP_TIMEOUT
 from utils import ip_cache, _is_private_ip
 
-# استخدام مكتبة ua-parser المدمجة والمستقرة
-from ua_parser import user_agent_parser
-
 async def get_ip_info(ip: str):
     if not ip or _is_private_ip(ip):
         return {"country": "Local", "isp": "Local ISP", "type": "residential", "asn": "N/A", "security": {}, "lat": 0.0, "lon": 0.0}
@@ -24,33 +21,6 @@ async def get_ip_info(ip: str):
                     return out
     except Exception: pass
     return {"country": "Unknown", "isp": "Unknown", "type": "Unknown", "asn": "Unknown", "security": {}, "lat": 0.0, "lon": 0.0}
-
-def parse_ua_advanced(ua: str, headers: dict = None):
-    try:
-        parsed = user_agent_parser.Parse(ua)
-        
-        browser_name = parsed['user_agent']['family'] or 'Unknown'
-        browser_version = parsed['user_agent']['major'] or 'Unknown'
-        os_name = parsed['os']['family'] or 'Unknown'
-        os_version = parsed['os']['major'] or 'Unknown'
-        device_type = parsed['device']['family'] or 'Desktop'
-        
-        # تحسينات بسيطة لبعض الأجهزة
-        if device_type != 'Other':
-            device_brand = device_type.split(' ')[0]
-            device_model = device_type
-        else:
-            device_brand = 'Unknown'
-            device_model = 'Unknown'
-
-        return {
-            "os": os_name, "os_version": os_version,
-            "device_type": device_type, "device_brand": device_brand, "device_model": device_model,
-            "browser": browser_name, "browser_version": browser_version
-        }
-    except Exception as e:
-        print(f"UA Parse Error: {e}")
-        return {"os": "Unknown", "os_version": "Unknown", "device_type": "Unknown", "device_brand": "Unknown", "device_model": "Unknown", "browser": "Unknown", "browser_version": "Unknown"}
 
 def extract_zone_id(url: str) -> str:
     try:
