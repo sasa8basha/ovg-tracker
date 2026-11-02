@@ -4,5 +4,4 @@ sqlalchemy
 pydantic
 httpx
 python-multipart
-ua-extract
-identify-browser
+ua-parser
