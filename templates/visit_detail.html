@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl" data-theme="dark">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OVG · تفاصيل الزيارة</title>
+  <title>OVG · تفاصيل الزيارة (Enterprise)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/design-tokens.css">
@@ -11,13 +11,12 @@
     body{font-family:'Cairo',sans-serif;background:var(--bg-page);color:var(--text-primary)}
     .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; }
     .stat-box { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 0.75rem; padding: 1rem; text-align: center; }
-    
-    /* دائرة النتيجة */
-    .score-ring { position: relative; width: 150px; height: 150px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .score-ring { position: relative; width: 160px; height: 160px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
     .score-ring svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-    .score-ring circle { fill: none; stroke-width: 8; stroke-linecap: round; }
+    .score-ring circle { fill: none; stroke-width: 10; stroke-linecap: round; }
     .score-bg { stroke: rgba(255,255,255,0.05); }
-    .score-progress { stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1.5s ease-out; }
+    .score-progress { stroke-dasharray: 440; stroke-dashoffset: 440; transition: stroke-dashoffset 1.5s ease-out; }
+    .threat-badge { background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); color: #f43f5e; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; }
   </style>
 </head>
 <body class="min-h-screen p-6">
@@ -30,7 +29,7 @@
         <div>
           <div class="flex items-center gap-3">
             <h1 class="text-2xl font-extrabold text-white font-mono">زيارة <span id="vId" class="text-indigo-400"></span></h1>
-            <span id="vBadge" class="px-3 py-1 rounded-full text-xs font-bold border"></span>
+            <div id="threatContainer" class="flex gap-2 flex-wrap"></div>
           </div>
           <p id="vTime" class="text-slate-400 text-sm mt-1"></p>
         </div>
@@ -42,35 +41,47 @@
       <!-- القسم الأيسر: التحليل والنتيجة -->
       <div class="lg:col-span-1 space-y-6">
         
-        <!-- الدائرة -->
-        <div class="glass-card p-6 flex flex-col items-center justify-center">
+        <!-- الدوائر (Score + Confidence) -->
+        <div class="glass-card p-6 flex flex-col items-center justify-center relative">
           <div class="score-ring mb-4">
-            <svg viewBox="0 0 150 150">
-              <circle class="score-bg" cx="75" cy="75" r="65"></circle>
-              <circle id="scoreCircle" class="score-progress" cx="75" cy="75" r="65"></circle>
+            <svg viewBox="0 0 160 160">
+              <circle class="score-bg" cx="80" cy="80" r="70"></circle>
+              <circle id="scoreCircle" class="score-progress" cx="80" cy="80" r="70"></circle>
             </svg>
             <div class="text-center z-10">
-              <div id="vScore" class="text-4xl font-extrabold text-white font-mono">0</div>
-              <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk Score</div>
+              <div id="vScore" class="text-5xl font-extrabold text-white font-mono">0</div>
+              <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Risk Score</div>
             </div>
           </div>
-          <div id="vVerdictText" class="text-lg font-bold"></div>
+          
+          <div class="w-full flex justify-between items-center px-4 mt-2">
+            <div class="text-center">
+              <div class="text-xs text-slate-400 mb-1">Confidence</div>
+              <div id="vConfidence" class="text-lg font-bold text-indigo-400 font-mono">0%</div>
+            </div>
+            <div class="w-px h-8 bg-white/10"></div>
+            <div class="text-center">
+              <div class="text-xs text-slate-400 mb-1">Verdict</div>
+              <div id="vVerdictText" class="text-sm font-bold"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- السلوك المعمق -->
+        <div class="glass-card p-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧬</span> التحليل السلوكي المعمق</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">سرعة الماوس</div><div id="vMouseSpeed" class="text-lg font-bold text-blue-400 font-mono">0 px/s</div></div>
+            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">انحناء المسار</div><div id="vCurvature" class="text-lg font-bold text-emerald-400 font-mono">0.0</div></div>
+            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">توقف الماوس</div><div id="vPauses" class="text-lg font-bold text-amber-400 font-mono">0</div></div>
+            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">أول حركة</div><div id="vFirstMove" class="text-lg font-bold text-purple-400 font-mono">0 ms</div></div>
+          </div>
         </div>
 
         <!-- الأدلة -->
         <div class="glass-card p-6">
-          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>⚖️</span> أسباب التقييم</h3>
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>⚖️</span> أسباب التقييم (Breakdown)</h3>
           <ul id="vEvidence" class="space-y-2 text-sm text-slate-300"></ul>
-        </div>
-
-        <!-- السلوك -->
-        <div class="glass-card p-6">
-          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧠</span> السلوك والتفاعل</h3>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">المكوث</div><div id="vTimeOnPage" class="text-lg font-bold text-blue-400 font-mono">0s</div></div>
-            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">نقرات</div><div id="vClicks" class="text-lg font-bold text-emerald-400 font-mono">0</div></div>
-            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">سكرول</div><div id="vScrolls" class="text-lg font-bold text-amber-400 font-mono">0</div></div>
-          </div>
         </div>
       </div>
 
@@ -85,10 +96,10 @@
             <div><div class="text-xs text-slate-500 mb-1">Country</div><div id="vCountry" class="text-slate-200"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">ISP</div><div id="vIsp" class="text-slate-200"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vAsn" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">نوع الاتصال</div><div id="vConnType" class="text-slate-200"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">VPN/Proxy</div><div id="vVpn"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">WebRTC Leak</div><div id="vWebrtc" class="text-slate-200 font-mono"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">Timezone</div><div id="vTimezone" class="text-slate-200"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">Zone ID</div><div id="vZone" class="text-slate-200 font-mono"></div></div>
           </div>
         </div>
 
@@ -100,8 +111,17 @@
             <div><div class="text-xs text-slate-500 mb-1">المتصفح</div><div id="vBrowser" class="text-slate-200"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">الجهاز</div><div id="vDevice" class="text-slate-200"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">الهاردوير</div><div id="vHardware" class="text-slate-200"></div></div>
-            <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Canvas Hash</div><div id="vCanvas" class="text-slate-200 font-mono text-xs bg-white/5 p-2 rounded"></div></div>
-            <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Zone ID</div><div id="vZone" class="text-slate-200 font-mono"></div></div>
+            <div class="col-span-2 md:col-span-4"><div class="text-xs text-slate-500 mb-1">Canvas Hash</div><div id="vCanvas" class="text-slate-200 font-mono text-xs bg-white/5 p-2 rounded"></div></div>
+          </div>
+        </div>
+
+        <!-- التفاعل العام -->
+        <div class="glass-card p-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🖱️</span> التفاعل العام</h3>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">مدة المكوث</div><div id="vTimeOnPage" class="text-lg font-bold text-blue-400 font-mono">0s</div></div>
+            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">نقرات</div><div id="vClicks" class="text-lg font-bold text-emerald-400 font-mono">0</div></div>
+            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">سكرول</div><div id="vScrolls" class="text-lg font-bold text-amber-400 font-mono">0</div></div>
           </div>
         </div>
 
@@ -119,58 +139,85 @@
       
       document.getElementById('app').style.display = 'block';
       
-      // Header & Basics
+      // Header
       document.getElementById('vId').textContent = `#${d.id}`;
       document.getElementById('vTime').textContent = d.timestamp;
       document.getElementById('vScore').textContent = d.score;
+      document.getElementById('vConfidence').textContent = `${d.confidence}%`;
+      
+      // Threat Types
+      const tc = document.getElementById('threatContainer');
+      if (d.threat_types && d.threat_types.length) {
+        tc.innerHTML = d.threat_types.map(t => `<span class="threat-badge">${t.toUpperCase()}</span>`).join('');
+      } else {
+        tc.innerHTML = `<span class="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded border border-emerald-500/20">No Threat</span>`;
+      }
+
+      // الشبكة
       document.getElementById('vIp').textContent = d.ip;
       document.getElementById('vCountry').textContent = d.country;
       document.getElementById('vIsp').textContent = d.isp;
       document.getElementById('vAsn').textContent = d.asn;
-      document.getElementById('vConnType').textContent = d.connection_type;
       document.getElementById('vWebrtc').textContent = d.webrtc_ip || 'None';
       document.getElementById('vTimezone').textContent = d.timezone;
+      document.getElementById('vZone').textContent = d.zone_id;
+      
+      // الجهاز
       document.getElementById('vOs').textContent = d.os;
       document.getElementById('vBrowser').textContent = d.browser;
       document.getElementById('vDevice').textContent = d.device;
       document.getElementById('vHardware').textContent = d.hardware;
       document.getElementById('vCanvas').textContent = d.canvas_hash;
-      document.getElementById('vZone').textContent = d.zone_id;
       
-      // Behavior
+      // التفاعل العام
       document.getElementById('vTimeOnPage').textContent = d.time_on_page + 's';
       document.getElementById('vClicks').textContent = d.clicks;
       document.getElementById('vScrolls').textContent = d.scrolls;
+
+      // السلوك المعمق
+      if (d.behavior_meta && d.behavior_meta.mouse) {
+        document.getElementById('vMouseSpeed').textContent = (d.behavior_meta.mouse.avg_speed || 0) + ' px/s';
+        document.getElementById('vCurvature').textContent = d.behavior_meta.mouse.curvature || 0;
+        document.getElementById('vPauses').textContent = d.behavior_meta.mouse.pauses || 0;
+      }
+      if (d.behavior_meta && d.behavior_meta.timing) {
+        document.getElementById('vFirstMove').textContent = (d.behavior_meta.timing.time_to_first_move || 0) + ' ms';
+      }
       
       // Verdict Style
-      const badge = document.getElementById('vBadge');
       const circle = document.getElementById('scoreCircle');
       let color = '';
-      if (d.verdict === 'valid') { color = '#10B981'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400'; document.getElementById('vVerdictText').className = 'text-lg font-bold text-emerald-400'; }
-      else if (d.verdict === 'invalid') { color = '#F43F5E'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-rose-500/30 bg-rose-500/10 text-rose-400'; document.getElementById('vVerdictText').className = 'text-lg font-bold text-rose-400'; }
-      else { color = '#F59E0B'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-amber-500/30 bg-amber-500/10 text-amber-400'; document.getElementById('vVerdictText').className = 'text-lg font-bold text-amber-400'; }
+      const vt = document.getElementById('vVerdictText');
       
-      badge.textContent = d.verdict.toUpperCase();
-      document.getElementById('vVerdictText').textContent = d.verdict === 'valid' ? 'زيارة سليمة' : d.verdict === 'invalid' ? 'بوت / زيارة وهمية' : 'زيارة مشبوهة';
+      if (d.verdict === 'clean' || d.verdict === 'valid') { 
+        color = '#10B981'; vt.className = 'text-sm font-bold text-emerald-400'; vt.textContent = d.verdict.toUpperCase(); 
+      } else if (d.verdict === 'invalid' || d.verdict === 'high_risk') { 
+        color = '#F43F5E'; vt.className = 'text-sm font-bold text-rose-400'; vt.textContent = d.verdict.toUpperCase(); 
+      } else { 
+        color = '#F59E0B'; vt.className = 'text-sm font-bold text-amber-400'; vt.textContent = d.verdict.toUpperCase(); 
+      }
       circle.style.stroke = color;
       
       // VPN
       const vpnEl = document.getElementById('vVpn');
-      if (d.is_vpn) { vpnEl.className = 'text-rose-400 font-bold'; vpnEl.textContent = 'YES (خطر)'; }
+      if (d.is_vpn) { vpnEl.className = 'text-rose-400 font-bold'; vpnEl.textContent = 'YES'; }
       else { vpnEl.className = 'text-emerald-400'; vpnEl.textContent = 'NO'; }
 
       // Evidence
       const evEl = document.getElementById('vEvidence');
       if (d.evidence && d.evidence.length) {
-        evEl.innerHTML = d.evidence.map(e => `<li class="flex items-start gap-2"><span class="text-rose-400">⚠️</span> <span>${e}</span></li>`).join('');
+        evEl.innerHTML = d.evidence.map(e => {
+          let colorClass = e.includes('[Hard]') ? 'text-rose-400' : e.includes('[Soft]') ? 'text-amber-400' : 'text-blue-400';
+          return `<li class="flex items-start gap-2"><span class="${colorClass} text-xs mt-0.5">●</span> <span class="text-xs">${e}</span></li>`;
+        }).join('');
       } else {
-        evEl.innerHTML = `<li class="text-emerald-400 flex items-center gap-2"><span>✅</span> لا توجد أدلة على التلاعب</li>`;
+        evEl.innerHTML = `<li class="text-emerald-400 text-xs flex items-center gap-2"><span>✅</span> لا توجد أدلة على التلاعب</li>`;
       }
 
-      // Animate Score Ring
+      // Animate Score Ring (Max 100 now)
       setTimeout(() => {
-        const percentage = Math.min(d.score / 150, 1);
-        const offset = 408 - (percentage * 408);
+        const percentage = Math.min(d.score / 100, 1);
+        const offset = 440 - (percentage * 440);
         circle.style.strokeDashoffset = offset;
       }, 100);
     }
@@ -178,4 +225,4 @@
     loadDetails();
   </script>
 </body>
-</html>
+                                                                                       </html>
