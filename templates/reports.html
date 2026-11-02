@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · التقارير والخريطة</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Leaflet.js للخريطة -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/design-tokens.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <style>
+    body{font-family:'Cairo',sans-serif;background:var(--bg-page);color:var(--text-primary)}
+    .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+    .tab-btn { padding: 10px 20px; border-radius: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; border: none; background: transparent; transition: 0.2s; }
+    .tab-btn.active { background: rgba(99,102,241,.15); color: var(--primary-500); }
+    #map { height: 600px; width: 100%; border-radius: 1rem; z-index: 1; }
+    .leaflet-container { background: #1e293b !important; }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+      <div>
+        <h1 class="text-3xl font-extrabold text-white">التقارير والخريطة الحية</h1>
+        <p class="text-slate-400 text-sm mt-1">تحليل جغرافي وتقني لتحسين الجودة</p>
+      </div>
+      <button onclick="window.location.href='/dashboard'" class="btn-ghost border border-slate-600">← العودة للداشبورد</button>
+    </div>
+
+    <div class="flex gap-2 mb-6 border-b border-white/10 pb-4">
+      <button class="tab-btn active" onclick="switchTab('map', this)">🗺️ الخريطة الحية</button>
+      <button class="tab-btn" onclick="switchTab('countries', this)">🌍 الدول</button>
+      <button class="tab-btn" onclick="switchTab('tech', this)">💻 الأجهزة والمتصفحات</button>
+    </div>
+
+    <!-- Map Tab -->
+    <div id="tab-map" class="tab-content">
+      <div class="glass rounded-2xl p-2">
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <!-- Countries Tab -->
+    <div id="tab-countries" class="tab-content hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="glass rounded-2xl p-6">
+          <h2 class="text-sm font-bold text-white mb-6">أعلى 10 دول (زيارات)</h2>
+          <div class="h-80"><canvas id="countryChart"></canvas></div>
+        </div>
+        <div class="glass rounded-2xl overflow-hidden">
+          <table class="w-full text-sm text-right">
+            <thead class="bg-black/40 text-slate-400 text-xs">
+              <tr>
+                <th class="px-4 py-3">الدولة</th>
+                <th class="px-4 py-3">إجمالي</th>
+                <th class="px-4 py-3">بوتات</th>
+              </tr>
+            </thead>
+            <tbody id="countriesTable" class="divide-y divide-white/5"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tech Tab -->
+    <div id="tab-tech" class="tab-content hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="glass rounded-2xl p-6">
+          <h2 class="text-sm font-bold text-white mb-6">توزيع الأجهزة</h2>
+          <div class="h-80"><canvas id="deviceChart"></canvas></div>
+        </div>
+        <div class="glass rounded-2xl p-6">
+          <h2 class="text-sm font-bold text-white mb-6">توزيع المتصفحات</h2>
+          <div class="h-80"><canvas id="browserChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const siteKey = new URL(location.href).searchParams.get('site');
+    let map = null;
+    let charts = {};
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById('tab-' + tabId).classList.remove('hidden');
+      btn.classList.add('active');
+
+      if (tabId === 'map') setTimeout(loadMap, 100);
+      if (tabId === 'countries') loadCountries();
+      if (tabId === 'tech') loadTech();
+    }
+
+    // ---------------- Map Logic ----------------
+    async function loadMap() {
+      if (!map) {
+        map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; OpenStreetMap &copy; CARTO',
+          subdomains: 'abcd', maxZoom: 19
+        }).addTo(map);
+      } else {
+        // مسح النقاط القديمة
+        map.eachLayer(layer => { if (layer instanceof L.CircleMarker) map.removeLayer(layer); });
+      }
+
+      let url = '/api/map/visits';
+      if (siteKey) url += `?site=${siteKey}`;
+      
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const data = await r.json();
+
+      data.forEach(v => {
+        let color = v.verdict === 'valid' ? '#10b981' : v.verdict === 'invalid' ? '#f43f5e' : '#f59e0b';
+        L.circleMarker([v.lat, v.lng], {
+          radius: 6,
+          fillColor: color,
+          color: '#fff',
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).addTo(map).bindPopup(`<b>${v.country}</b><br>IP: ${v.ip}<br>Status: ${v.verdict.toUpperCase()}`);
+      });
+    }
+
+    // ---------------- Countries Logic ----------------
+    async function loadCountries() {
+      let url = '/api/reports/countries';
+      if (siteKey) url += `?site=${siteKey}`;
+      const r = await fetch(url);
+      const data = await r.json();
+
+      if (charts.country) charts.country.destroy();
+      
+      const labels = data.map(d => d.name);
+      const totals = data.map(d => d.total);
+      const invalids = data.map(d => d.invalid);
+
+      charts.country = new Chart(document.getElementById('countryChart'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'إجمالي', data: totals, backgroundColor: '#6366f1', borderRadius: 4 },
+            { label: 'بوتات', data: invalids, backgroundColor: '#f43f5e', borderRadius: 4 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#cbd5e1', font: { family: 'Cairo' } } } }, scales: { x: { ticks: { color: '#cbd5e1' } }, y: { ticks: { color: '#cbd5e1' } } } }
+      });
+
+      document.getElementById('countriesTable').innerHTML = data.map(d => `
+        <tr class="hover:bg-white/5">
+          <td class="px-4 py-3 font-bold text-white">${d.name}</td>
+          <td class="px-4 py-3 text-slate-300">${d.total}</td>
+          <td class="px-4 py-3 text-rose-400 font-bold">${d.invalid}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ---------------- Tech Logic ----------------
+    async function loadTech() {
+      let url = '/api/reports/tech';
+      if (siteKey) url += `?site=${siteKey}`;
+      const r = await fetch(url);
+      const data = await r.json();
+
+      if (charts.device) charts.device.destroy();
+      if (charts.browser) charts.browser.destroy();
+
+      charts.device = new Chart(document.getElementById('deviceChart'), {
+        type: 'doughnut',
+        data: {
+          labels: data.devices.map(d => d.name),
+          datasets: [{ data: data.devices.map(d => d.count), backgroundColor: ['#6366f1', '#10b981', '#f59e0b'], borderWidth: 0 }]
+        },
+        options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { family: 'Cairo' } } } } }
+      });
+
+      charts.browser = new Chart(document.getElementById('browserChart'), {
+        type: 'pie',
+        data: {
+          labels: data.browsers.map(d => d.name),
+          datasets: [{ data: data.browsers.map(d => d.count), backgroundColor: ['#6366f1', '#8b5cf6', '#f43f5e', '#10b981', '#f59e0b'], borderWidth: 0 }]
+        },
+        options: { plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { family: 'Cairo' } } } } }
+      });
+    }
+
+    // تشغيل الخريطة تلقائياً في البداية
+    loadMap();
+  </script>
+</body>
+  </html>
