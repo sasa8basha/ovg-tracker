@@ -3,8 +3,9 @@ import httpx
 from urllib.parse import urlparse, parse_qs
 from config import GEO_LOOKUP_TIMEOUT
 from utils import ip_cache, _is_private_ip
-from ua_extract import DeviceDetector
-from identify_browser import identify_browser
+
+# استخدام مكتبة ua-parser المدمجة والمستقرة
+from ua_parser import user_agent_parser
 
 async def get_ip_info(ip: str):
     if not ip or _is_private_ip(ip):
@@ -26,26 +27,21 @@ async def get_ip_info(ip: str):
 
 def parse_ua_advanced(ua: str, headers: dict = None):
     try:
-        # الطريقة الصحيحة للتعامل مع مكتبة ua_extract (ترجع Dictionary)
-        dd = DeviceDetector()
-        parsed = dd.parse(ua)
+        parsed = user_agent_parser.Parse(ua)
         
-        browser_name = parsed.get('client', {}).get('name', 'Unknown')
-        browser_version = parsed.get('client', {}).get('version', 'Unknown')
-        os_name = parsed.get('os', {}).get('name', 'Unknown')
-        os_version = parsed.get('os', {}).get('version', 'Unknown')
-        device_type = parsed.get('device', {}).get('type', 'Desktop')
-        device_brand = parsed.get('device', {}).get('brand', 'Unknown')
-        device_model = parsed.get('device', {}).get('model', 'Unknown')
-
-        # تصحيح إضافي باستخدام Client Hints (للمتصفحات المخفية)
-        sec_ch_ua = headers.get('sec-ch-ua', '') if headers else ''
-        sec_ch_platform = headers.get('sec-ch-ua-platform', '') if headers else ''
-        if sec_ch_ua or sec_ch_platform:
-            hints = identify_browser(ua, sec_ch_ua, sec_ch_platform)
-            if hints.get('name') and hints['name'] != 'Unknown': browser_name = hints['name']
-            if hints.get('version') and hints['version'] != 'Unknown': browser_version = hints['version']
-            if hints.get('platform') and hints['platform'] != 'Unknown': os_name = hints['platform']
+        browser_name = parsed['user_agent']['family'] or 'Unknown'
+        browser_version = parsed['user_agent']['major'] or 'Unknown'
+        os_name = parsed['os']['family'] or 'Unknown'
+        os_version = parsed['os']['major'] or 'Unknown'
+        device_type = parsed['device']['family'] or 'Desktop'
+        
+        # تحسينات بسيطة لبعض الأجهزة
+        if device_type != 'Other':
+            device_brand = device_type.split(' ')[0]
+            device_model = device_type
+        else:
+            device_brand = 'Unknown'
+            device_model = 'Unknown'
 
         return {
             "os": os_name, "os_version": os_version,
