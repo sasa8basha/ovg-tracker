@@ -27,7 +27,7 @@ class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
     site_id = Column(Integer, ForeignKey("sites.id"), index=True, nullable=True)
-    session_id = Column(String, index=True, nullable=True) # جديد: لربط النبضات
+    session_id = Column(String, index=True, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     ip = Column(String, index=True)
     user_agent = Column(String)
