@@ -4,4 +4,3 @@ sqlalchemy
 pydantic
 httpx
 python-multipart
-ua-parser
