@@ -5,9 +5,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from database import Base
 
-# =========================================================
-# MODELS
-# =========================================================
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -30,6 +27,7 @@ class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
     site_id = Column(Integer, ForeignKey("sites.id"), index=True, nullable=True)
+    session_id = Column(String, index=True, nullable=True) # جديد: لربط النبضات
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     ip = Column(String, index=True)
     user_agent = Column(String)
@@ -38,7 +36,6 @@ class VisitModel(Base):
     verdict = Column(String, index=True)
     evidence = Column(JSON)
     
-    # --- حقول الجهاز والمتصفح الدقيقة جداً ---
     os = Column(String, default="Unknown")
     os_version = Column(String, default="Unknown")
     device = Column(String, default="Unknown")
@@ -46,7 +43,6 @@ class VisitModel(Base):
     device_model = Column(String, default="Unknown")
     browser = Column(String, default="Unknown")
     browser_version = Column(String, default="Unknown")
-    # -------------------------------------
 
     country = Column(String, default="Unknown")
     isp = Column(String, default="Unknown")
