@@ -5,103 +5,94 @@
   <title>OVG · تسجيل الدخول</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="/static/css/design-tokens.css">
-  <link rel="stylesheet" href="/static/css/components.css">
-  
   <style>
-    body{font-family:'Cairo',sans-serif}
-    .bg-mesh{background:
-      radial-gradient(at 20% 20%, rgba(99,102,241,.15) 0px, transparent 50%),
-      radial-gradient(at 80% 80%, rgba(168,85,247,.15) 0px, transparent 50%),
-      radial-gradient(at 50% 50%, rgba(59,130,246,.1) 0px, transparent 50%),
-      var(--bg-page);}
-    .card{background:var(--bg-card);border: 1px solid var(--border);}
-    .input{width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:12px;font-size:15px;transition:.15s;background:var(--bg-page);color:var(--text-primary)}
-    .input:focus{outline:none;border-color:var(--primary-500);box-shadow:0 0 0 4px rgba(99,102,241,.2)}
-    .btn{background:linear-gradient(135deg,var(--primary-500),var(--primary-600));color:#fff;padding:13px;border-radius:12px;font-weight:700;width:100%;transition:.15s;box-shadow:0 10px 25px -5px rgba(99,102,241,.5)}
-    .btn:hover{transform:translateY(-1px);box-shadow:0 15px 30px -5px rgba(99,102,241,.6)}
-    .btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
-    .tab{padding:10px;border-radius:10px;font-weight:700;font-size:14px;transition:.15s;color:var(--text-secondary);flex:1;background:transparent;border:none;cursor:pointer}
-    .tab.active{background:rgba(99,102,241,.2);color:var(--primary-500)}
+    body{font-family:'Cairo',sans-serif;background:#0F172A;color:#F1F5F9;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+    .card{background:#1E293B;border:1px solid #334155;border-radius:24px;padding:32px;width:100%;max-width:440px}
+    .input{width:100%;padding:12px 16px;border:1.5px solid #334155;border-radius:12px;font-size:15px;background:#0F172A;color:#F1F5F9;margin-top:6px;box-sizing:border-box;font-family:'Cairo',sans-serif}
+    .input:focus{outline:none;border-color:#6366F1;box-shadow:0 0 0 4px rgba(99,102,241,.15)}
+    .btn{background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;padding:13px;border-radius:12px;font-weight:700;width:100%;border:none;cursor:pointer;font-size:15px;font-family:'Cairo',sans-serif}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .tab{padding:10px;border-radius:10px;font-weight:700;font-size:14px;flex:1;background:transparent;color:#94A3B8;border:none;cursor:pointer;font-family:'Cairo',sans-serif}
+    .tab.active{background:rgba(99,102,241,.2);color:#6366F1}
+    label{font-size:13px;color:#CBD5E1;font-weight:600}
+    .error{background:rgba(244,63,94,.1);color:#F43F5E;padding:10px;border-radius:10px;font-size:13px;text-align:center;border:1px solid rgba(244,63,94,.2)}
   </style>
 </head>
-<body class="bg-mesh min-h-screen flex items-center justify-center p-4">
-  <div class="card w-full max-w-md rounded-3xl shadow-2xl p-8 md:p-10 animate-fade-up">
-    <div class="text-center mb-6">
-      <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/40">
-        <span class="text-4xl">🛡️</span>
-      </div>
-      <h1 class="text-2xl font-extrabold text-white">OVG Tracker</h1>
-      <p class="text-slate-400 text-sm mt-1">منصة تتبع الترافيك ومنع البوتات</p>
+<body>
+  <div class="card">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:36px">🛡️</div>
+      <h1 style="font-size:24px;font-weight:800;margin:0">OVG Tracker</h1>
+      <p style="color:#94A3B8;font-size:13px;margin:6px 0 0">منصة تتبع الترافيك ومنع البوتات</p>
     </div>
 
-    <div class="flex gap-2 mb-6 bg-black/20 p-1 rounded-xl border border-white/5">
-      <button type="button" id="tab-login" class="tab active" onclick="switchTab('login')">تسجيل دخول</button>
-      <button type="button" id="tab-signup" class="tab" onclick="switchTab('signup')">إنشاء حساب</button>
+    <div style="display:flex;gap:8px;margin-bottom:20px;background:rgba(0,0,0,.2);padding:4px;border-radius:12px">
+      <button class="tab active" id="tab-login" onclick="switchTab('login')">تسجيل دخول</button>
+      <button class="tab" id="tab-signup" onclick="switchTab('signup')">إنشاء حساب</button>
     </div>
 
-    <form id="authForm" class="space-y-4" autocomplete="on">
+    <form id="authForm" style="display:flex;flex-direction:column;gap:14px">
       <div>
-        <label class="block text-sm font-semibold text-slate-300 mb-1.5">اسم المستخدم</label>
-        <input name="username" class="input" placeholder="مثال: ahmed" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9_.\-]{3,32}">
-        <p class="text-[11px] text-slate-400 mt-1 hidden" id="userHint">3-32 حرف (إنجليزي، أرقام، _ . -)</p>
+        <label>اسم المستخدم</label>
+        <input name="username" class="input" placeholder="ahmed أو بريدك الإلكتروني" required>
+      </div>
+      <div id="emailWrap" style="display:none">
+        <label>البريد الإلكتروني</label>
+        <input name="email" type="email" class="input" placeholder="you@example.com">
       </div>
       <div>
-        <label class="block text-sm font-semibold text-slate-300 mb-1.5">كلمة المرور</label>
-        <input name="password" type="password" class="input" placeholder="••••••••" autocomplete="current-password" required minlength="6">
+        <label>كلمة المرور</label>
+        <input name="password" type="password" class="input" placeholder="••••••••" required minlength="6">
       </div>
-      <div id="confirmWrap" class="hidden">
-        <label class="block text-sm font-semibold text-slate-300 mb-1.5">تأكيد كلمة المرور</label>
-        <input name="confirm" type="password" class="input" placeholder="••••••••" autocomplete="new-password">
+      <div id="confirmWrap" style="display:none">
+        <label>تأكيد كلمة المرور</label>
+        <input name="confirm" type="password" class="input" placeholder="••••••••">
       </div>
+      <p id="error" class="error" style="display:none"></p>
       <button type="submit" id="submitBtn" class="btn">تسجيل الدخول</button>
-      <p id="error" class="hidden text-rose-400 text-sm text-center font-semibold bg-rose-500/10 py-2.5 rounded-lg border border-rose-500/20"></p>
+      <a href="/forgot-password" style="text-align:center;color:#818CF8;font-size:13px;text-decoration:none;margin-top:4px">نسيت كلمة المرور؟</a>
     </form>
-    <p class="text-center text-xs text-slate-500 mt-8">© OVG Analytics — Session 4.0</p>
   </div>
+
   <script>
     let MODE = 'login';
     function switchTab(m) {
       MODE = m;
       document.getElementById('tab-login').classList.toggle('active', m === 'login');
       document.getElementById('tab-signup').classList.toggle('active', m === 'signup');
-      document.getElementById('confirmWrap').classList.toggle('hidden', m !== 'signup');
-      document.getElementById('userHint').classList.toggle('hidden', m !== 'signup');
+      document.getElementById('emailWrap').style.display = m === 'signup' ? 'block' : 'none';
+      document.getElementById('confirmWrap').style.display = m === 'signup' ? 'block' : 'none';
       document.getElementById('submitBtn').textContent = m === 'signup' ? 'إنشاء حساب' : 'تسجيل الدخول';
-      const pwd = document.querySelector('input[name=password]');
-      pwd.autocomplete = m === 'signup' ? 'new-password' : 'current-password';
-      document.getElementById('error').classList.add('hidden');
+      document.getElementById('error').style.display = 'none';
     }
     document.getElementById('authForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('submitBtn');
       const err = document.getElementById('error');
-      btn.disabled = true; err.classList.add('hidden');
-      const orig = btn.textContent;
-      btn.textContent = 'جاري...';
+      btn.disabled = true; err.style.display = 'none';
+      const orig = btn.textContent; btn.textContent = 'جاري...';
       const fd = new FormData(e.target);
-      const body = { username: (fd.get('username')||'').trim(), password: fd.get('password') };
+      const body = {
+        username: (fd.get('username')||'').trim(),
+        password: fd.get('password'),
+        email: (fd.get('email')||'').trim(),
+      };
       if (MODE === 'signup' && body.password !== fd.get('confirm')) {
-        err.textContent = 'كلمتا المرور غير متطابقتين';
-        err.classList.remove('hidden');
-        btn.disabled = false; btn.textContent = orig;
-        return;
+        err.textContent = 'كلمتا المرور غير متطابقتين'; err.style.display = 'block';
+        btn.disabled = false; btn.textContent = orig; return;
       }
       const url = MODE === 'signup' ? '/api/auth/signup' : '/api/auth/login';
       try {
         const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
         const d = await r.json().catch(()=>({}));
         if (r.ok) { location.href = '/dashboard'; return; }
-        err.textContent = d.detail || 'فشل العملية';
-        err.classList.remove('hidden');
+        err.textContent = d.detail || 'فشل العملية'; err.style.display = 'block';
       } catch(e) {
-        err.textContent = 'خطأ في الاتصال بالسيرفر';
-        err.classList.remove('hidden');
+        err.textContent = 'خطأ في الاتصال بالسيرفر'; err.style.display = 'block';
       } finally {
         btn.disabled = false; btn.textContent = orig;
       }
     });
   </script>
 </body>
-  </html>
+        </html>
