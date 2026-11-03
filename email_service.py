@@ -5,8 +5,6 @@ Pluggable email sender:
   - "console": prints to logs (dev)
   - "smtp":    standard SMTP
   - "resend":  https://resend.com API
-
-All email builders return HTML + plaintext for accessibility.
 """
 import asyncio
 import smtplib
@@ -21,7 +19,6 @@ from config import (
     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_USE_TLS,
     RESEND_API_KEY,
 )
-
 
 # =========================================================
 # LOW-LEVEL SENDERS
@@ -152,12 +149,13 @@ def build_password_reset_email(username: str, reset_url: str) -> tuple[str, str,
 🔒 لو مش إنت اللي طلبت ده، تجاهل الإيميل — كلمة المرور مش هتتغير.
 </p>
 """
+    # تم إضافة الأقواس < > حوالين الرابط عشان نمنع تقطيعه في النص المجرد
     text = f"""OVG Tracker — إعادة تعيين كلمة المرور
 
 أهلاً {username}،
 
 اضغط على الرابط التالي لإنشاء كلمة مرور جديدة:
-{reset_url}
+<{reset_url}>
 
 الرابط صالح لمدة ساعة واحدة فقط.
 
@@ -185,7 +183,7 @@ def build_email_verification_email(username: str, verify_url: str) -> tuple[str,
 أهلاً {username}،
 
 افتح الرابط التالي لتفعيل بريدك:
-{verify_url}
+<{verify_url}>
 
 الرابط صالح لمدة 24 ساعة.
 """
@@ -216,7 +214,7 @@ def build_welcome_email(username: str) -> tuple[str, str, str]:
 
 
 # =========================================================
-# HIGH-LEVEL SENDERS (called by main.py)
+# HIGH-LEVEL SENDERS
 # =========================================================
 async def send_password_reset_email(to: str, username: str, reset_url: str):
     subject, html, text = build_password_reset_email(username, reset_url)
