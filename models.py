@@ -41,6 +41,8 @@ class VisitModel(Base):
     device = Column(String, default="Unknown")
     browser = Column(String, default="Unknown")
     country = Column(String, default="Unknown")
+    # Phase R3 — Fix [R14]: country_code (ISO 2-letter) for accurate grouping
+    country_code = Column(String(2), nullable=True, index=True)
     isp = Column(String, default="Unknown")
     timezone = Column(String, default="Unknown")
     canvas_hash = Column(String, default="Unknown")
@@ -49,12 +51,12 @@ class VisitModel(Base):
     asn = Column(String, default="Unknown")
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
-    
+
     # التحليل السلوكي
     time_on_page = Column(Integer, default=0) # بالملي ثانية
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
-    
+
     # إحداثيات الخريطة
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
@@ -62,4 +64,5 @@ class VisitModel(Base):
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
+        Index("ix_visits_country_code", "country_code"),
     )
