@@ -41,7 +41,7 @@ class VisitModel(Base):
     device = Column(String, default="Unknown")
     browser = Column(String, default="Unknown")
     country = Column(String, default="Unknown")
-    # Phase R3 — Fix [R14]: country_code (ISO 2-letter) for accurate grouping
+    # Phase R3 — Fix [R14]: country_code (ISO 2-letter)
     country_code = Column(String(2), nullable=True, index=True)
     isp = Column(String, default="Unknown")
     timezone = Column(String, default="Unknown")
@@ -64,5 +64,6 @@ class VisitModel(Base):
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
-        Index("ix_visits_country_code", "country_code"),
+        # تم إزالة Index("ix_visits_country_code", "country_code") 
+        # لأن الـ Migration هي اللي مسؤولة عنه في database.py
     )
