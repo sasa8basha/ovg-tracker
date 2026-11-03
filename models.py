@@ -5,16 +5,19 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from database import Base
 
-# =========================================================
-# MODELS
-# =========================================================
+
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    # Phase 5 — Auth System
+    email = Column(String(255), unique=True, nullable=True, index=True)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    token_version = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     sites = relationship("SiteModel", back_populates="user", cascade="all, delete-orphan")
+
 
 class SiteModel(Base):
     __tablename__ = "sites"
@@ -25,6 +28,7 @@ class SiteModel(Base):
     site_key = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("UserModel", back_populates="sites")
+
 
 class VisitModel(Base):
     __tablename__ = "visits"
@@ -41,7 +45,6 @@ class VisitModel(Base):
     device = Column(String, default="Unknown")
     browser = Column(String, default="Unknown")
     country = Column(String, default="Unknown")
-    # Phase R3 — Fix [R14]: country_code (ISO 2-letter)
     country_code = Column(String(2), nullable=True, index=True)
     isp = Column(String, default="Unknown")
     timezone = Column(String, default="Unknown")
@@ -51,19 +54,37 @@ class VisitModel(Base):
     asn = Column(String, default="Unknown")
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
-
-    # التحليل السلوكي
-    time_on_page = Column(Integer, default=0) # بالملي ثانية
+    time_on_page = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
-
-    # إحداثيات الخريطة
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
 
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
-        # تم إزالة Index("ix_visits_country_code", "country_code") 
-        # لأن الـ Migration هي اللي مسؤولة عنه في database.py
     )
+
+
+# =========================================================
+# Phase 5 — Auth Tokens
+# =========================================================
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    ip = Column(String(45), default="")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
