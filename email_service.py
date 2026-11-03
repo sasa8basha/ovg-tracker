@@ -1,32 +1,17 @@
-"""
-email_service.py — Phase 5
-
-Pluggable email sender:
-  - "console": prints to logs (dev)
-  - "smtp":    standard SMTP
-  - "resend":  https://resend.com API
-"""
 import asyncio
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
-
 import httpx
-
 from config import (
     EMAIL_PROVIDER, EMAIL_FROM, EMAIL_FROM_NAME, PUBLIC_URL,
     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_USE_TLS,
     RESEND_API_KEY,
 )
 
-# =========================================================
-# LOW-LEVEL SENDERS
-# =========================================================
 def _send_smtp_sync(to: str, subject: str, html: str, text: str):
-    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        print("⚠️ SMTP not configured — skipping send")
-        return
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS: return
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
@@ -34,193 +19,98 @@ def _send_smtp_sync(to: str, subject: str, html: str, text: str):
         msg["To"] = to
         msg.attach(MIMEText(text, "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
-
         if SMTP_USE_TLS:
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
-                s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(EMAIL_FROM, [to], msg.as_string())
+                s.starttls(); s.login(SMTP_USER, SMTP_PASS); s.sendmail(EMAIL_FROM, [to], msg.as_string())
         else:
             with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as s:
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(EMAIL_FROM, [to], msg.as_string())
-        print(f"✅ SMTP sent to {to}")
-    except Exception as e:
-        print(f"⚠️ SMTP send failed: {e}")
-
+                s.login(SMTP_USER, SMTP_PASS); s.sendmail(EMAIL_FROM, [to], msg.as_string())
+    except Exception as e: print(f"⚠️ SMTP send failed: {e}")
 
 async def _send_resend(to: str, subject: str, html: str, text: str):
-    if not RESEND_API_KEY:
-        print("⚠️ RESEND_API_KEY not set — skipping send")
-        return
+    if not RESEND_API_KEY: return
     try:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.post(
                 "https://api.resend.com/emails",
-                headers={
-                    "Authorization": f"Bearer {RESEND_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "from": f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>",
-                    "to": [to],
-                    "subject": subject,
-                    "html": html,
-                    "text": text,
-                },
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                json={"from": f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>", "to": [to], "subject": subject, "html": html, "text": text},
             )
-            if r.status_code >= 300:
-                print(f"⚠️ Resend error: {r.status_code} {r.text[:200]}")
-            else:
-                print(f"✅ Resend sent to {to}")
-    except Exception as e:
-        print(f"⚠️ Resend exception: {e}")
-
+            if r.status_code >= 300: print(f"⚠️ Resend error: {r.status_code} {r.text[:200]}")
+    except Exception as e: print(f"⚠️ Resend exception: {e}")
 
 async def send_email(to: str, subject: str, html: str, text: str = ""):
-    if not to:
-        return
+    if not to: return
     if EMAIL_PROVIDER == "console":
         print("\n" + "=" * 70)
-        print(f"📧 EMAIL [console]")
-        print(f"To:      {to}")
-        print(f"From:    {EMAIL_FROM_NAME} <{EMAIL_FROM}>")
-        print(f"Subject: {subject}")
-        print("-" * 70)
-        print(text or "(html-only — see file logs)")
+        print(f"📧 EMAIL [console]\nTo: {to}\nFrom: {EMAIL_FROM_NAME} <{EMAIL_FROM}>\nSubject: {subject}\n" + "-" * 70)
+        print(text or "(html-only)")
         print("=" * 70 + "\n")
         return
     if EMAIL_PROVIDER == "smtp":
         await asyncio.to_thread(_send_smtp_sync, to, subject, html, text or html)
-        return
-    if EMAIL_PROVIDER == "resend":
+    elif EMAIL_PROVIDER == "resend":
         await _send_resend(to, subject, html, text or html)
-        return
-    print(f"⚠️ Unknown EMAIL_PROVIDER: {EMAIL_PROVIDER}")
 
-
-# =========================================================
-# HTML TEMPLATE
-# =========================================================
 def _wrap_html(title: str, body_html: str) -> str:
-    return f"""<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{title}</title></head>
-<body style="margin:0;padding:0;background:#0F172A;font-family:Arial,Helvetica,sans-serif;color:#F1F5F9">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#0F172A">
-<tr><td align="center" style="padding:40px 16px">
-<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background:#1E293B;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4)">
-<tr><td style="padding:28px 40px;border-bottom:1px solid #334155;background:#1E293B">
-<div style="font-size:22px;font-weight:800;color:#F1F5F9">🛡️ OVG Tracker</div>
-</td></tr>
+    return f"""<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>{title}</title></head>
+<body style="margin:0;padding:0;background:#0F172A;font-family:Arial,sans-serif;color:#F1F5F9">
+<table width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#0F172A"><tr><td align="center" style="padding:40px 16px">
+<table width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background:#1E293B;border-radius:16px;overflow:hidden">
+<tr><td style="padding:28px 40px;border-bottom:1px solid #334155"><div style="font-size:22px;font-weight:800;">🛡️ OVG Tracker</div></td></tr>
 <tr><td style="padding:36px 40px">{body_html}</td></tr>
-<tr><td style="padding:24px 40px;background:#0F172A;border-top:1px solid #334155;color:#64748B;font-size:12px;line-height:1.6">
-لو مش إنت اللي طلبت ده، تقدر تتجاهل الإيميل بأمان.<br>
-© OVG Tracker · <a href="{PUBLIC_URL}" style="color:#818CF8;text-decoration:none">{PUBLIC_URL}</a>
-</td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>"""
+<tr><td style="padding:24px 40px;background:#0F172A;color:#64748B;font-size:12px;text-align:center">© OVG Tracker</td></tr>
+</table></td></tr></table></body></html>"""
 
-
-def _link_box(url: str) -> str:
-    """صندوق يظهر فيه اللينك كامل وقابل للنسخ أو الضغط"""
-    return f"""<div style="margin:24px 0;padding:16px;background:#0F172A;border:1px dashed #6366F1;border-radius:8px;text-align:center;word-break:break-all;">
-<a href="{url}" target="_blank" style="color:#818CF8;text-decoration:none;font-family:monospace;font-size:14px;display:block;">{url}</a>
-</div>"""
-
-
-# =========================================================
-# EMAIL BUILDERS
-# =========================================================
-def build_password_reset_email(username: str, reset_url: str) -> tuple[str, str, str]:
-    subject = "🔐 إعادة تعيين كلمة المرور — OVG Tracker"
+def build_password_reset_email(username: str, otp: str) -> tuple[str, str, str]:
+    subject = "🔐 كود إعادة تعيين كلمة المرور — OVG Tracker"
     body_html = f"""
-<h1 style="margin:0 0 12px;font-size:22px;color:#F1F5F9">إعادة تعيين كلمة المرور</h1>
-<p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
-<p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">
-وصلنا طلب لإعادة تعيين كلمة المرور على حسابك في OVG Tracker. 
-<br>
-اضغط على اللينك ده أو انسخه بالكامل والصقه في المتصفح:
-</p>
-{_link_box(reset_url)}
-<p style="margin:16px 0 0;font-size:13px;color:#94A3B8;line-height:1.7">
-⏱️ الرابط صالح لمدة <b>ساعة واحدة</b> فقط.<br>
-🔒 لو مش إنت اللي طلبت ده، تجاهل الإيميل — كلمة المرور مش هتتغير.
-</p>
-"""
-    text = f"""OVG Tracker — إعادة تعيين كلمة المرور
-
-أهلاً {username}،
-
-انسخ هذا الرابط بالكامل وضعه في المتصفح:
-{reset_url}
-
-الرابط صالح لمدة ساعة واحدة فقط.
-"""
+    <h1 style="margin:0 0 12px;font-size:22px;color:#F1F5F9">إعادة تعيين كلمة المرور</h1>
+    <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#CBD5E1;line-height:1.7">
+    وصلنا طلب لإعادة تعيين كلمة المرور. استخدم الكود التالي في الصفحة لإكمال العملية:
+    </p>
+    <div style="text-align:center;background:#0F172A;border:1px dashed #6366F1;border-radius:12px;padding:20px;margin:20px 0;">
+        <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#818CF8;font-family:monospace;">{otp}</span>
+    </div>
+    <p style="margin:16px 0 0;font-size:13px;color:#94A3B8;line-height:1.7">
+    ⏱️ الكود صالح لمدة <b>ساعة واحدة</b> فقط.<br>
+    🔒 لو مش إنت اللي طلبت ده، تجاهل الإيميل.
+    </p>
+    """
+    text = f"OVG Tracker\n\nأهلاً {username}،\n\nكود إعادة تعيين كلمة المرور الخاص بك هو:\n\n{otp}\n\nالكود صالح لمدة ساعة واحدة."
     return subject, _wrap_html(subject, body_html), text
-
 
 def build_email_verification_email(username: str, verify_url: str) -> tuple[str, str, str]:
     subject = "✅ فعّل بريدك الإلكتروني — OVG Tracker"
     body_html = f"""
-<h1 style="margin:0 0 12px;font-size:22px;color:#F1F5F9">فعّل بريدك الإلكتروني</h1>
-<p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
-<p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">
-شكرًا لتسجيلك في OVG Tracker! فعّل بريدك دلوقتي عشان نضمن إنك تقدر تستعيد حسابك في أي وقت.
-<br>
-اضغط على اللينك ده أو انسخه بالكامل والصقه في المتصفح:
-</p>
-{_link_box(verify_url)}
-<p style="margin:16px 0 0;font-size:13px;color:#94A3B8;line-height:1.7">
-⏱️ الرابط صالح لمدة 24 ساعة.<br>
-لو مش إنت اللي سجلت، تجاهل الإيميل.
-</p>
-"""
-    text = f"""OVG Tracker — تفعيل البريد الإلكتروني
-
-أهلاً {username}،
-
-انسخ هذا الرابط بالكامل وضعه في المتصفح:
-{verify_url}
-
-الرابط صالح لمدة 24 ساعة.
-"""
+    <h1 style="margin:0 0 12px;font-size:22px;color:#F1F5F9">فعّل بريدك الإلكتروني</h1>
+    <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#CBD5E1;line-height:1.7">شكرًا لتسجيلك! فعّل بريدك دلوقتي لتأمين حسابك.</p>
+    <div style="text-align:center;margin:24px 0;">
+        <a href="{verify_url}" style="background:#10B981;color:#fff;padding:14px 32px;text-decoration:none;border-radius:12px;font-weight:700;">تفعيل البريد</a>
+    </div>
+    """
+    text = f"OVG Tracker\n\nافتح الرابط لتفعيل بريدك:\n{verify_url}"
     return subject, _wrap_html(subject, body_html), text
-
 
 def build_welcome_email(username: str) -> tuple[str, str, str]:
     subject = "🎉 أهلاً بيك في OVG Tracker"
     body_html = f"""
-<h1 style="margin:0 0 12px;font-size:22px;color:#F1F5F9">أهلاً بيك في OVG Tracker</h1>
-<p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
-<p style="margin:0 0 16px;font-size:15px;color:#CBD5E1;line-height:1.7">
-حسابك جاهز. خطوتك التالية: أضف أول موقع ليك وابدأ تتبع الترافيك في دقيقة واحدة.
-</p>
-{_link_box(PUBLIC_URL + "/dashboard")}
-"""
-    text = f"""OVG Tracker — أهلاً بيك!
-
-حسابك جاهز. ابدأ من:
-{PUBLIC_URL}/dashboard
-"""
+    <h1 style="margin:0 0 12px;font-size:22px;color:#F1F5F9">أهلاً بيك في OVG Tracker</h1>
+    <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#CBD5E1;line-height:1.7">حسابك جاهز. أضف أول موقع ليك وابدأ تتبع الترافيك.</p>
+    """
+    text = f"OVG Tracker\n\nحسابك جاهز."
     return subject, _wrap_html(subject, body_html), text
 
-
-# =========================================================
-# HIGH-LEVEL SENDERS
-# =========================================================
-async def send_password_reset_email(to: str, username: str, reset_url: str):
-    subject, html, text = build_password_reset_email(username, reset_url)
+async def send_password_reset_email(to: str, username: str, otp: str):
+    subject, html, text = build_password_reset_email(username, otp)
     await send_email(to, subject, html, text)
-
 
 async def send_email_verification(to: str, username: str, verify_url: str):
     subject, html, text = build_email_verification_email(username, verify_url)
     await send_email(to, subject, html, text)
-
 
 async def send_welcome_email(to: str, username: str):
     subject, html, text = build_welcome_email(username)
