@@ -6,6 +6,7 @@ import secrets
 # CONFIG (Hardcoded for Netrun)
 # =========================================================
 DATABASE_URL       = os.getenv("OVG_DB_URL", "sqlite:///./ovg.db")
+ENV                = os.getenv("OVG_ENV", "prod").lower().strip()  # "dev" enables mock-data
 DASHBOARD_KEY      = "sasa"
 SECRET             = "a3f8b2e1c9d4f7a6b5c8e2d1f4a7b9c3e6d8f1a4b7c9e2d5f8a1b3c6d9e2f4a7"
 ADMIN_USER         = ""
