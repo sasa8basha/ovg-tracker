@@ -19,11 +19,9 @@ Base = declarative_base()
 def migrate_country_code():
     """
     Phase R3 — Fix [R14]: add country_code column if missing.
-
     - آمن على قواعد جديدة (table مش موجود → skip)
     - آمن على قواعد شغالة من قبل (column مش موجود → add)
     - آمن على إعادة التشغيل (column موجود → skip)
-    - الزيارات القديمة: country_code يبقى NULL (fallback to country name في التقارير)
     """
     try:
         insp = inspect(engine)
@@ -36,6 +34,7 @@ def migrate_country_code():
 
         with engine.connect() as conn:
             conn.execute(text("ALTER TABLE visits ADD COLUMN country_code VARCHAR(2)"))
+            # استخدام IF NOT EXISTS يمنع أي خطأ لو الفهرس موجود
             conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_visits_country_code ON visits (country_code)"
             ))
