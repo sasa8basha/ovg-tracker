@@ -125,11 +125,11 @@ def _wrap_html(title: str, body_html: str) -> str:
 </body></html>"""
 
 
-def _btn(url: str, label: str, color: str = "#6366F1") -> str:
-    return f"""<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0">
-<tr><td align="center" style="border-radius:12px;background:{color}">
-<a href="{url}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;border-radius:12px">{label}</a>
-</td></tr></table>"""
+def _link_box(url: str) -> str:
+    """صندوق يظهر فيه اللينك كامل وقابل للنسخ أو الضغط"""
+    return f"""<div style="margin:24px 0;padding:16px;background:#0F172A;border:1px dashed #6366F1;border-radius:8px;text-align:center;word-break:break-all;">
+<a href="{url}" target="_blank" style="color:#818CF8;text-decoration:none;font-family:monospace;font-size:14px;display:block;">{url}</a>
+</div>"""
 
 
 # =========================================================
@@ -141,25 +141,24 @@ def build_password_reset_email(username: str, reset_url: str) -> tuple[str, str,
 <h1 style="margin:0 0 12px;font-size:22px;color:#F1F5F9">إعادة تعيين كلمة المرور</h1>
 <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
 <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">
-وصلنا طلب لإعادة تعيين كلمة المرور على حسابك في OVG Tracker. اضغط على الزر أدناه لإنشاء كلمة مرور جديدة.
+وصلنا طلب لإعادة تعيين كلمة المرور على حسابك في OVG Tracker. 
+<br>
+اضغط على اللينك ده أو انسخه بالكامل والصقه في المتصفح:
 </p>
-{_btn(reset_url, "إعادة تعيين كلمة المرور", "#6366F1")}
+{_link_box(reset_url)}
 <p style="margin:16px 0 0;font-size:13px;color:#94A3B8;line-height:1.7">
 ⏱️ الرابط صالح لمدة <b>ساعة واحدة</b> فقط.<br>
 🔒 لو مش إنت اللي طلبت ده، تجاهل الإيميل — كلمة المرور مش هتتغير.
 </p>
 """
-    # تم إضافة الأقواس < > حوالين الرابط عشان نمنع تقطيعه في النص المجرد
     text = f"""OVG Tracker — إعادة تعيين كلمة المرور
 
 أهلاً {username}،
 
-اضغط على الرابط التالي لإنشاء كلمة مرور جديدة:
-<{reset_url}>
+انسخ هذا الرابط بالكامل وضعه في المتصفح:
+{reset_url}
 
 الرابط صالح لمدة ساعة واحدة فقط.
-
-لو مش إنت اللي طلبت ده، تجاهل الإيميل.
 """
     return subject, _wrap_html(subject, body_html), text
 
@@ -171,8 +170,10 @@ def build_email_verification_email(username: str, verify_url: str) -> tuple[str,
 <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">أهلاً <b style="color:#F1F5F9">{username}</b>،</p>
 <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7">
 شكرًا لتسجيلك في OVG Tracker! فعّل بريدك دلوقتي عشان نضمن إنك تقدر تستعيد حسابك في أي وقت.
+<br>
+اضغط على اللينك ده أو انسخه بالكامل والصقه في المتصفح:
 </p>
-{_btn(verify_url, "تفعيل البريد الإلكتروني", "#10B981")}
+{_link_box(verify_url)}
 <p style="margin:16px 0 0;font-size:13px;color:#94A3B8;line-height:1.7">
 ⏱️ الرابط صالح لمدة 24 ساعة.<br>
 لو مش إنت اللي سجلت، تجاهل الإيميل.
@@ -182,8 +183,8 @@ def build_email_verification_email(username: str, verify_url: str) -> tuple[str,
 
 أهلاً {username}،
 
-افتح الرابط التالي لتفعيل بريدك:
-<{verify_url}>
+انسخ هذا الرابط بالكامل وضعه في المتصفح:
+{verify_url}
 
 الرابط صالح لمدة 24 ساعة.
 """
@@ -198,12 +199,7 @@ def build_welcome_email(username: str) -> tuple[str, str, str]:
 <p style="margin:0 0 16px;font-size:15px;color:#CBD5E1;line-height:1.7">
 حسابك جاهز. خطوتك التالية: أضف أول موقع ليك وابدأ تتبع الترافيك في دقيقة واحدة.
 </p>
-{_btn(PUBLIC_URL + "/dashboard", "اذهب للداشبورد")}
-<ul style="margin:16px 0 0;padding:0 20px;color:#CBD5E1;font-size:14px;line-height:1.9">
-  <li>أضف موقعك من صفحة "المواقع"</li>
-  <li>انسخ كود التتبع وحطه في موقعك</li>
-  <li>شاهد التحليل لحظة بلحظة</li>
-</ul>
+{_link_box(PUBLIC_URL + "/dashboard")}
 """
     text = f"""OVG Tracker — أهلاً بيك!
 
