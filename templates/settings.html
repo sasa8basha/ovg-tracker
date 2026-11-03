@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · الإعدادات</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Cairo',sans-serif;background:#0F172A;color:#F1F5F9;padding:24px}
+    .glass{background:rgba(30,41,59,.7);border:1px solid rgba(255,255,255,.05);border-radius:16px;padding:24px;margin-bottom:20px;max-width:640px;margin-left:auto;margin-right:auto}
+    .input{width:100%;padding:12px 16px;border:1.5px solid #334155;border-radius:12px;font-size:15px;background:#0F172A;color:#F1F5F9;box-sizing:border-box;font-family:'Cairo',sans-serif}
+    .input:focus{outline:none;border-color:#6366F1;box-shadow:0 0 0 4px rgba(99,102,241,.15)}
+    label{font-size:13px;color:#CBD5E1;font-weight:600;display:block;margin-bottom:6px}
+    .btn{background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;padding:11px 22px;border-radius:10px;font-weight:700;border:none;cursor:pointer;font-size:14px;font-family:'Cairo',sans-serif}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .btn-danger{background:#F43F5E}
+    .btn-secondary{background:#334155}
+    h2{font-size:16px;font-weight:800;margin:0 0 16px;color:#F1F5F9}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+    .badge-ok{background:rgba(16,185,129,.15);color:#10B981}
+    .badge-warn{background:rgba(245,158,11,.15);color:#F59E0B}
+    .msg{padding:10px;border-radius:10px;font-size:13px;text-align:center;margin-top:10px;display:none}
+    .msg-ok{background:rgba(16,185,129,.1);color:#10B981;border:1px solid rgba(16,185,129,.3)}
+    .msg-err{background:rgba(244,63,94,.1);color:#F43F5E;border:1px solid rgba(244,63,94,.2)}
+    .back-link{color:#818CF8;text-decoration:none;font-size:14px}
+  </style>
+</head>
+<body>
+  <div style="max-width:640px;margin:0 auto 20px">
+    <a href="/dashboard" class="back-link">← العودة للداشبورد</a>
+    <h1 style="font-size:26px;font-weight:800;margin:12px 0 4px">الإعدادات</h1>
+    <p style="color:#94A3B8;font-size:13px;margin:0">إدارة حسابك وأمانه</p>
+  </div>
+
+  <!-- Profile -->
+  <div class="glass">
+    <h2>📋 المعلومات الشخصية</h2>
+    <div style="margin-bottom:12px">
+      <label>اسم المستخدم</label>
+      <input id="inpUsername" class="input">
+    </div>
+    <div style="margin-bottom:12px">
+      <label>البريد الإلكتروني <span id="verifyBadge"></span></label>
+      <input id="inpEmail" type="email" class="input">
+    </div>
+    <button class="btn" onclick="saveProfile()">حفظ التعديلات</button>
+    <button class="btn btn-secondary" id="resendBtn" onclick="resendVerify()" style="display:none;margin-right:8px">إعادة إرسال رابط التفعيل</button>
+    <p id="profileMsg" class="msg"></p>
+  </div>
+
+  <!-- Change Password -->
+  <div class="glass">
+    <h2>🔒 تغيير كلمة المرور</h2>
+    <div style="margin-bottom:12px">
+      <label>كلمة المرور الحالية</label>
+      <input id="inpCurPw" type="password" class="input">
+    </div>
+    <div style="margin-bottom:12px">
+      <label>كلمة المرور الجديدة</label>
+      <input id="inpNewPw" type="password" class="input">
+    </div>
+    <button class="btn" onclick="changePassword()">تحديث كلمة المرور</button>
+    <p id="pwMsg" class="msg"></p>
+  </div>
+
+  <!-- Sessions -->
+  <div class="glass">
+    <h2>🖥️ الجلسات</h2>
+    <p style="color:#94A3B8;font-size:13px;margin:0 0 12px">تسجيل الخروج من كل الأجهزة التانية (هيتم إبقاء الجهاز الحالي).</p>
+    <button class="btn btn-secondary" onclick="logoutAll()">تسجيل الخروج من باقي الأجهزة</button>
+    <p id="sessMsg" class="msg"></p>
+  </div>
+
+  <!-- Delete Account -->
+  <div class="glass" style="border-color:rgba(244,63,94,.3)">
+    <h2 style="color:#F43F5E">⚠️ حذف الحساب</h2>
+    <p style="color:#94A3B8;font-size:13px;margin:0 0 12px">حذف كل شيء نهائيًا: المواقع، الزيارات، والإعدادات. لا يمكن التراجع.</p>
+    <div style="margin-bottom:12px">
+      <label>كلمة المرور</label>
+      <input id="inpDelPw" type="password" class="input">
+    </div>
+    <div style="margin-bottom:12px">
+      <label>اكتب اسم المستخدم للتأكيد</label>
+      <input id="inpDelUser" class="input">
+    </div>
+    <button class="btn btn-danger" onclick="deleteAccount()">حذف الحساب نهائيًا</button>
+    <p id="delMsg" class="msg"></p>
+  </div>
+
+  <script>
+    function show(el, ok, text) {
+      el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
+      el.textContent = text;
+      el.style.display = 'block';
+    }
+
+    async function loadSettings() {
+      const r = await fetch('/api/settings');
+      if (!r.ok) { location.href = '/'; return; }
+      const d = await r.json();
+      document.getElementById('inpUsername').value = d.username || '';
+      document.getElementById('inpEmail').value = d.email || '';
+      const b = document.getElementById('verifyBadge');
+      if (!d.email) {
+        b.innerHTML = '<span class="badge badge-warn">لا يوجد بريد</span>';
+        document.getElementById('resendBtn').style.display = 'none';
+      } else if (d.email_verified) {
+        b.innerHTML = '<span class="badge badge-ok">✓ مفعّل</span>';
+        document.getElementById('resendBtn').style.display = 'none';
+      } else {
+        b.innerHTML = '<span class="badge badge-warn">غير مفعّل</span>';
+        document.getElementById('resendBtn').style.display = 'inline-block';
+      }
+    }
+
+    async function saveProfile() {
+      const username = document.getElementById('inpUsername').value.trim();
+      const email = document.getElementById('inpEmail').value.trim();
+      const msg = document.getElementById('profileMsg');
+      const r = await fetch('/api/settings/profile', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username, email })
+      });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) {
+        show(msg, true, 'تم حفظ التعديلات ✅');
+        loadSettings();
+      } else {
+        show(msg, false, d.detail || 'فشل الحفظ');
+      }
+    }
+
+    async function resendVerify() {
+      const msg = document.getElementById('profileMsg');
+      const r = await fetch('/api/auth/resend-verification', { method: 'POST' });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) show(msg, true, d.message || 'تم الإرسال');
+      else show(msg, false, d.detail || 'فشل الإرسال');
+    }
+
+    async function changePassword() {
+      const current_password = document.getElementById('inpCurPw').value;
+      const new_password = document.getElementById('inpNewPw').value;
+      const msg = document.getElementById('pwMsg');
+      const r = await fetch('/api/settings/change-password', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ current_password, new_password })
+      });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) { show(msg, true, d.message); document.getElementById('inpCurPw').value = ''; document.getElementById('inpNewPw').value = ''; }
+      else show(msg, false, d.detail || 'فشل التحديث');
+    }
+
+    async function logoutAll() {
+      const msg = document.getElementById('sessMsg');
+      const r = await fetch('/api/settings/logout-all', { method: 'POST' });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) show(msg, true, d.message || 'تم تسجيل الخروج من باقي الأجهزة');
+      else show(msg, false, d.detail || 'فشل');
+    }
+
+    async function deleteAccount() {
+      if (!confirm('هل أنت متأكد تمامًا؟ كل البيانات هتتحذف نهائيًا!')) return;
+      const password = document.getElementById('inpDelPw').value;
+      const confirmName = document.getElementById('inpDelUser').value.trim();
+      const msg = document.getElementById('delMsg');
+      const r = await fetch('/api/settings/account', {
+        method: 'DELETE', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ password, confirm: confirmName })
+      });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) { location.href = '/'; }
+      else show(msg, false, d.detail || 'فشل الحذف');
+    }
+
+    loadSettings();
+  </script>
+</body>
+</html>
