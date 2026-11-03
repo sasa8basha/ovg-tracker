@@ -9,6 +9,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+
 def _safe_alter(conn, sql: str, label: str):
     try:
         conn.execute(text(sql))
@@ -17,10 +18,13 @@ def _safe_alter(conn, sql: str, label: str):
     except Exception as e:
         print(f"⚠️ Migration '{label}' skipped: {e}")
 
+
 def migrate_auth_columns():
+    """Phase 5 — adds email, email_verified, token_version to users."""
     try:
         insp = inspect(engine)
-        if "users" not in insp.get_table_names(): return
+        if "users" not in insp.get_table_names():
+            return
         cols = [c["name"] for c in insp.get_columns("users")]
         with engine.connect() as conn:
             if "email" not in cols:
@@ -33,37 +37,28 @@ def migrate_auth_columns():
     except Exception as e:
         print(f"⚠️ migrate_auth_columns skipped: {e}")
 
+
 def migrate_country_code():
     try:
         insp = inspect(engine)
-        if "visits" not in insp.get_table_names(): return
+        if "visits" not in insp.get_table_names():
+            return
         cols = [c["name"] for c in insp.get_columns("visits")]
-        if "country_code" in cols: return
+        if "country_code" in cols:
+            return
         with engine.connect() as conn:
             conn.execute(text("ALTER TABLE visits ADD COLUMN country_code VARCHAR(2)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_visits_country_code ON visits (country_code)"))
             conn.commit()
         print("✅ Migration: added visits.country_code column")
     except Exception as e:
-        print(f"⚠️ migrate_country_code skipped: {e}")
+        print(f"⚠️ Migration skipped: {e}")
 
-def migrate_phase_a():
-    try:
-        insp = inspect(engine)
-        if "visits" not in insp.get_table_names(): return
-        cols = [c["name"] for c in insp.get_columns("visits")]
-        with engine.connect() as conn:
-            if "behavior_data" not in cols:
-                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN behavior_data JSON", "visits.behavior_data")
-            if "raw_mouse_path" not in cols:
-                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN raw_mouse_path JSON", "visits.raw_mouse_path")
-    except Exception as e:
-        print(f"⚠️ migrate_phase_a skipped: {e}")
 
 def run_migrations():
     migrate_auth_columns()
     migrate_country_code()
-    migrate_phase_a()
+
 
 def get_db():
     db = SessionLocal()
