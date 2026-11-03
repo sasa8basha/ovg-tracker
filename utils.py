@@ -1,9 +1,17 @@
+"""
+utils.py — OVG Tracker
+
+Phase R2 — Performance:
+  [R11] TTLCache: add invalidate(), invalidate_prefix(), clear()
+        + stats_cache instance (15s TTL for /api/stats)
+"""
 import time
 import ipaddress
 from collections import OrderedDict
 from urllib.parse import urlparse
 from fastapi import HTTPException, Request
 from config import TRACK_RATE_PER_MIN, GEO_CACHE_MAX, GEO_CACHE_TTL, PUBLIC_URL
+
 
 class TTLCache:
     def __init__(self, maxsize: int = 10000, ttl: int = 3600):
@@ -27,6 +35,24 @@ class TTLCache:
         while len(self._data) > self.maxsize:
             self._data.popitem(last=False)
 
+    # =========================================================
+    # Phase R2 — Fix [R11]: cache invalidation helpers
+    # =========================================================
+    def invalidate(self, key):
+        """Remove a specific key from cache (used on new visit / delete site)."""
+        self._data.pop(key, None)
+
+    def invalidate_prefix(self, prefix):
+        """Remove all keys starting with prefix."""
+        for k in list(self._data.keys()):
+            if k.startswith(prefix):
+                del self._data[k]
+
+    def clear(self):
+        """Remove all cache entries."""
+        self._data.clear()
+
+
 class WindowRateLimiter:
     def __init__(self, max_req=120, window=60, maxsize=100000):
         self.max_req, self.window, self.maxsize = max_req, window, maxsize
@@ -47,10 +73,23 @@ class WindowRateLimiter:
             raise HTTPException(status_code=429, detail="محاولات كتير — جرب بعد شوية",
                                 headers={"Retry-After": str(self.window)})
 
+
+# =========================================================
+# CACHE INSTANCES
+# =========================================================
 ip_cache = TTLCache(maxsize=GEO_CACHE_MAX, ttl=GEO_CACHE_TTL)
+
+# Phase R2 — Fix [R11]: stats cache for /api/stats (15s TTL)
+# - Cache hit → 1 query (site resolve only) or 0 (user-level)
+# - Cache miss → 3 queries (site resolve + aggregate + recent)
+# - Without cache → 6 queries per request
+stats_cache = TTLCache(maxsize=1000, ttl=15)
+
+# Rate limiters (unchanged)
 track_limiter = WindowRateLimiter(max_req=TRACK_RATE_PER_MIN, window=60)
 signup_limiter = WindowRateLimiter(max_req=5, window=300)
 login_limiter = WindowRateLimiter(max_req=15, window=300)
+
 
 def _is_private_ip(ip: str) -> bool:
     try:
@@ -58,6 +97,7 @@ def _is_private_ip(ip: str) -> bool:
         return a.is_private or a.is_loopback or a.is_link_local or a.is_reserved
     except ValueError:
         return False
+
 
 def get_client_ip(request: Request) -> str:
     cf = request.headers.get("cf-connecting-ip")
@@ -75,6 +115,7 @@ def get_client_ip(request: Request) -> str:
     if xri and xri.strip():
         return xri.strip()
     return request.client.host if request.client else "0.0.0.0"
+
 
 def safe_origin(request: Request) -> str:
     origin = PUBLIC_URL
