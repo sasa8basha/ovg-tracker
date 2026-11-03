@@ -15,13 +15,19 @@
     .row-invalid { border-right-color: var(--invalid); }
     .row-suspicious { border-right-color: var(--suspicious); }
     .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+    .date-input, .select-input { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 10px; font-size: 14px; font-family: 'Cairo', sans-serif; }
+    .date-input:focus, .select-input:focus { outline: none; border-color: var(--primary-500); }
+    .filter-indicator { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: rgba(99,102,241,0.2); color: #a5b4fc; }
   </style>
 </head>
 <body class="min-h-screen p-6">
   <div class="max-w-7xl mx-auto">
-    <div class="flex justify-between items-center mb-8">
+    <div class="flex justify-between items-center mb-6">
       <div>
-        <h1 class="text-3xl font-extrabold text-white">سجل الزيارات</h1>
+        <h1 class="text-3xl font-extrabold text-white flex items-center gap-3">
+          سجل الزيارات
+          <span id="activeFilters" class="hidden text-xs"></span>
+        </h1>
         <p class="text-slate-400 text-sm mt-1">تحليل دقيق لكل زيارة لتحسين الأربتراج والـ CPM</p>
       </div>
       <div class="flex gap-3">
@@ -32,15 +38,39 @@
       </div>
     </div>
 
-    <div class="glass rounded-2xl p-4 mb-6 flex gap-4 flex-wrap">
-      <select id="filterVerdict" class="bg-black/20 border border-white/10 text-white rounded-xl px-4 py-2 outline-none text-sm" onchange="loadVisits(1)">
-        <option value="">كل الأحكام</option>
-        <option value="valid">سليم (Valid)</option>
-        <option value="invalid">بوت (Invalid)</option>
-        <option value="suspicious">مشبوه (Suspicious)</option>
-      </select>
-      <div class="flex-1"></div>
-      <div class="text-slate-400 text-sm flex items-center">إجمالي الزيارات: <span id="totalCount" class="text-white font-bold mr-2">0</span></div>
+    <!-- Phase R4 — Filters bar (applies to table + export) -->
+    <div class="glass rounded-2xl p-4 mb-6 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 mb-1">الحكم</label>
+        <select id="filterVerdict" class="select-input w-full" onchange="applyFilters()">
+          <option value="">كل الأحكام</option>
+          <option value="valid">سليم</option>
+          <option value="invalid">بوت</option>
+          <option value="suspicious">مشبوه</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 mb-1">Zone</label>
+        <input type="text" id="filterZone" class="date-input w-full" placeholder="اختياري" onkeydown="if(event.key==='Enter')applyFilters()">
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 mb-1">📅 من</label>
+        <input type="date" id="filterFrom" class="date-input w-full" onchange="applyFilters()">
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 mb-1">📅 إلى</label>
+        <input type="date" id="filterTo" class="date-input w-full" onchange="applyFilters()">
+      </div>
+      <div class="flex gap-2">
+        <button onclick="clearFilters()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-xl font-bold text-sm transition">مسح</button>
+      </div>
+    </div>
+
+    <div class="glass rounded-2xl p-4 mb-4 flex justify-between items-center">
+      <div class="text-slate-400 text-sm">
+        إجمالي: <span id="totalCount" class="text-white font-bold">0</span>
+      </div>
+      <div id="pageInfo" class="text-slate-400 text-sm">صفحة 1</div>
     </div>
 
     <div class="glass rounded-2xl overflow-hidden shadow-2xl">
@@ -51,8 +81,9 @@
               <th class="px-4 py-4">رقم الزيارة</th>
               <th class="px-4 py-4">الوقت</th>
               <th class="px-4 py-4">IP / الدولة</th>
+              <th class="px-4 py-4">Zone</th>
               <th class="px-4 py-4 text-center">مدة المكوث</th>
-              <th class="px-4 py-4 text-center">تفاعل (نقرات/سكرول)</th>
+              <th class="px-4 py-4 text-center">تفاعل</th>
               <th class="px-4 py-4 text-center">Score</th>
               <th class="px-4 py-4 text-center">الحكم</th>
               <th class="px-4 py-4"></th>
@@ -62,10 +93,10 @@
         </table>
       </div>
     </div>
-    
+
     <div class="flex justify-between items-center mt-6">
       <button id="prevBtn" onclick="loadVisits(currentPage - 1)" class="btn-ghost border border-slate-700 text-sm disabled:opacity-30">الصفحة السابقة</button>
-      <span id="pageInfo" class="text-slate-400 text-sm">صفحة 1</span>
+      <span id="pageIndicator" class="text-slate-400 text-sm">صفحة 1</span>
       <button id="nextBtn" onclick="loadVisits(currentPage + 1)" class="btn-ghost border border-slate-700 text-sm disabled:opacity-30">الصفحة التالية</button>
     </div>
   </div>
@@ -74,32 +105,94 @@
     const siteKey = new URL(location.href).searchParams.get('site');
     let currentPage = 1;
 
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function getFilters() {
+      return {
+        verdict: document.getElementById('filterVerdict').value || '',
+        zone: document.getElementById('filterZone').value.trim() || '',
+        from: document.getElementById('filterFrom').value || '',
+        to: document.getElementById('filterTo').value || '',
+      };
+    }
+
+    function filtersActive(f) {
+      return !!(f.verdict || f.zone || f.from || f.to);
+    }
+
+    function updateFilterIndicator(f) {
+      const ind = document.getElementById('activeFilters');
+      const parts = [];
+      if (f.verdict) parts.push(f.verdict);
+      if (f.zone) parts.push(`zone:${f.zone}`);
+      if (f.from) parts.push(`من ${f.from}`);
+      if (f.to) parts.push(`إلى ${f.to}`);
+      if (parts.length) {
+        ind.className = 'filter-indicator';
+        ind.textContent = '🔍 ' + parts.join(' · ');
+        ind.classList.remove('hidden');
+      } else {
+        ind.classList.add('hidden');
+      }
+    }
+
+    // Phase R4 — Filter state
+    function applyFilters() {
+      currentPage = 1;
+      loadVisits(1);
+    }
+
+    function clearFilters() {
+      document.getElementById('filterVerdict').value = '';
+      document.getElementById('filterZone').value = '';
+      document.getElementById('filterFrom').value = '';
+      document.getElementById('filterTo').value = '';
+      applyFilters();
+    }
+
+    // Phase R4 — Export with filters
     function exportData() {
-      let url = `/api/export/visits`;
-      if (siteKey) url += `?site=${siteKey}`;
-      window.location.href = url;
+      const f = getFilters();
+      const params = new URLSearchParams();
+      if (siteKey) params.set('site', siteKey);
+      if (f.verdict) params.set('verdict', f.verdict);
+      if (f.zone) params.set('zone', f.zone);
+      if (f.from) params.set('from_date', f.from);
+      if (f.to) params.set('to_date', f.to);
+      window.location.href = '/api/export/visits?' + params.toString();
     }
 
     async function loadVisits(page) {
       if (page < 1) return;
-      const verdict = document.getElementById('filterVerdict').value;
-      let url = `/api/visits?page=${page}&per_page=20`;
-      if (siteKey) url += `&site=${siteKey}`;
-      if (verdict) url += `&verdict=${verdict}`;
 
-      const r = await fetch(url);
+      const f = getFilters();
+      const params = new URLSearchParams();
+      params.set('page', page);
+      params.set('per_page', 20);
+      if (siteKey) params.set('site', siteKey);
+      if (f.verdict) params.set('verdict', f.verdict);
+      if (f.zone) params.set('zone', f.zone);
+      if (f.from) params.set('from_date', f.from);
+      if (f.to) params.set('to_date', f.to);
+
+      const r = await fetch('/api/visits?' + params.toString());
       if (!r.ok) return;
       const d = await r.json();
-      
-      currentPage = d.page;
-      document.getElementById('totalCount').textContent = d.total;
+
+      currentPage = d.page || page;
+      document.getElementById('totalCount').textContent = d.total || 0;
       document.getElementById('pageInfo').textContent = `صفحة ${d.page} من ${d.pages || 1}`;
+      document.getElementById('pageIndicator').textContent = `صفحة ${d.page} / ${d.pages || 1}`;
       document.getElementById('prevBtn').disabled = d.page <= 1;
       document.getElementById('nextBtn').disabled = d.page >= d.pages;
 
+      updateFilterIndicator(f);
+
       const tb = document.getElementById('visitsTable');
       if (!d.items.length) {
-        tb.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-500">لا توجد زيارات مطابقة</td></tr>`;
+        tb.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-500">لا توجد زيارات مطابقة${filtersActive(f) ? ' للفلاتر' : ''}</td></tr>`;
         return;
       }
 
@@ -107,14 +200,16 @@
         const badgeClass = v.verdict === 'valid' ? 'bg-emerald-500/10 text-emerald-400' : v.verdict === 'invalid' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400';
         const rowClass = v.verdict === 'valid' ? 'row-valid' : v.verdict === 'invalid' ? 'row-invalid' : 'row-suspicious';
         const scoreColor = v.score > 80 ? 'text-rose-400' : v.score > 40 ? 'text-amber-400' : 'text-emerald-400';
-        
+        const cLabel = v.country_code ? `${esc(v.country_code)} · ${esc(v.country)}` : esc(v.country);
+
         return `<tr class="table-row ${rowClass} cursor-pointer hover:bg-white/5" onclick="window.location.href='/visits/${v.id}'">
           <td class="px-4 py-4 font-mono text-indigo-300 text-xs">#${v.id}</td>
-          <td class="px-4 py-4 text-slate-400 text-xs font-mono">${v.time}</td>
+          <td class="px-4 py-4 text-slate-400 text-xs font-mono">${esc(v.time)}</td>
           <td class="px-4 py-4 text-xs">
-            <div class="font-bold text-white">${v.ip}</div>
-            <div class="text-slate-500">${v.country} · ${v.browser}</div>
+            <div class="font-bold text-white font-mono">${esc(v.ip)}</div>
+            <div class="text-slate-500">${cLabel} · ${esc(v.browser)}</div>
           </td>
+          <td class="px-4 py-4 font-mono text-xs text-slate-300">${esc(v.zone)}</td>
           <td class="px-4 py-4 text-center">
             <span class="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-mono text-xs">${v.time_on_page}s</span>
           </td>
@@ -131,5 +226,4 @@
     loadVisits(1);
   </script>
 </body>
-    </html>
-                                               
+  </html>
