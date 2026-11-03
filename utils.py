@@ -1,13 +1,3 @@
-"""
-utils.py — OVG Tracker
-
-Phase R2 — Performance:
-  [R11] TTLCache: add invalidate(), invalidate_prefix(), clear()
-        + stats_cache instance (15s TTL for /api/stats)
-
-Phase R3 — Data Quality:
-  [R15] zone_evidence_cache (60s TTL for top_evidence per zone)
-"""
 import time
 import ipaddress
 from collections import OrderedDict
@@ -71,17 +61,20 @@ class WindowRateLimiter:
                                 headers={"Retry-After": str(self.window)})
 
 
-# =========================================================
-# CACHE INSTANCES
-# =========================================================
+# Caches
 ip_cache = TTLCache(maxsize=GEO_CACHE_MAX, ttl=GEO_CACHE_TTL)
-stats_cache = TTLCache(maxsize=1000, ttl=15)                # Phase R2 [R11]
-zone_evidence_cache = TTLCache(maxsize=500, ttl=60)         # Phase R3 [R15]
+stats_cache = TTLCache(maxsize=1000, ttl=15)
+zone_evidence_cache = TTLCache(maxsize=500, ttl=60)
 
-# Rate limiters
+# Rate limiters (existing)
 track_limiter = WindowRateLimiter(max_req=TRACK_RATE_PER_MIN, window=60)
 signup_limiter = WindowRateLimiter(max_req=5, window=300)
 login_limiter = WindowRateLimiter(max_req=15, window=300)
+
+# Rate limiters (Phase 5 — Auth)
+forgot_password_limiter = WindowRateLimiter(max_req=3, window=900)   # 3 / 15 min
+reset_password_limiter = WindowRateLimiter(max_req=5, window=900)    # 5 / 15 min
+verify_resend_limiter = WindowRateLimiter(max_req=3, window=900)     # 3 / 15 min
 
 
 def _is_private_ip(ip: str) -> bool:
