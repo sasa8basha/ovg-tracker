@@ -71,6 +71,7 @@
   // ============ ICONS ============
   const ICON = {
     dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+    live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="6" opacity="0.6"/><circle cx="12" cy="12" r="10" opacity="0.3"/></svg>',
     radar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><path d="M12 2 L12 8"/></svg>',
     visits: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
     labeling: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
@@ -95,6 +96,7 @@
     ar: [
       { group: 'التحليل', items: [
         { id: 'dashboard', label: 'لوحة التحكم', icon: 'dashboard', href: '/dashboard' },
+        { id: 'live',      label: 'Live Monitor', icon: 'live',      href: '/live', needsSite: true },
         { id: 'radar',     label: 'Radar',        icon: 'radar',     href: '/radar' },
         { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/visits', needsSite: true },
         { id: 'labeling',  label: 'المراجعة',     icon: 'labeling',  href: '/labeling', badge: 'labeling' },
@@ -112,6 +114,7 @@
     en: [
       { group: 'Analyze', items: [
         { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
+        { id: 'live',      label: 'Live Monitor', icon: 'live', href: '/live', needsSite: true },
         { id: 'radar',     label: 'Radar',     icon: 'radar',     href: '/radar' },
         { id: 'visits',    label: 'Visits',    icon: 'visits',    href: '/visits', needsSite: true },
         { id: 'labeling',  label: 'Labeling',  icon: 'labeling',  href: '/labeling', badge: 'labeling' },
@@ -167,10 +170,14 @@
         const badgeHtml = it.badge
           ? `<span class="sh-nav-badge" data-badge="${esc(it.badge)}" style="display:none;">0</span>`
           : '';
+        // Special "LIVE" indicator for the live nav item
+        const livePulse = it.id === 'live'
+          ? '<span class="sh-nav-live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#F43F5E;margin-right:6px;box-shadow:0 0 6px #F43F5E;animation:sh-live-pulse 1.5s ease-in-out infinite;"></span>'
+          : '';
         itemsHtml += `
           <a href="${esc(href)}" class="sh-nav-item ${isActive}" style="${style}" data-nav="${esc(it.id)}">
             ${ICON[it.icon] || ''}
-            <span class="label">${esc(it.label)}</span>
+            <span class="label">${livePulse}${esc(it.label)}</span>
             ${badgeHtml}
           </a>`;
       });
@@ -773,6 +780,19 @@
         </div>
         ${buildMobileNav()}
       </div>`;
+
+    // Inject the live pulse animation keyframes (once)
+    if (!document.getElementById('shLiveKeyframes')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'shLiveKeyframes';
+      styleEl.textContent = `
+        @keyframes sh-live-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.75); }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
 
     const cmdWrapper = document.createElement('div');
     cmdWrapper.innerHTML = buildCmdPalette();
