@@ -20,6 +20,7 @@ from routers import (
     zones_analytics as zones_analytics_router,
     radar as radar_router,
     zone_actions as zone_actions_router,
+    live as live_router,
     pages as pages_router,
 )
 
@@ -27,7 +28,7 @@ Base.metadata.create_all(bind=engine)
 run_migrations()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="5.5")
+app = FastAPI(title="OVG Tracker", version="5.6")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if ALLOWED_ORIGINS == ["*"]:
@@ -58,4 +59,5 @@ app.include_router(data_quality_router.router, prefix="/api", tags=["data-qualit
 app.include_router(zones_analytics_router.router, prefix="/api", tags=["zones-analytics"])
 app.include_router(radar_router.router, prefix="/api", tags=["radar"])
 app.include_router(zone_actions_router.router, prefix="/api", tags=["zone-actions"])
+app.include_router(live_router.router, prefix="/api", tags=["live"])
 app.include_router(pages_router.router, tags=["pages"])
