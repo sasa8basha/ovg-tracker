@@ -78,7 +78,7 @@ def get_stats(site: str = Query(None), user: UserModel = Depends(current_user),
 def get_visits(
     site: str = Query(None), verdict: str = Query(None), country: str = Query(None),
     zone: str = Query(None), from_date: str = Query(None), to_date: str = Query(None),
-    page: int = Query(1, ge=1), per_page: int = Query(20, ge=10, le=100),
+    page: int = Query(1, ge=1), per_page: int = Query(20, ge=1, le=100),
     cursor: int = Query(None),
     user: UserModel = Depends(current_user), db: Session = Depends(get_db),
 ):
@@ -129,6 +129,7 @@ def get_visits(
         "device": v.device, "browser": v.browser,
         "time_on_page": round(v.time_on_page / 1000, 1) if v.time_on_page else 0,
         "clicks": v.clicks, "scrolls": v.scrolls,
+        "ground_truth": v.ground_truth,
     } for v in visits]
     return {"items": items, "total": total, "page": page,
             "pages": pages, "next_cursor": next_cursor}
@@ -229,4 +230,4 @@ def export_visits(
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-store",
         },
-        )
+                  )
