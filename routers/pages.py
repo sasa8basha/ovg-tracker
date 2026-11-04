@@ -122,6 +122,16 @@ def zone_analytics_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(read_template("zone_analytics.html"))
 
 
+# =========================================================
+# v8 — The Radar page
+# =========================================================
+@router.get("/radar", response_class=HTMLResponse)
+def radar_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("radar.html"))
+
+
 @router.get("/api/_debug/stats")
 def debug_stats(user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
     total_visits = db.query(VisitModel).count()
@@ -190,4 +200,4 @@ def generate_mock(site: str = Query(None), user: UserModel = Depends(current_use
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "5.3"}
+    return {"status": "ok", "version": "5.4"}
