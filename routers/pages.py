@@ -7,9 +7,7 @@ from fastapi import APIRouter, Depends, Request, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from config import (
-    DASHBOARD_KEY, SESSION_COOKIE, SESSION_TTL, ENV,
-)
+from config import DASHBOARD_KEY, SESSION_COOKIE, SESSION_TTL, ENV
 from database import get_db
 from models import UserModel, SiteModel, VisitModel
 from auth import _optional_user, current_user, make_token, consume_email_verification_token
@@ -103,9 +101,27 @@ def smart_reports_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(read_template("smart_reports.html"))
 
 
-# =========================================================
-# DEBUG / DIAGNOSTIC / MOCK
-# =========================================================
+@router.get("/labeling", response_class=HTMLResponse)
+def labeling_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("labeling.html"))
+
+
+@router.get("/data-quality", response_class=HTMLResponse)
+def data_quality_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("data_quality.html"))
+
+
+@router.get("/zone-analytics", response_class=HTMLResponse)
+def zone_analytics_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("zone_analytics.html"))
+
+
 @router.get("/api/_debug/stats")
 def debug_stats(user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
     total_visits = db.query(VisitModel).count()
@@ -128,7 +144,8 @@ def debug_stats(user: UserModel = Depends(current_user), db: Session = Depends(g
         "recent_visits": [
             {"id": v.id, "site_id": v.site_id,
              "ts": v.timestamp.isoformat() if v.timestamp else None,
-             "verdict": v.verdict, "score": v.score}
+             "verdict": v.verdict, "score": v.score,
+             "ground_truth": v.ground_truth}
             for v in recent
         ],
     }
@@ -156,7 +173,8 @@ def generate_mock(site: str = Query(None), user: UserModel = Depends(current_use
         db.add(VisitModel(
             site_id=s.id, ip="127.0.0.1", user_agent="Mock",
             zone_id=random.choice(zones), score=sc, verdict=v,
-            evidence=["Mock Data"], country=cn, country_code=cc,
+            evidence=[{"code": "MOCK_SIGNAL", "severity": "low", "score": 0, "detail": "Mock"}],
+            country=cn, country_code=cc,
             isp="Mock ISP", connection_type="residential",
             time_on_page=random.randint(1000, 15000),
             clicks=random.randint(0, 5), scrolls=random.randint(0, 10),
@@ -172,4 +190,4 @@ def generate_mock(site: str = Query(None), user: UserModel = Depends(current_use
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "5.1"}
+    return {"status": "ok", "version": "5.3"}
