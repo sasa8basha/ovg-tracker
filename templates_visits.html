@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · الزيارات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body {
+      font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif;
+      color: #CBD5E1;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+
+    .db-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+      background: #08090D; color: #7B8496;
+      font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 13px;
+      z-index: 9998;
+    }
+    .db-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%;
+      animation: db-spin 0.8s linear infinite;
+    }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    /* ============ HEADER ============ */
+    .dv-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .dv-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #F8FAFC;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+    .dv-sub {
+      font-size: 12px;
+      color: #7B8496;
+      margin-top: 4px;
+    }
+    .dv-header-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ============ FILTERS ============ */
+    .dv-filters {
+      background: #0F1117;
+      border: 1px solid #232734;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+      gap: 8px;
+      align-items: end;
+    }
+    @media (max-width: 1100px) {
+      .dv-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
+    }
+    @media (max-width: 700px) {
+      .dv-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .dv-filter-field { min-width: 0; }
+    .dv-filter-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      color: #4A5263;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .dv-input {
+      width: 100%;
+      height: 32px;
+      padding: 0 10px;
+      background: #08090D;
+      border: 1px solid #232734;
+      border-radius: 6px;
+      color: #F8FAFC;
+      font-family: inherit;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 120ms;
+    }
+    .dv-input:focus {
+      border-color: #7C5CFF;
+      box-shadow: 0 0 0 3px rgba(124,92,255,0.12);
+    }
+    select.dv-input {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237B8496' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+    body.ar select.dv-input {
+      background-position: left 10px center;
+      padding-right: 10px;
+      padding-left: 28px;
+    }
+    .dv-filter-actions { display: flex; gap: 6px; }
+
+    /* ============ BULK BAR ============ */
+    .dv-bulk {
+      position: sticky;
+      top: 0;
+      z-index: 15;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #1C1F2E 0%, #161822 100%);
+      border: 1px solid #7C5CFF;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 16px rgba(124, 92, 255, 0.15);
+      animation: dv-bulk-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .dv-bulk.is-open { display: flex; }
+    @keyframes dv-bulk-in {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .dv-bulk-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 800;
+      color: #F8FAFC;
+    }
+    .dv-bulk-count .num {
+      color: #9B80FF;
+    }
+    .dv-bulk-actions { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+    .dv-bulk-hint {
+      font-size: 11px;
+      color: #7B8496;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ============ TABLE ============ */
+    .dv-table-wrap {
+      background: #0F1117;
+      border: 1px solid #232734;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .dv-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+    }
+    .dv-thead {
+      background: rgba(0,0,0,0.3);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .dv-thead th {
+      padding: 10px 8px;
+      text-align: right;
+      font-size: 10px;
+      font-weight: 700;
+      color: #4A5263;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #1A1D29;
+      white-space: nowrap;
+    }
+    body.ar .dv-thead th { text-align: right; }
+    .dv-thead th.center { text-align: center; }
+    .dv-thead th.checkbox-cell { width: 32px; }
+
+    .dv-row { transition: background 100ms; cursor: pointer; }
+    .dv-row:hover { background: #161822; }
+    .dv-row.selected { background: rgba(124,92,255,0.08); }
+    .dv-row.checked { background: rgba(124,92,255,0.12); }
+
+    .dv-row td {
+      padding: 8px;
+      border-bottom: 1px solid #1A1D29;
+      vertical-align: middle;
+    }
+    .dv-row:last-child td { border-bottom: none; }
+    .dv-row td.checkbox-cell {
+      width: 32px;
+      padding: 8px 8px 8px 12px;
+    }
+
+    .dv-checkbox {
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      accent-color: #7C5CFF;
+    }
+
+    .dv-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #9B80FF;
+      font-weight: 700;
+    }
+    .dv-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: #7B8496;
+    }
+    .dv-ip-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .dv-ip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #F8FAFC;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 140px;
+    }
+    .dv-country {
+      font-size: 10px;
+      color: #7B8496;
+    }
+    .dv-zone {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #F8FAFC;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #161822;
+      display: inline-block;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: background 120ms;
+    }
+    .dv-zone:hover { background: #1C1F2E; }
+    .dv-badge-sm {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .dv-badge-sm.time-badge {
+      background: rgba(59,130,246,0.12);
+      color: #93C5FD;
+    }
+    .dv-interaction {
+      font-size: 10px;
+      color: #7B8496;
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+    }
+    .dv-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .dv-verdict-cell { text-align: center; }
+
+    .dv-actions-cell {
+      width: 100px;
+      text-align: left;
+      padding-left: 12px;
+    }
+    body.ar .dv-actions-cell { text-align: left; padding-left: 12px; padding-right: 4px; }
+    .dv-row-actions {
+      display: flex;
+      gap: 4px;
+      justify-content: flex-end;
+      opacity: 0;
+      transition: opacity 120ms;
+    }
+    .dv-row:hover .dv-row-actions,
+    .dv-row.selected .dv-row-actions { opacity: 1; }
+
+    .dv-icon-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid #232734;
+      background: transparent;
+      color: #7B8496;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 120ms;
+      font-family: inherit;
+    }
+    .dv-icon-btn:hover { background: #1C1F2E; color: #F8FAFC; border-color: #2E3446; }
+    .dv-icon-btn.human:hover { background: rgba(16,185,129,0.15); color: #10B981; border-color: rgba(16,185,129,0.35); }
+    .dv-icon-btn.bot:hover { background: rgba(244,63,94,0.15); color: #F43F5E; border-color: rgba(244,63,94,0.35); }
+    .dv-icon-btn.view { text-decoration: none; }
+
+    .dv-verdict-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .dv-verdict-badge.valid { background: rgba(16,185,129,0.12); color: #10B981; }
+    .dv-verdict-badge.invalid { background: rgba(244,63,94,0.12); color: #F43F5E; }
+    .dv-verdict-badge.suspicious { background: rgba(245,158,11,0.12); color: #F59E0B; }
+
+    .dv-gt-badge {
+      display: inline-block;
+      margin-left: 4px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .dv-gt-badge.human { color: #10B981; }
+    .dv-gt-badge.bot { color: #F43F5E; }
+    body.ar .dv-gt-badge { margin-left: 0; margin-right: 4px; }
+
+    /* ============ PAGINATION ============ */
+    .dv-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 4px;
+      flex-wrap: wrap;
+    }
+    .dv-pagination-info {
+      font-size: 12px;
+      color: #7B8496;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .dv-pagination-info .num {
+      color: #F8FAFC;
+      font-weight: 800;
+    }
+    .dv-pagination-controls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .dv-page-btn {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid #232734;
+      color: #CBD5E1;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 120ms;
+    }
+    .dv-page-btn:hover:not(:disabled) {
+      background: #161822;
+      border-color: #2E3446;
+      color: #F8FAFC;
+    }
+    .dv-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .dv-page-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #F8FAFC;
+      font-weight: 800;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* ============ EMPTY / LOADING / ERROR ============ */
+    .dv-empty {
+      padding: 60px 20px;
+      text-align: center;
+      color: #7B8496;
+    }
+    .dv-empty-icon { font-size: 48px; opacity: 0.4; display: block; margin-bottom: 12px; }
+    .dv-empty-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #F8FAFC;
+      margin-bottom: 6px;
+    }
+    .dv-empty-sub { font-size: 12px; margin-bottom: 16px; }
+
+    .dv-skel-row {
+      height: 44px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #161822 0%, #232734 50%, #161822 100%);
+      background-size: 1000px 100%;
+      animation: dv-shimmer 1.6s infinite linear;
+    }
+    @keyframes dv-shimmer {
+      0% { background-position: -1000px 0; }
+      100% { background-position: 1000px 0; }
+    }
+
+    /* ============ MOBILE CARDS ============ */
+    @media (max-width: 768px) {
+      .dv-thead { display: none; }
+      .dv-table { display: block; }
+      .dv-tbody, .dv-row { display: block; }
+      .dv-row {
+        background: #0F1117;
+        border: 1px solid #232734;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        position: relative;
+      }
+      .dv-row td {
+        border: none;
+        padding: 1px 0;
+        display: block;
+      }
+      .dv-row td.checkbox-cell {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        padding: 0;
+        width: auto;
+      }
+      body.ar .dv-row td.checkbox-cell { left: auto; right: 8px; }
+      .dv-row td.id-cell { display: none; }
+      .dv-row td.zone-cell {
+        margin-bottom: 4px;
+      }
+      .dv-zone { font-size: 12px; }
+      .dv-row td.ip-cell {
+        display: flex !important;
+        flex-direction: row;
+        gap: 8px;
+        align-items: center;
+        font-size: 11px;
+        margin-bottom: 4px;
+      }
+      .dv-ip-wrap { flex-direction: row; gap: 6px; align-items: center; }
+      .dv-ip { max-width: 120px; }
+      .dv-row td.time-cell,
+      .dv-row td.timepage-cell,
+      .dv-row td.interaction-cell { display: none; }
+      .dv-row td.verdict-cell {
+        display: inline-block;
+        margin-right: 6px;
+      }
+      .dv-row td.score-cell {
+        display: inline-block;
+        margin-right: 6px;
+        text-align: right;
+      }
+      .dv-actions-cell {
+        position: absolute;
+        top: 8px;
+        left: 30px;
+        width: auto;
+        padding: 0;
+      }
+      body.ar .dv-actions-cell { left: auto; right: 30px; }
+      .dv-row-actions { opacity: 1; }
+      .dv-table-wrap {
+        background: transparent;
+        border: none;
+      }
+    }
+
+    /* Row flash */
+    @keyframes dv-flash-ok {
+      0%, 100% { background: transparent; }
+      30% { background: rgba(16,185,129,0.12); }
+    }
+    @keyframes dv-flash-bot {
+      0%, 100% { background: transparent; }
+      30% { background: rgba(244,63,94,0.12); }
+    }
+    .dv-row.flash-ok { animation: dv-flash-ok 600ms ease; }
+    .dv-row.flash-bot { animation: dv-flash-bot 600ms ease; }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري التحميل…</div>
+  </div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+
+      <div class="dv-header">
+        <div>
+          <h1 class="dv-title">الزيارات</h1>
+          <p class="dv-sub" id="dvSub">—</p>
+        </div>
+        <div class="dv-header-actions">
+          <button class="sh-btn sh-btn-ghost" id="exportBtn" type="button">
+            📥 تصدير CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="dv-filters">
+        <div class="dv-filter-field">
+          <label class="dv-filter-label">الحكم</label>
+          <select id="fVerdict" class="dv-input">
+            <option value="">الكل</option>
+            <option value="valid">سليم</option>
+            <option value="suspicious">مشبوه</option>
+            <option value="invalid">بوت</option>
+          </select>
+        </div>
+        <div class="dv-filter-field">
+          <label class="dv-filter-label">الزون</label>
+          <input type="text" id="fZone" class="dv-input" placeholder="مثال: 10245">
+        </div>
+        <div class="dv-filter-field">
+          <label class="dv-filter-label">من تاريخ</label>
+          <input type="date" id="fFrom" class="dv-input">
+        </div>
+        <div class="dv-filter-field">
+          <label class="dv-filter-label">إلى تاريخ</label>
+          <input type="date" id="fTo" class="dv-input">
+        </div>
+        <div class="dv-filter-field">
+          <label class="dv-filter-label">الدولة</label>
+          <input type="text" id="fCountry" class="dv-input" placeholder="EG, US..." maxlength="2">
+        </div>
+        <div class="dv-filter-actions">
+          <button class="sh-btn sh-btn-primary" id="applyBtn" type="button" style="height:32px;">تطبيق</button>
+          <button class="sh-btn sh-btn-ghost" id="clearBtn" type="button" style="height:32px;">مسح</button>
+        </div>
+      </div>
+
+      <div class="dv-bulk" id="bulkBar">
+        <div class="dv-bulk-count">
+          <span class="num" id="bulkCount">0</span> محدد
+        </div>
+        <div class="dv-bulk-actions">
+          <button class="sh-btn sh-btn-sm" id="bulkHuman" type="button" style="background:rgba(16,185,129,0.15);color:#10B981;border-color:rgba(16,185,129,0.35);">
+            ✓ إنسان
+          </button>
+          <button class="sh-btn sh-btn-sm" id="bulkBot" type="button" style="background:rgba(244,63,94,0.15);color:#F43F5E;border-color:rgba(244,63,94,0.35);">
+            ✗ بوت
+          </button>
+          <button class="sh-btn sh-btn-sm sh-btn-ghost" id="bulkClear" type="button">
+            إلغاء التحديد
+          </button>
+        </div>
+        <div class="dv-bulk-hint">H = إنسان · B = بوت · Esc = إلغاء</div>
+      </div>
+
+      <div class="dv-table-wrap">
+        <table class="dv-table">
+          <thead class="dv-thead">
+            <tr>
+              <th class="checkbox-cell center"><input type="checkbox" class="dv-checkbox" id="selectAll" title="تحديد الكل"></th>
+              <th>#ID</th>
+              <th>الوقت</th>
+              <th>IP / الدولة</th>
+              <th>الزون</th>
+              <th class="center">المكوث</th>
+              <th class="center">تفاعل</th>
+              <th class="center">Score</th>
+              <th class="center">الحكم</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody class="dv-tbody" id="dvTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="dv-pagination">
+        <div class="dv-pagination-info" id="pageInfo">—</div>
+        <div class="dv-pagination-controls">
+          <button class="dv-page-btn" id="prevBtn" type="button">← السابق</button>
+          <span class="dv-page-num" id="pageNum">1 / 1</span>
+          <button class="dv-page-btn" id="nextBtn" type="button">التالي →</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const DV = {
+      siteKey: null,
+      currentPage: 1,
+      perPage: 25,
+      totalPages: 1,
+      totalItems: 0,
+      selected: new Set(),
+      loading: false,
+    };
+
+    // ============ HELPERS ============
+    const esc = (s) => Shell.esc(s);
+    const fmtNum = (n) => Shell.fmtNum(n);
+
+    function setSubtitle() {
+      const parts = [];
+      if (Shell.state.currentSite) parts.push(Shell.state.currentSite.name);
+      if (DV.totalItems > 0) parts.push(fmtNum(DV.totalItems) + ' زيارة');
+      if (DV.selected.size > 0) parts.push(DV.selected.size + ' محدد');
+      const el = document.getElementById('dvSub');
+      if (el) el.textContent = parts.length ? parts.join(' · ') : '—';
+    }
+
+    function getFilters() {
+      return {
+        verdict: document.getElementById('fVerdict').value || '',
+        zone: document.getElementById('fZone').value.trim(),
+        from: document.getElementById('fFrom').value || '',
+        to: document.getElementById('fTo').value || '',
+        country: document.getElementById('fCountry').value.trim().toUpperCase(),
+      };
+    }
+
+    function buildQuery() {
+      const f = getFilters();
+      const params = new URLSearchParams();
+      if (DV.siteKey) params.set('site', DV.siteKey);
+      if (f.verdict) params.set('verdict', f.verdict);
+      if (f.zone) params.set('zone', f.zone);
+      if (f.from) params.set('from_date', f.from);
+      if (f.to) params.set('to_date', f.to);
+      if (f.country) params.set('country', f.country);
+      return params;
+    }
+
+    // ============ RENDER ============
+    function renderSkeleton() {
+      const tb = document.getElementById('dvTbody');
+      tb.innerHTML = Array.from({length: 8}).map(() =>
+        '<tr class="dv-row"><td colspan="10"><div class="dv-skel-row" style="margin:0;"></div></td></tr>'
+      ).join('');
+    }
+
+    function renderEmpty() {
+      const tb = document.getElementById('dvTbody');
+      tb.innerHTML = `
+        <tr><td colspan="10">
+          <div class="dv-empty">
+            <span class="dv-empty-icon">👁️</span>
+            <div class="dv-empty-title">مفيش زيارات</div>
+            <div class="dv-empty-sub">جرّب تغيّر الفلتر، أو ركّب كود التتبع لو لسه</div>
+            <button class="sh-btn sh-btn-ghost" onclick="clearFilters()" type="button">مسح الفلاتر</button>
+          </div>
+        </td></tr>`;
+    }
+
+    function renderError(msg) {
+      const tb = document.getElementById('dvTbody');
+      tb.innerHTML = `
+        <tr><td colspan="10">
+          <div class="dv-empty">
+            <span class="dv-empty-icon">⚠️</span>
+            <div class="dv-empty-title">فشل التحميل</div>
+            <div class="dv-empty-sub">${esc(msg)}</div>
+            <button class="sh-btn sh-btn-primary" onclick="loadVisits(DV.currentPage)" type="button">🔄 إعادة</button>
+          </div>
+        </td></tr>`;
+    }
+
+    function verdictClass(v) {
+      if (v === 'valid') return 'valid';
+      if (v === 'invalid') return 'invalid';
+      return 'suspicious';
+    }
+
+    function scoreColor(s) {
+      if (s > 80) return '#F43F5E';
+      if (s > 40) return '#F59E0B';
+      return '#10B981';
+    }
+
+    function renderVisits(data) {
+      const tb = document.getElementById('dvTbody');
+      if (!data.items || data.items.length === 0) {
+        renderEmpty();
+        updatePagination(data);
+        return;
+      }
+
+      tb.innerHTML = data.items.map(v => {
+        const isChecked = DV.selected.has(v.id);
+        const vClass = verdictClass(v.verdict);
+        const gtBadge = v.ground_truth
+          ? `<span class="dv-gt-badge ${v.ground_truth}">${v.ground_truth === 'bot' ? '✗ بوت' : '✓ إنسان'}</span>`
+          : '';
+
+        return `
+          <tr class="dv-row ${isChecked ? 'checked' : ''}" data-visit-id="${v.id}">
+            <td class="checkbox-cell">
+              <input type="checkbox" class="dv-checkbox row-check" data-id="${v.id}" ${isChecked ? 'checked' : ''}>
+            </td>
+            <td class="id-cell">
+              <a href="/visits/${v.id}" class="dv-id" style="text-decoration:none;">#${v.id}</a>
+            </td>
+            <td class="time-cell"><span class="dv-time">${esc(v.time || '')}</span></td>
+            <td class="ip-cell">
+              <div class="dv-ip-wrap">
+                <span class="dv-ip">${esc(v.ip || '—')}</span>
+                <span class="dv-country">${esc(v.country_code || v.country || '—')}</span>
+              </div>
+            </td>
+            <td class="zone-cell">
+              <span class="dv-zone">${esc(v.zone || 'unknown')}</span>
+            </td>
+            <td class="timepage-cell" style="text-align:center;">
+              <span class="dv-badge-sm time-badge">${v.time_on_page || 0}s</span>
+            </td>
+            <td class="interaction-cell" style="text-align:center;">
+              <span class="dv-interaction">🖱 ${v.clicks || 0} · 📜 ${v.scrolls || 0}</span>
+            </td>
+            <td class="score-cell" style="text-align:center;">
+              <span class="dv-score" style="color:${scoreColor(v.score || 0)};">${v.score || 0}</span>
+            </td>
+            <td class="verdict-cell">
+              <span class="dv-verdict-badge ${vClass}">${(v.verdict || '').toUpperCase()}</span>
+              ${gtBadge}
+            </td>
+            <td class="dv-actions-cell">
+              <div class="dv-row-actions">
+                <button class="dv-icon-btn human" data-action="human" data-id="${v.id}" title="إنسان">✓</button>
+                <button class="dv-icon-btn bot" data-action="bot" data-id="${v.id}" title="بوت">✗</button>
+                <a href="/visits/${v.id}" class="dv-icon-btn view" title="تفاصيل">→</a>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+
+      bindRowEvents();
+      updatePagination(data);
+      setSubtitle();
+    }
+
+    function bindRowEvents() {
+      document.querySelectorAll('.row-check').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const id = parseInt(cb.dataset.id, 10);
+          if (cb.checked) DV.selected.add(id);
+          else DV.selected.delete(id);
+          cb.closest('tr').classList.toggle('checked', cb.checked);
+          updateBulkBar();
+          setSubtitle();
+        });
+      });
+
+      document.querySelectorAll('.dv-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.row-check') || e.target.closest('.dv-icon-btn') || e.target.closest('a')) return;
+          const id = parseInt(row.dataset.visitId, 10);
+          window.location.href = '/visits/' + id;
+        });
+      });
+
+      document.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const action = btn.dataset.action;
+          const id = parseInt(btn.dataset.id, 10);
+          if (action === 'human') await labelVisit(id, 'human', btn);
+          else if (action === 'bot') await labelVisit(id, 'bot', btn);
+        });
+      });
+    }
+
+    async function labelVisit(id, label, btn) {
+      btn.disabled = true;
+      try {
+        await Shell.api(`/api/visits/${id}/ground-truth`, {
+          method: 'POST',
+          body: JSON.stringify({ label }),
+        });
+        const row = document.querySelector(`tr[data-visit-id="${id}"]`);
+        if (row) {
+          row.classList.add(label === 'human' ? 'flash-ok' : 'flash-bot');
+          setTimeout(() => row.classList.remove('flash-ok', 'flash-bot'), 700);
+          const verdictCell = row.querySelector('.verdict-cell');
+          if (verdictCell) {
+            const gtExisting = verdictCell.querySelector('.dv-gt-badge');
+            if (gtExisting) gtExisting.remove();
+            const badge = document.createElement('span');
+            badge.className = `dv-gt-badge ${label}`;
+            badge.textContent = label === 'bot' ? '✗ بوت' : '✓ إنسان';
+            verdictCell.appendChild(badge);
+          }
+        }
+        Shell.toast(label === 'human' ? 'علّمت كإنسان ✓' : 'علّمت كبوت ✗', 'success', 1800);
+      } catch (err) {
+        Shell.toast('فشل: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function updatePagination(data) {
+      DV.totalItems = data.total || 0;
+      DV.totalPages = data.pages || 1;
+      DV.currentPage = data.page || 1;
+
+      const info = document.getElementById('pageInfo');
+      const num = document.getElementById('pageNum');
+      const prev = document.getElementById('prevBtn');
+      const next = document.getElementById('nextBtn');
+
+      if (info) {
+        const from = DV.totalItems > 0 ? (DV.currentPage - 1) * DV.perPage + 1 : 0;
+        const to = Math.min(DV.currentPage * DV.perPage, DV.totalItems);
+        info.innerHTML = `عرض <span class="num">${fmtNum(from)}–${fmtNum(to)}</span> من <span class="num">${fmtNum(DV.totalItems)}</span>`;
+      }
+      if (num) num.textContent = `${DV.currentPage} / ${DV.totalPages}`;
+      if (prev) prev.disabled = DV.currentPage <= 1;
+      if (next) next.disabled = DV.currentPage >= DV.totalPages;
+    }
+
+    function updateBulkBar() {
+      const bar = document.getElementById('bulkBar');
+      const countEl = document.getElementById('bulkCount');
+      if (!bar) return;
+      if (DV.selected.size > 0) {
+        bar.classList.add('is-open');
+        if (countEl) countEl.textContent = DV.selected.size;
+      } else {
+        bar.classList.remove('is-open');
+      }
+    }
+
+    // ============ LOAD ============
+    async function loadVisits(page) {
+      if (DV.loading) return;
+      DV.loading = true;
+      DV.currentPage = page || 1;
+      renderSkeleton();
+
+      try {
+        const params = buildQuery();
+        params.set('page', DV.currentPage);
+        params.set('per_page', DV.perPage);
+        const data = await Shell.api('/api/visits?' + params.toString());
+        renderVisits(data);
+      } catch (err) {
+        renderError(err.message);
+      } finally {
+        DV.loading = false;
+      }
+    }
+
+    function applyFilters() {
+      DV.selected.clear();
+      updateBulkBar();
+      loadVisits(1);
+    }
+
+    function clearFilters() {
+      document.getElementById('fVerdict').value = '';
+      document.getElementById('fZone').value = '';
+      document.getElementById('fFrom').value = '';
+      document.getElementById('fTo').value = '';
+      document.getElementById('fCountry').value = '';
+      applyFilters();
+    }
+
+    // ============ EXPORT ============
+    function exportData() {
+      const params = buildQuery();
+      window.location.href = '/api/export/visits?' + params.toString();
+    }
+
+    // ============ BULK ============
+    async function bulkLabel(label) {
+      if (DV.selected.size === 0) return;
+      if (DV.selected.size > 200) {
+        Shell.toast('الحد الأقصى 200 زيارة في المرة', 'error');
+        return;
+      }
+
+      const ids = Array.from(DV.selected);
+      const btns = [document.getElementById('bulkHuman'), document.getElementById('bulkBot')];
+      btns.forEach(b => { if (b) b.disabled = true; });
+
+      try {
+        const res = await Shell.api('/api/visits/bulk-label', {
+          method: 'POST',
+          body: JSON.stringify({ visit_ids: ids, label }),
+        });
+
+        // Update all rows in the current page
+        ids.forEach(id => {
+          const row = document.querySelector(`tr[data-visit-id="${id}"]`);
+          if (!row) return;
+          row.classList.add(label === 'human' ? 'flash-ok' : 'flash-bot');
+          setTimeout(() => row.classList.remove('flash-ok', 'flash-bot'), 700);
+          const verdictCell = row.querySelector('.verdict-cell');
+          if (verdictCell) {
+            const gtExisting = verdictCell.querySelector('.dv-gt-badge');
+            if (gtExisting) gtExisting.remove();
+            const badge = document.createElement('span');
+            badge.className = `dv-gt-badge ${label}`;
+            badge.textContent = label === 'bot' ? '✗ بوت' : '✓ إنسان';
+            verdictCell.appendChild(badge);
+          }
+        });
+
+        Shell.toast(`تم تصنيف ${res.updated} زيارة${res.skipped ? ` · تخطي ${res.skipped}` : ''}`, 'success');
+        DV.selected.clear();
+        updateBulkBar();
+        document.querySelectorAll('.row-check').forEach(cb => { cb.checked = false; });
+        document.querySelectorAll('.dv-row').forEach(r => r.classList.remove('checked'));
+        const selectAll = document.getElementById('selectAll');
+        if (selectAll) selectAll.checked = false;
+        setSubtitle();
+      } catch (err) {
+        Shell.toast('فشل: ' + err.message, 'error');
+      } finally {
+        btns.forEach(b => { if (b) b.disabled = false; });
+      }
+    }
+
+    // ============ KEYBOARD ============
+    function initKeyboard() {
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        if (DV.selected.size === 0) return;
+        if (e.key === 'h' || e.key === 'H') { e.preventDefault(); bulkLabel('human'); }
+        else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); bulkLabel('bot'); }
+        else if (e.key === 'Escape') {
+          DV.selected.clear();
+          updateBulkBar();
+          document.querySelectorAll('.row-check').forEach(cb => { cb.checked = false; });
+          document.querySelectorAll('.dv-row').forEach(r => r.classList.remove('checked'));
+          const selectAll = document.getElementById('selectAll');
+          if (selectAll) selectAll.checked = false;
+          setSubtitle();
+        }
+      });
+    }
+
+    // ============ BOOT ============
+    (async function boot() {
+      try {
+        const params = new URLSearchParams(location.search);
+        const siteKey = params.get('site') || null;
+        DV.siteKey = siteKey;
+
+        let currentSite = null;
+        if (siteKey) {
+          try {
+            const sites = await Shell.api('/api/sites');
+            currentSite = sites.find(s => s.site_key === siteKey) || null;
+          } catch (e) {}
+        }
+
+        await Shell.mount({
+          active: 'visits',
+          lang: 'ar',
+          currentSite: currentSite,
+          breadcrumb: [
+            { label: 'الزيارات', href: '/visits' },
+            ...(currentSite ? [{ label: currentSite.name }] : []),
+          ],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+
+        // Preload filters from URL (other params)
+        if (params.get('verdict')) document.getElementById('fVerdict').value = params.get('verdict');
+        if (params.get('zone')) document.getElementById('fZone').value = params.get('zone');
+        if (params.get('from_date')) document.getElementById('fFrom').value = params.get('from_date');
+        if (params.get('to_date')) document.getElementById('fTo').value = params.get('to_date');
+        if (params.get('country')) document.getElementById('fCountry').value = params.get('country');
+
+        // Bind
+        document.getElementById('applyBtn').addEventListener('click', applyFilters);
+        document.getElementById('clearBtn').addEventListener('click', clearFilters);
+        document.getElementById('exportBtn').addEventListener('click', exportData);
+        document.getElementById('prevBtn').addEventListener('click', () => loadVisits(DV.currentPage - 1));
+        document.getElementById('nextBtn').addEventListener('click', () => loadVisits(DV.currentPage + 1));
+        document.getElementById('bulkHuman').addEventListener('click', () => bulkLabel('human'));
+        document.getElementById('bulkBot').addEventListener('click', () => bulkLabel('bot'));
+        document.getElementById('bulkClear').addEventListener('click', () => {
+          DV.selected.clear();
+          updateBulkBar();
+          document.querySelectorAll('.row-check').forEach(cb => { cb.checked = false; });
+          document.querySelectorAll('.dv-row').forEach(r => r.classList.remove('checked'));
+          const sa = document.getElementById('selectAll');
+          if (sa) sa.checked = false;
+          setSubtitle();
+        });
+
+        // Select all
+        document.getElementById('selectAll').addEventListener('change', (e) => {
+          const checked = e.target.checked;
+          document.querySelectorAll('.row-check').forEach(cb => {
+            cb.checked = checked;
+            const id = parseInt(cb.dataset.id, 10);
+            if (checked) DV.selected.add(id);
+            else DV.selected.delete(id);
+            cb.closest('tr').classList.toggle('checked', checked);
+          });
+          updateBulkBar();
+          setSubtitle();
+        });
+
+        // Enter on any filter applies
+        ['fZone', 'fCountry'].forEach(id => {
+          document.getElementById(id).addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') applyFilters();
+          });
+        });
+        ['fVerdict', 'fFrom', 'fTo'].forEach(id => {
+          document.getElementById(id).addEventListener('change', applyFilters);
+        });
+
+        initKeyboard();
+        loadVisits(1);
+      } catch (e) {
+        console.error('[Visits Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color:#F43F5E;font-weight:700;margin-bottom:8px;">فشل التحميل</div>
+            <div style="font-size:12px;color:#7B8496;max-width:340px;text-align:center;line-height:1.6;">${Shell.esc(e.message || 'خطأ غير معروف')}</div>
+            <button onclick="location.reload()" style="margin-top:16px;padding:8px 16px;background:#7C5CFF;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;">🔄 إعادة المحاولة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
