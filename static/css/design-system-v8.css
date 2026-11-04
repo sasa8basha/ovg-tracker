@@ -1,0 +1,295 @@
+/* =========================================================
+   OVG Tracker v8 — Design System
+   Additive — doesn't override existing design-tokens.css
+   Used by: /radar, /council, /twin (future)
+   ========================================================= */
+
+:root {
+  /* ============ SURFACES (v8 — deeper, cooler) ============ */
+  --v8-canvas:        #08090D;
+  --v8-surface:       #0F1117;
+  --v8-elevated:      #161822;
+  --v8-overlay:       rgba(8, 9, 13, 0.85);
+  --v8-glass:         rgba(22, 24, 34, 0.72);
+
+  /* ============ BORDERS ============ */
+  --v8-line-subtle:   #1A1D29;
+  --v8-line-default:  #232734;
+  --v8-line-strong:   #2E3446;
+  --v8-line-focus:    #7C5CFF;
+
+  /* ============ TEXT ============ */
+  --v8-ink-hi:        #F8FAFC;
+  --v8-ink-md:        #CBD5E1;
+  --v8-ink-lo:        #7B8496;
+  --v8-ink-mute:      #4A5263;
+
+  /* ============ BRAND ============ */
+  --v8-brand:         #7C5CFF;
+  --v8-brand-hi:      #9B80FF;
+  --v8-brand-lo:      #5A3FD4;
+  --v8-brand-tint:    rgba(124, 92, 255, 0.12);
+  --v8-brand-glow:    0 0 32px rgba(124, 92, 255, 0.4);
+
+  /* ============ SEMANTIC ============ */
+  --v8-green:         #10B981;
+  --v8-green-tint:    rgba(16, 185, 129, 0.12);
+  --v8-amber:         #F59E0B;
+  --v8-amber-tint:    rgba(245, 158, 11, 0.12);
+  --v8-orange:        #F97316;
+  --v8-orange-tint:   rgba(249, 115, 22, 0.12);
+  --v8-rose:          #F43F5E;
+  --v8-rose-tint:     rgba(244, 63, 94, 0.12);
+  --v8-red:           #DC2626;
+  --v8-red-tint:      rgba(220, 38, 38, 0.15);
+
+  /* ============ TYPOGRAPHY ============ */
+  --v8-font-sans:     'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif;
+  --v8-font-mono:     'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+
+  --v8-fs-2xs:        10px;
+  --v8-fs-xs:         11px;
+  --v8-fs-sm:         12px;
+  --v8-fs-base:       13px;
+  --v8-fs-md:         14px;
+  --v8-fs-lg:         16px;
+  --v8-fs-xl:         20px;
+  --v8-fs-2xl:        28px;
+  --v8-fs-3xl:        40px;
+  --v8-fs-4xl:        56px;
+
+  --v8-lh-tight:      1.1;
+  --v8-lh-snug:       1.3;
+  --v8-lh-base:       1.5;
+
+  --v8-ls-tight:      -0.02em;
+  --v8-ls-wide:       0.02em;
+  --v8-ls-wider:      0.06em;
+
+  /* ============ SPACING ============ */
+  --v8-sp-1:          2px;
+  --v8-sp-2:          4px;
+  --v8-sp-3:          6px;
+  --v8-sp-4:          8px;
+  --v8-sp-5:          12px;
+  --v8-sp-6:          16px;
+  --v8-sp-7:          20px;
+  --v8-sp-8:          24px;
+  --v8-sp-9:          32px;
+  --v8-sp-10:         40px;
+  --v8-sp-11:         48px;
+  --v8-sp-12:         64px;
+
+  /* ============ RADIUS ============ */
+  --v8-radius-xs:     4px;
+  --v8-radius-sm:     6px;
+  --v8-radius-md:     10px;
+  --v8-radius-lg:     14px;
+  --v8-radius-xl:     20px;
+  --v8-radius-full:   9999px;
+
+  /* ============ SHADOWS ============ */
+  --v8-shadow-sm:     0 1px 2px rgba(0,0,0,0.35);
+  --v8-shadow-md:     0 2px 4px rgba(0,0,0,0.25), 0 4px 8px rgba(0,0,0,0.15);
+  --v8-shadow-lg:     0 4px 8px rgba(0,0,0,0.25), 0 8px 16px rgba(0,0,0,0.18);
+  --v8-shadow-xl:     0 8px 16px rgba(0,0,0,0.3), 0 16px 32px rgba(0,0,0,0.2);
+
+  /* ============ MOTION ============ */
+  --v8-dur-instant:   60ms;
+  --v8-dur-fast:      120ms;
+  --v8-dur-base:      200ms;
+  --v8-dur-slow:      300ms;
+
+  --v8-ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
+  --v8-ease-io:       cubic-bezier(0.65, 0, 0.35, 1);
+  --v8-ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============ BASE ============ */
+.v8-body {
+  font-family: var(--v8-font-sans);
+  background: var(--v8-canvas);
+  color: var(--v8-ink-md);
+  font-size: var(--v8-fs-base);
+  line-height: var(--v8-lh-base);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+.v8-mono { font-family: var(--v8-font-mono); font-feature-settings: "tnum"; }
+.v8-num { font-family: var(--v8-font-mono); font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+/* ============ CARDS ============ */
+.v8-card {
+  background: var(--v8-surface);
+  border: 1px solid var(--v8-line-default);
+  border-radius: var(--v8-radius-lg);
+  transition: border-color var(--v8-dur-fast) var(--v8-ease-out),
+              box-shadow var(--v8-dur-fast) var(--v8-ease-out);
+}
+
+.v8-card:hover {
+  border-color: var(--v8-line-strong);
+  box-shadow: var(--v8-shadow-md);
+}
+
+.v8-card-glass {
+  background: var(--v8-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--v8-line-default);
+  border-radius: var(--v8-radius-lg);
+}
+
+/* ============ BUTTONS ============ */
+.v8-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v8-sp-2);
+  padding: 8px 14px;
+  border-radius: var(--v8-radius-md);
+  font-size: var(--v8-fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--v8-dur-fast) var(--v8-ease-out);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.v8-btn:active { transform: scale(0.97); }
+.v8-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.v8-btn-primary {
+  background: var(--v8-brand);
+  color: white;
+  box-shadow: 0 0 0 0 var(--v8-brand);
+}
+.v8-btn-primary:hover {
+  background: var(--v8-brand-hi);
+  box-shadow: var(--v8-brand-glow);
+}
+
+.v8-btn-ghost {
+  background: transparent;
+  color: var(--v8-ink-md);
+  border-color: var(--v8-line-default);
+}
+.v8-btn-ghost:hover {
+  background: var(--v8-elevated);
+  border-color: var(--v8-line-strong);
+  color: var(--v8-ink-hi);
+}
+
+.v8-btn-danger {
+  background: var(--v8-rose-tint);
+  color: var(--v8-rose);
+  border-color: var(--v8-rose);
+}
+.v8-btn-danger:hover {
+  background: var(--v8-rose);
+  color: white;
+}
+
+/* ============ BADGES ============ */
+.v8-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--v8-radius-full);
+  font-size: var(--v8-fs-2xs);
+  font-weight: 700;
+  letter-spacing: var(--v8-ls-wide);
+  text-transform: uppercase;
+}
+
+.v8-badge-good   { background: var(--v8-green-tint);  color: var(--v8-green); }
+.v8-badge-warn   { background: var(--v8-amber-tint);  color: var(--v8-amber); }
+.v8-badge-bad    { background: var(--v8-rose-tint);   color: var(--v8-rose); }
+.v8-badge-danger { background: var(--v8-red-tint);    color: var(--v8-red); }
+.v8-badge-neutral{ background: rgba(255,255,255,0.06); color: var(--v8-ink-lo); }
+
+/* ============ INPUTS ============ */
+.v8-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--v8-canvas);
+  border: 1px solid var(--v8-line-default);
+  border-radius: var(--v8-radius-md);
+  color: var(--v8-ink-hi);
+  font-family: var(--v8-font-sans);
+  font-size: var(--v8-fs-sm);
+  transition: border-color var(--v8-dur-fast);
+}
+.v8-input:focus {
+  outline: none;
+  border-color: var(--v8-brand);
+  box-shadow: 0 0 0 3px var(--v8-brand-tint);
+}
+
+/* ============ SKELETON ============ */
+@keyframes v8-shimmer {
+  0%   { background-position: -1000px 0; }
+  100% { background-position:  1000px 0; }
+}
+
+.v8-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--v8-elevated) 0%,
+    var(--v8-line-default) 50%,
+    var(--v8-elevated) 100%
+  );
+  background-size: 1000px 100%;
+  animation: v8-shimmer 1.5s infinite linear;
+  border-radius: var(--v8-radius-md);
+}
+
+/* ============ ANIMATIONS ============ */
+@keyframes v8-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes v8-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes v8-pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+@keyframes v8-spin {
+  to { transform: rotate(360deg); }
+}
+
+.v8-anim-fade-up { animation: v8-fade-up var(--v8-dur-slow) var(--v8-ease-out); }
+.v8-anim-fade-in { animation: v8-fade-in var(--v8-dur-base) var(--v8-ease-out); }
+
+/* ============ UTILITIES ============ */
+.v8-text-hi  { color: var(--v8-ink-hi); }
+.v8-text-md  { color: var(--v8-ink-md); }
+.v8-text-lo  { color: var(--v8-ink-lo); }
+.v8-text-mute{ color: var(--v8-ink-mute); }
+
+.v8-tight     { line-height: var(--v8-lh-tight); }
+.v8-snug      { line-height: var(--v8-lh-snug); }
+.v8-uppercase { text-transform: uppercase; letter-spacing: var(--v8-ls-wider); }
+
+/* ============ SCROLLBAR ============ */
+.v8-body ::-webkit-scrollbar { width: 8px; height: 8px; }
+.v8-body ::-webkit-scrollbar-track { background: transparent; }
+.v8-body ::-webkit-scrollbar-thumb {
+  background: var(--v8-line-default);
+  border-radius: var(--v8-radius-full);
+}
+.v8-body ::-webkit-scrollbar-thumb:hover { background: var(--v8-line-strong); }
+
+/* ============ FOCUS RING ============ */
+.v8-body *:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--v8-canvas),
+              0 0 0 4px var(--v8-brand-tint);
+  border-radius: inherit;
+    }
