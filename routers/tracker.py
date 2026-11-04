@@ -33,6 +33,7 @@ TRACKER_CODE_TEMPLATE = r"""<script>
   var startTime = Date.now();
   var mousemoves = 0, touchstarts = 0, clicks = 0, scrolls = 0;
   var mouseX = [], mouseY = [], mousePoints = [], sent = false;
+  var sendReason = "timeout";
 
   document.addEventListener('mousemove', function (e) {
     mousemoves++;
@@ -184,6 +185,7 @@ TRACKER_CODE_TEMPLATE = r"""<script>
       },
       behavior: {
         time_on_page_ms: Date.now() - startTime,
+        send_reason: sendReason,
         mouse_variance: variance(mouseX) + variance(mouseY),
         mouse_analysis: analyzeMouseTrajectory(mousePoints),
         events: { mousemove: mousemoves, touchstart: touchstarts, clicks: clicks, scrolls: scrolls }
@@ -199,10 +201,12 @@ TRACKER_CODE_TEMPLATE = r"""<script>
       fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function (err) { console.error('[OVG] Send failed:', err); });
     });
   }
-  setTimeout(send, SEND_DELAY_MS);
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') send(); });
-  window.addEventListener('pagehide', function () { send(); });
-  window.addEventListener('beforeunload', function () { send(); });
+  setTimeout(function () { sendReason = "timeout"; send(); }, SEND_DELAY_MS);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { sendReason = "hidden"; send(); }
+  });
+  window.addEventListener('pagehide', function () { sendReason = "unload"; send(); });
+  window.addEventListener('beforeunload', function () { sendReason = "unload"; send(); });
 })();
 </script>"""
 
