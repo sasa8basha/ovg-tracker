@@ -60,7 +60,7 @@ class VisitModel(Base):
     scrolls = Column(Integer, default=0)
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
-    ground_truth = Column(String(10), nullable=True, index=True)  # "human" | "bot" | None
+    ground_truth = Column(String(10), nullable=True, index=True)
     ground_truth_at = Column(DateTime, nullable=True)
     ground_truth_by = Column(String(64), nullable=True)
 
@@ -93,15 +93,10 @@ class EmailVerificationToken(Base):
 
 
 # =========================================================
-# v8 — BAN RISK SNAPSHOTS (The Radar)
+# v8 — Ban Risk Snapshots (The Radar)
 # =========================================================
 class BanRiskSnapshot(Base):
-    """
-    لقطة يومية/ساعية لمؤشر خطر حظر Adsterra.
-    تُستخدم للـ trend + التاريخ + التنبؤ.
-    """
     __tablename__ = "ban_risk_snapshots"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
         Integer,
@@ -110,23 +105,52 @@ class BanRiskSnapshot(Base):
         nullable=False,
     )
     timestamp = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
-
-    # Core score (0-100, higher = more risk). NULL if insufficient data.
     score = Column(Integer, nullable=True)
     level = Column(String(20), nullable=False, default="unknown")
-    # levels: low | medium | high | critical | unknown
-
-    # Denormalized metrics for fast historical charts
     total_24h = Column(Integer, default=0)
     bot_rate = Column(Float, default=0.0)
     wasted_rate = Column(Float, default=0.0)
     human_quality = Column(Float, default=0.0)
     zone_diversity = Column(Integer, default=0)
     source_diversity = Column(Integer, default=0)
-
-    # Full breakdown (factors list, recommendations, etc.)
     factors = Column(JSON, nullable=True)
 
     __table_args__ = (
         Index("ix_ban_risk_user_time", "user_id", "timestamp"),
+    )
+
+
+# =========================================================
+# v8 — Zone Actions (Quick Actions + Decision Log)
+# =========================================================
+class ZoneActionModel(Base):
+    """
+    كل إجراء على زون بيتسجل هنا. بيدي:
+    - Quick Actions التاريخ
+    - Undo capability
+    - Decision Journal future
+    - Council future (يستخدم القرارات السابقة)
+    """
+    __tablename__ = "zone_actions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    zone_id = Column(String, index=True, nullable=False)
+    action = Column(String(20), nullable=False)
+    # blacklist | pause | scale | resume
+    reason = Column(String(200), default="")
+    metadata_json = Column(JSON, nullable=True)
+    # for scale: {"percent": 30}; for pause: {"hours": 24}
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    reverted_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_zone_actions_user_zone", "user_id", "zone_id"),
+        Index("ix_zone_actions_user_time", "user_id", "timestamp"),
+        Index("ix_zone_actions_user_active", "user_id", "action", "reverted_at"),
     )
