@@ -90,3 +90,43 @@ class EmailVerificationToken(Base):
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# =========================================================
+# v8 — BAN RISK SNAPSHOTS (The Radar)
+# =========================================================
+class BanRiskSnapshot(Base):
+    """
+    لقطة يومية/ساعية لمؤشر خطر حظر Adsterra.
+    تُستخدم للـ trend + التاريخ + التنبؤ.
+    """
+    __tablename__ = "ban_risk_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+
+    # Core score (0-100, higher = more risk). NULL if insufficient data.
+    score = Column(Integer, nullable=True)
+    level = Column(String(20), nullable=False, default="unknown")
+    # levels: low | medium | high | critical | unknown
+
+    # Denormalized metrics for fast historical charts
+    total_24h = Column(Integer, default=0)
+    bot_rate = Column(Float, default=0.0)
+    wasted_rate = Column(Float, default=0.0)
+    human_quality = Column(Float, default=0.0)
+    zone_diversity = Column(Integer, default=0)
+    source_diversity = Column(Integer, default=0)
+
+    # Full breakdown (factors list, recommendations, etc.)
+    factors = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("ix_ban_risk_user_time", "user_id", "timestamp"),
+    )
