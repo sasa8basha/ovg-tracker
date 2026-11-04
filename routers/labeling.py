@@ -1,0 +1,255 @@
+"""
+routers/labeling.py — Ground truth + Manual review queue + Rule performance.
+"""
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from database import get_db
+from models import UserModel, SiteModel, VisitModel
+from schemas import GroundTruthIn
+from auth import current_user
+from analysis import CODE_TO_SOURCE
+from helpers import _resolve_user_site
+from utils import stats_cache
+
+router = APIRouter()
+
+
+@router.post("/visits/{visit_id}/ground-truth")
+def set_ground_truth(visit_id: int, payload: GroundTruthIn,
+                     user: UserModel = Depends(current_user),
+                     db: Session = Depends(get_db)):
+    v = db.query(VisitModel).join(SiteModel).filter(
+        VisitModel.id == visit_id, SiteModel.user_id == user.id
+    ).first()
+    if not v:
+        raise HTTPException(404, "الزيارة مش موجودة")
+
+    v.ground_truth = payload.label
+    v.ground_truth_at = datetime.utcnow()
+    v.ground_truth_by = user.username
+    db.commit()
+    db.refresh(v)
+
+    stats_cache.invalidate(f"labeling:stats:{user.id}")
+    stats_cache.invalidate(f"labeling:rules:{user.id}")
+
+    return {
+        "ok": True,
+        "visit_id": v.id,
+        "ground_truth": v.ground_truth,
+        "labeled_at": v.ground_truth_at.isoformat() if v.ground_truth_at else None,
+    }
+
+
+@router.delete("/visits/{visit_id}/ground-truth")
+def delete_ground_truth(visit_id: int, user: UserModel = Depends(current_user),
+                        db: Session = Depends(get_db)):
+    v = db.query(VisitModel).join(SiteModel).filter(
+        VisitModel.id == visit_id, SiteModel.user_id == user.id
+    ).first()
+    if not v:
+        raise HTTPException(404, "الزيارة مش موجودة")
+    v.ground_truth = None
+    v.ground_truth_at = None
+    v.ground_truth_by = None
+    db.commit()
+    stats_cache.invalidate(f"labeling:stats:{user.id}")
+    stats_cache.invalidate(f"labeling:rules:{user.id}")
+    return {"ok": True, "visit_id": v.id}
+
+
+@router.get("/labeling/queue")
+def get_labeling_queue(
+    site: str = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    order: str = Query("uncertainty"),
+    user: UserModel = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    q = db.query(VisitModel)
+    if site:
+        s = _resolve_user_site(site, user, db)
+        q = q.filter(VisitModel.site_id == s.id)
+    else:
+        q = q.join(SiteModel, VisitModel.site_id == SiteModel.id).filter(
+            SiteModel.user_id == user.id
+        )
+    q = q.filter(
+        VisitModel.ground_truth.is_(None),
+        VisitModel.score >= 40,
+        VisitModel.score <= 80,
+    )
+    if order == "uncertainty":
+        q = q.order_by(func.abs(VisitModel.score - 60).asc(), VisitModel.id.desc())
+    elif order == "oldest":
+        q = q.order_by(VisitModel.id.asc())
+    else:
+        q = q.order_by(VisitModel.id.desc())
+
+    visits = q.limit(limit).all()
+
+    items = []
+    for v in visits:
+        ev = v.evidence or []
+        top_ev = []
+        if isinstance(ev, list):
+            dicts = [e for e in ev if isinstance(e, dict)]
+            dicts.sort(key=lambda e: abs(int(e.get("score", 0) or 0)), reverse=True)
+            for e in dicts[:5]:
+                top_ev.append({
+                    "code": e.get("code", "UNKNOWN"),
+                    "severity": e.get("severity", "medium"),
+                    "score": int(e.get("score", 0) or 0),
+                    "detail": e.get("detail", ""),
+                })
+        items.append({
+            "id": v.id, "score": v.score, "verdict": v.verdict,
+            "time": v.timestamp.strftime("%Y-%m-%d %H:%M") if v.timestamp else "",
+            "zone": v.zone_id, "country": v.country, "country_code": v.country_code,
+            "browser": v.browser, "os": v.os, "device": v.device,
+            "asn": v.asn, "is_vpn": bool(v.is_vpn),
+            "evidence_count": len(ev) if isinstance(ev, list) else 0,
+            "top_evidence": top_ev,
+        })
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/labeling/stats")
+def get_labeling_stats(user: UserModel = Depends(current_user),
+                       db: Session = Depends(get_db)):
+    cached = stats_cache.get(f"labeling:stats:{user.id}")
+    if cached is not None:
+        return cached
+
+    base = db.query(VisitModel).join(
+        SiteModel, VisitModel.site_id == SiteModel.id
+    ).filter(SiteModel.user_id == user.id)
+
+    total = base.count()
+    labeled = base.filter(VisitModel.ground_truth.isnot(None)).count()
+    labeled_human = base.filter(VisitModel.ground_truth == "human").count()
+    labeled_bot = base.filter(VisitModel.ground_truth == "bot").count()
+    unlabeled = total - labeled
+    pending_review = base.filter(
+        VisitModel.ground_truth.is_(None),
+        VisitModel.score >= 40,
+        VisitModel.score <= 80,
+    ).count()
+
+    tp = base.filter(VisitModel.verdict == "invalid", VisitModel.ground_truth == "bot").count()
+    fp = base.filter(VisitModel.verdict == "invalid", VisitModel.ground_truth == "human").count()
+    fn_strict = base.filter(VisitModel.verdict == "valid", VisitModel.ground_truth == "bot").count()
+    fn_suspicious = base.filter(VisitModel.verdict == "suspicious", VisitModel.ground_truth == "bot").count()
+    tn = base.filter(VisitModel.verdict == "valid", VisitModel.ground_truth == "human").count()
+
+    precision = round(tp / (tp + fp) * 100, 2) if (tp + fp) > 0 else None
+    recall_strict = round(tp / (tp + fn_strict) * 100, 2) if (tp + fn_strict) > 0 else None
+    recall_loose = round(tp / (tp + fn_strict + fn_suspicious) * 100, 2) if (tp + fn_strict + fn_suspicious) > 0 else None
+    agreement = round((tp + tn) / labeled * 100, 2) if labeled > 0 else None
+
+    result = {
+        "total": total, "labeled": labeled,
+        "labeled_human": labeled_human, "labeled_bot": labeled_bot,
+        "unlabeled": unlabeled, "pending_review": pending_review,
+        "progress_percent": round(labeled / total * 100, 2) if total > 0 else 0.0,
+        "tp": tp, "fp": fp, "tn": tn,
+        "fn_strict": fn_strict, "fn_suspicious": fn_suspicious,
+        "precision": precision, "recall_strict": recall_strict,
+        "recall_loose": recall_loose, "agreement": agreement,
+        "reliable": labeled >= 30,
+    }
+    stats_cache.set(f"labeling:stats:{user.id}", result)
+    return result
+
+
+@router.get("/labeling/rule-performance")
+def get_rule_performance(user: UserModel = Depends(current_user),
+                         db: Session = Depends(get_db)):
+    cached = stats_cache.get(f"labeling:rules:{user.id}")
+    if cached is not None:
+        return cached
+
+    LIMIT = 20000
+
+    labeled = db.query(VisitModel).join(
+        SiteModel, VisitModel.site_id == SiteModel.id
+    ).filter(
+        SiteModel.user_id == user.id,
+        VisitModel.ground_truth.isnot(None),
+    ).order_by(VisitModel.id.desc()).limit(LIMIT).all()
+
+    unlabeled = db.query(VisitModel).join(
+        SiteModel, VisitModel.site_id == SiteModel.id
+    ).filter(
+        SiteModel.user_id == user.id,
+        VisitModel.ground_truth.is_(None),
+    ).order_by(VisitModel.id.desc()).limit(LIMIT).all()
+
+    stats = {}
+
+    for v in labeled:
+        ev = v.evidence or []
+        if not isinstance(ev, list):
+            continue
+        seen = set()
+        for e in ev:
+            if not isinstance(e, dict):
+                continue
+            code = e.get("code")
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            if code not in stats:
+                stats[code] = {"tp": 0, "fp": 0, "unlabeled": 0}
+            if v.ground_truth == "bot":
+                stats[code]["tp"] += 1
+            elif v.ground_truth == "human":
+                stats[code]["fp"] += 1
+
+    for v in unlabeled:
+        ev = v.evidence or []
+        if not isinstance(ev, list):
+            continue
+        seen = set()
+        for e in ev:
+            if not isinstance(e, dict):
+                continue
+            code = e.get("code")
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            if code not in stats:
+                stats[code] = {"tp": 0, "fp": 0, "unlabeled": 0}
+            stats[code]["unlabeled"] += 1
+
+    rules = []
+    for code, s in stats.items():
+        total_labeled = s["tp"] + s["fp"]
+        precision = round(s["tp"] / total_labeled * 100, 2) if total_labeled > 0 else None
+        rules.append({
+            "code": code,
+            "source": CODE_TO_SOURCE.get(code, "unknown"),
+            "tp": s["tp"], "fp": s["fp"],
+            "unlabeled": s["unlabeled"],
+            "total_labeled": total_labeled,
+            "precision": precision,
+            "reliable": total_labeled >= 30,
+        })
+
+    rules.sort(key=lambda r: (
+        r["precision"] is None,
+        r["precision"] if r["precision"] is not None else 999,
+        -r["total_labeled"],
+    ))
+
+    result = {
+        "rules": rules,
+        "labeled_sample_size": len(labeled),
+        "unlabeled_sample_size": len(unlabeled),
+        "truncated": len(labeled) >= LIMIT or len(unlabeled) >= LIMIT,
+    }
+    stats_cache.set(f"labeling:rules:{user.id}", result)
+    return result
