@@ -1,13 +1,5 @@
 """
 main.py — OVG Tracker entry point.
-
-This file ONLY:
-  1. Creates the FastAPI app
-  2. Configures CORS + static files
-  3. Runs DB init (create_all + migrations + bootstrap)
-  4. Includes all routers
-
-Business logic lives in routers/*.py
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,20 +15,19 @@ from routers import (
     tracker as tracker_router,
     stats as stats_router,
     reports as reports_router,
+    labeling as labeling_router,
+    data_quality as data_quality_router,
+    zones_analytics as zones_analytics_router,
     pages as pages_router,
 )
 
-# =========================================================
-# INIT
-# =========================================================
 Base.metadata.create_all(bind=engine)
 run_migrations()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="5.1")
+app = FastAPI(title="OVG Tracker", version="5.3")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# CORS
 if ALLOWED_ORIGINS == ["*"]:
     app.add_middleware(
         CORSMiddleware,
@@ -54,13 +45,13 @@ else:
         allow_headers=["*"],
     )
 
-# =========================================================
-# ROUTERS
-# =========================================================
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(sites_router.router, prefix="/api/sites", tags=["sites"])
 app.include_router(tracker_router.router, prefix="/api", tags=["tracker"])
 app.include_router(stats_router.router, prefix="/api", tags=["stats"])
 app.include_router(reports_router.router, prefix="/api", tags=["reports"])
+app.include_router(labeling_router.router, prefix="/api", tags=["labeling"])
+app.include_router(data_quality_router.router, prefix="/api", tags=["data-quality"])
+app.include_router(zones_analytics_router.router, prefix="/api", tags=["zones-analytics"])
 app.include_router(pages_router.router, tags=["pages"])
