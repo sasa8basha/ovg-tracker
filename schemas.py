@@ -1,6 +1,5 @@
 """
 schemas.py — Pydantic models for OVG Tracker.
-All request/response bodies. Centralized for reuse across routers.
 """
 from pydantic import BaseModel, Field
 
@@ -54,3 +53,7 @@ class TrackPayload(BaseModel):
 class CPMSettingsIn(BaseModel):
     cpm_buy: float = Field(ge=0.0, le=100.0)
     cpm_sell: float = Field(ge=0.0, le=100.0)
+
+
+class GroundTruthIn(BaseModel):
+    label: str = Field(pattern=r"^(human|bot)$")
