@@ -38,6 +38,30 @@ def migrate_auth_columns():
         print(f"⚠️ migrate_auth_columns skipped: {e}")
 
 
+def migrate_cpm_columns():
+    """Phase 3A — adds cpm_buy, cpm_sell to users for P&L calculation."""
+    try:
+        insp = inspect(engine)
+        if "users" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("users")]
+        with engine.connect() as conn:
+            if "cpm_buy" not in cols:
+                _safe_alter(
+                    conn,
+                    "ALTER TABLE users ADD COLUMN cpm_buy FLOAT NOT NULL DEFAULT 1.0",
+                    "users.cpm_buy",
+                )
+            if "cpm_sell" not in cols:
+                _safe_alter(
+                    conn,
+                    "ALTER TABLE users ADD COLUMN cpm_sell FLOAT NOT NULL DEFAULT 1.5",
+                    "users.cpm_sell",
+                )
+    except Exception as e:
+        print(f"⚠️ migrate_cpm_columns skipped: {e}")
+
+
 def migrate_country_code():
     try:
         insp = inspect(engine)
@@ -57,6 +81,7 @@ def migrate_country_code():
 
 def run_migrations():
     migrate_auth_columns()
+    migrate_cpm_columns()
     migrate_country_code()
 
 
