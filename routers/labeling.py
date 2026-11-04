@@ -1,5 +1,8 @@
 """
 routers/labeling.py — Ground truth + Manual review queue + Rule performance.
+
+v8 addition:
+  - POST /api/visits/bulk-label — bulk ground truth assignment
 """
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,6 +18,8 @@ from helpers import _resolve_user_site
 from utils import stats_cache
 
 router = APIRouter()
+
+BULK_MAX = 200
 
 
 @router.post("/visits/{visit_id}/ground-truth")
@@ -59,6 +64,82 @@ def delete_ground_truth(visit_id: int, user: UserModel = Depends(current_user),
     stats_cache.invalidate(f"labeling:stats:{user.id}")
     stats_cache.invalidate(f"labeling:rules:{user.id}")
     return {"ok": True, "visit_id": v.id}
+
+
+# =========================================================
+# v8 — Bulk label
+# =========================================================
+@router.post("/visits/bulk-label")
+def bulk_label(
+    payload: dict,
+    user: UserModel = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    body: {"visit_ids": [1, 2, 3], "label": "bot" | "human"}
+
+    - الحد الأقصى 200 زيارة في المرة
+    - idempotent: بيحدث الـ label الموجود
+    - يتخطى الزيارات اللي مش بتاعت المستخدم
+    """
+    visit_ids = payload.get("visit_ids")
+    label = (payload.get("label") or "").strip().lower()
+
+    if not isinstance(visit_ids, list):
+        raise HTTPException(400, "visit_ids لازم تكون قائمة")
+    if label not in ("bot", "human"):
+        raise HTTPException(400, "label لازم تكون bot أو human")
+    if len(visit_ids) == 0:
+        return {"ok": True, "updated": 0, "skipped": 0, "invalid_ids": 0}
+    if len(visit_ids) > BULK_MAX:
+        raise HTTPException(400, f"الحد الأقصى {BULK_MAX} زيارة في المرة")
+
+    clean_ids = []
+    invalid_ids = 0
+    for vid in visit_ids:
+        try:
+            n = int(vid)
+            if n <= 0:
+                invalid_ids += 1
+                continue
+            clean_ids.append(n)
+        except (ValueError, TypeError):
+            invalid_ids += 1
+
+    if not clean_ids:
+        return {
+            "ok": True, "updated": 0, "skipped": 0,
+            "invalid_ids": invalid_ids,
+        }
+
+    # نجيب بس اللي بتاعت المستخدم
+    visits = db.query(VisitModel).join(
+        SiteModel, VisitModel.site_id == SiteModel.id
+    ).filter(
+        VisitModel.id.in_(clean_ids),
+        SiteModel.user_id == user.id,
+    ).all()
+
+    now = datetime.utcnow()
+    updated = 0
+    for v in visits:
+        v.ground_truth = label
+        v.ground_truth_at = now
+        v.ground_truth_by = user.username
+        updated += 1
+
+    db.commit()
+
+    stats_cache.invalidate(f"labeling:stats:{user.id}")
+    stats_cache.invalidate(f"labeling:rules:{user.id}")
+
+    return {
+        "ok": True,
+        "updated": updated,
+        "skipped": len(clean_ids) - updated,
+        "invalid_ids": invalid_ids,
+        "label": label,
+    }
 
 
 @router.get("/labeling/queue")
