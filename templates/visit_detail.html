@@ -11,21 +11,17 @@
     body{font-family:'Cairo',sans-serif;background:var(--bg-page);color:var(--text-primary)}
     .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; }
     .stat-box { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 0.75rem; padding: 1rem; text-align: center; }
-
     .score-ring { position: relative; width: 150px; height: 150px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     .score-ring svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
     .score-ring circle { fill: none; stroke-width: 8; stroke-linecap: round; }
     .score-bg { stroke: rgba(255,255,255,0.05); }
     .score-progress { stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1.5s ease-out; }
-
-    /* Category summary chips */
     .cat-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
   </style>
 </head>
 <body class="min-h-screen p-6">
   <div class="max-w-6xl mx-auto" id="app" style="display: none;">
 
-    <!-- Header -->
     <div class="flex justify-between items-center mb-8">
       <div class="flex items-center gap-4">
         <button onclick="history.back()" class="text-slate-400 hover:text-white transition bg-white/5 p-2 rounded-lg">→</button>
@@ -40,12 +36,33 @@
       </div>
     </div>
 
+    <!-- Ground Truth Card -->
+    <div class="glass-card p-5 mb-6">
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+          <div class="text-xs font-bold text-slate-400 mb-1">🏷️ تصنيفك اليدوي (Ground Truth)</div>
+          <div id="gtStatus" class="text-sm text-slate-300">لم يتم التصنيف بعد</div>
+        </div>
+        <div class="flex gap-2">
+          <button id="gtHumanBtn" onclick="setGroundTruth('human')" class="px-4 py-2 rounded-lg font-bold text-sm border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition">
+            ✓ يوزر حقيقي
+          </button>
+          <button id="gtBotBtn" onclick="setGroundTruth('bot')" class="px-4 py-2 rounded-lg font-bold text-sm border border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 transition">
+            ✗ بوت
+          </button>
+          <button id="gtClearBtn" onclick="clearGroundTruth()" class="px-3 py-2 rounded-lg font-bold text-xs text-slate-400 hover:bg-white/5 transition hidden">
+            مسح التصنيف
+          </button>
+        </div>
+      </div>
+      <div class="mt-3 text-[11px] text-slate-500">
+        💡 التصنيف بيُستخدم في تحسين دقة النظام — كل تصنيف بيأثر على Rule Performance.
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-      <!-- Left: Score & Analysis -->
       <div class="lg:col-span-1 space-y-6">
-
-        <!-- Score Ring -->
         <div class="glass-card p-6 flex flex-col items-center justify-center">
           <div class="score-ring mb-4">
             <svg viewBox="0 0 150 150">
@@ -62,15 +79,6 @@
           <div id="vCategories" class="flex flex-wrap gap-1 mt-3 justify-center"></div>
         </div>
 
-        <!-- Evidence (Phase 4: structured) -->
-        <div class="glass-card p-6">
-          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <span>⚖️</span> أسباب التقييم
-          </h3>
-          <ul id="vEvidence" class="space-y-1.5 text-sm text-slate-300"></ul>
-        </div>
-
-        <!-- Behavior -->
         <div class="glass-card p-6">
           <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧠</span> السلوك والتفاعل</h3>
           <div class="grid grid-cols-3 gap-3">
@@ -81,9 +89,7 @@
         </div>
       </div>
 
-      <!-- Right: Network & Device -->
       <div class="lg:col-span-2 space-y-6">
-
         <div class="glass-card p-6">
           <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🌐</span> الشبكة والاتصال</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -110,67 +116,35 @@
           </div>
         </div>
 
+        <div class="glass-card p-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+            <span>🧭</span> Decision Path
+            <span class="text-[10px] text-slate-500 font-normal">(بالترتيب اللي النظام حكم بيه)</span>
+          </h3>
+          <div class="text-xs text-slate-400 mb-3" id="traceSummary"></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-right">
+              <thead class="text-[10px] text-slate-500 bg-black/20">
+                <tr>
+                  <th class="px-2 py-2 text-center">#</th>
+                  <th class="px-2 py-2">Rule</th>
+                  <th class="px-2 py-2">Source</th>
+                  <th class="px-2 py-2 text-center">Severity</th>
+                  <th class="px-2 py-2 text-center">Score</th>
+                  <th class="px-2 py-2 text-center">Running</th>
+                </tr>
+              </thead>
+              <tbody id="traceBody" class="divide-y divide-white/5"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
     const visitId = window.location.pathname.split('/').pop();
-
-    // ===== Phase 4: Evidence i18n map =====
-    const EVIDENCE_I18N = {
-        // Critical
-        WEBDRIVER_FLAG: "علامة WebDriver",
-        CDP_DETECTED: "كشف CDP (بوت مؤكد)",
-        WINDOWS_UA_LINUX: "UA ويندوز + Linux (مستحيل)",
-        FIREFOX_CHROME_OBJ: "Firefox + window.chrome (مستحيل)",
-        // High
-        BOT_UA: "User-Agent مشبوه",
-        VPN_DATACENTER: "VPN + Datacenter",
-        WEBRTC_LEAK: "تسريب WebRTC",
-        PLUGINS_ZERO: "Chrome بدون plugins",
-        CHROME_NO_OBJ: "Chrome UA بدون window.chrome",
-        FINGERPRINT_REUSE_HIGH: "بصمة متكررة (30+/دقيقة)",
-        ROBOTIC_LINEAR: "حركة ماوس روبوتية (خطية)",
-        // Medium
-        DATACENTER_IP: "IP من Datacenter",
-        VPN_PROXY: "VPN/Proxy",
-        WEBRTC_VPN_DIFF: "WebRTC مختلف (احتمال VPN)",
-        CANVAS_MISSING: "Canvas مفقود",
-        LANGUAGES_EMPTY: "navigator.languages فاضي",
-        LOW_CPU: "CPU منخفض",
-        TZ_MISMATCH: "توقيت مش متطابق مع IP",
-        MOBILE_WIDE_SCREEN: "موبايل + شاشة عريضة",
-        ROBOTIC_CURVATURE: "حركة ماوس روبوتية (انحناء صفر)",
-        ROBOTIC_VARIANCE: "حركة ماوس روبوتية (تباين منخفض)",
-        OS_MISMATCH_WIN: "تضارب نظام (Windows)",
-        OS_MISMATCH_MAC: "تضارب نظام (Mac)",
-        FINGERPRINT_REUSE_MED: "بصمة متكررة (20-29/دقيقة)",
-        LEFT_FAST: "خرج بسرعة",
-        // Low
-        UTC_TZ: "توقيت UTC/غير معروف",
-        CANVAS_BLOCKED: "Canvas محظور (خصوصية)",
-        SINGLE_LANG: "لغة واحدة فقط",
-        FINGERPRINT_REUSE_LOW: "بصمة متكررة (11-19/دقيقة)",
-        SOFT_RENDERER: "Software Rendering",
-        ZOMBIE: "مفيش تفاعل",
-        // Human
-        HUMAN_RICH_INTERACTION: "تفاعل غني (بشري)",
-        HUMAN_NATURAL_MOUSE: "حركة ماوس طبيعية (بشري)",
-        HUMAN_LONG_ENGAGEMENT: "تفاعل طويل (بشري)",
-        // Legacy
-        LEGACY_SIGNAL: "إشارة قديمة",
-    };
-
-    // ===== Phase 4: Severity styles =====
-    const SEVERITY_STYLE = {
-        critical: { bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30', icon: '🚨', label: 'حرج' },
-        high:     { bg: 'bg-orange-500/15', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚠️', label: 'عالي' },
-        medium:   { bg: 'bg-amber-500/15', text: 'text-amber-300', border: 'border-amber-500/30', icon: '⚡', label: 'متوسط' },
-        low:      { bg: 'bg-yellow-500/15', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '💡', label: 'منخفض' },
-        human:    { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30', icon: '✅', label: 'بشري' },
-        unknown:  { bg: 'bg-slate-500/15', text: 'text-slate-300', border: 'border-slate-500/30', icon: '❓', label: 'غير معروف' },
-    };
+    let currentGroundTruth = null;
 
     function esc(s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -178,89 +152,101 @@
       });
     }
 
-    function normalizeEvidenceItem(item) {
-      if (typeof item === 'string') {
-        return { code: null, severity: 'unknown', score: 0, detail: item };
+    function renderGroundTruth(gt, at, by) {
+      const status = document.getElementById('gtStatus');
+      const clearBtn = document.getElementById('gtClearBtn');
+      if (gt === 'human') {
+        status.innerHTML = `<span class="px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 font-bold text-xs">✓ يوزر حقيقي</span>
+          ${at ? `<span class="text-[10px] text-slate-500 ml-2">${at.slice(0, 19).replace('T', ' ')} · ${by || ''}</span>` : ''}`;
+        clearBtn.classList.remove('hidden');
+      } else if (gt === 'bot') {
+        status.innerHTML = `<span class="px-2 py-1 rounded bg-rose-500/15 text-rose-300 font-bold text-xs">✗ بوت</span>
+          ${at ? `<span class="text-[10px] text-slate-500 ml-2">${at.slice(0, 19).replace('T', ' ')} · ${by || ''}</span>` : ''}`;
+        clearBtn.classList.remove('hidden');
+      } else {
+        status.innerHTML = `<span class="text-slate-500">لم يتم التصنيف بعد</span>`;
+        clearBtn.classList.add('hidden');
       }
-      if (item && typeof item === 'object') {
-        return {
-          code: item.code || null,
-          severity: item.severity || 'unknown',
-          score: Number(item.score) || 0,
-          detail: item.detail || '',
-        };
-      }
-      return { code: null, severity: 'unknown', score: 0, detail: String(item) };
+      currentGroundTruth = gt;
     }
 
-    function renderEvidence(container, evidenceList) {
-      container.innerHTML = '';
-      if (!evidenceList || !evidenceList.length) {
-        const li = document.createElement('li');
-        li.className = 'text-emerald-400 flex items-center gap-2';
-        const icon = document.createElement('span');
-        icon.textContent = '✅';
-        const txt = document.createElement('span');
-        txt.textContent = 'لا توجد أدلة على التلاعب';
-        li.appendChild(icon); li.appendChild(txt);
-        container.appendChild(li);
+    async function setGroundTruth(label) {
+      try {
+        const r = await fetch(`/api/visits/${visitId}/ground-truth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          renderGroundTruth(d.ground_truth, d.labeled_at, 'أنت');
+        } else {
+          alert('فشل الحفظ');
+        }
+      } catch (e) { alert('خطأ في الاتصال'); }
+    }
+
+    async function clearGroundTruth() {
+      if (!confirm('مسح التصنيف؟')) return;
+      try {
+        const r = await fetch(`/api/visits/${visitId}/ground-truth`, { method: 'DELETE' });
+        if (r.ok) renderGroundTruth(null, null, null);
+      } catch (e) { alert('خطأ'); }
+    }
+
+    function renderTrace(trace) {
+      const summary = document.getElementById('traceSummary');
+      const tbody = document.getElementById('traceBody');
+      if (!trace || !trace.length) {
+        summary.textContent = 'لا توجد إشارات مسجّلة';
+        tbody.innerHTML = '';
         return;
       }
+      const sevCounts = {};
+      trace.forEach(t => { sevCounts[t.severity] = (sevCounts[t.severity] || 0) + 1; });
+      const parts = Object.entries(sevCounts).map(([k, v]) => `${v} ${k}`).join(' · ');
+      const finalTotal = trace[trace.length - 1].running_total;
+      summary.innerHTML = `إجمالي ${trace.length} إشارة: ${parts} — المجموع التراكمي: <b class="font-mono">${finalTotal}</b>`;
 
-      evidenceList.forEach(function (rawItem) {
-        const item = normalizeEvidenceItem(rawItem);
-        const style = SEVERITY_STYLE[item.severity] || SEVERITY_STYLE.unknown;
+      const sevColors = {
+        critical: 'text-rose-400 bg-rose-500/10',
+        high: 'text-orange-400 bg-orange-500/10',
+        medium: 'text-amber-400 bg-amber-500/10',
+        low: 'text-yellow-400 bg-yellow-500/10',
+        human: 'text-emerald-400 bg-emerald-500/10',
+      };
 
-        const li = document.createElement('li');
-        li.className = 'flex items-start gap-2 p-2 rounded-lg border ' + style.border + ' ' + style.bg;
-
-        const icon = document.createElement('span');
-        icon.className = 'text-base leading-none mt-0.5';
-        icon.textContent = style.icon;
-
-        const content = document.createElement('div');
-        content.className = 'flex-1 min-w-0';
-
-        const label = (item.code && EVIDENCE_I18N[item.code]) || item.detail || 'إشارة';
-        const title = document.createElement('div');
-        title.className = style.text + ' font-semibold text-sm';
-        title.textContent = label;
-        content.appendChild(title);
-
-        // Show raw detail as sub-text when i18n label is used
-        if (item.code && EVIDENCE_I18N[item.code] && item.detail && item.detail !== label) {
-          const sub = document.createElement('div');
-          sub.className = 'text-[11px] text-slate-400 mt-0.5 break-words';
-          sub.textContent = item.detail;
-          content.appendChild(sub);
-        }
-
-        li.appendChild(icon);
-        li.appendChild(content);
-
-        // Score badge
-        if (item.score !== 0) {
-          const scoreBadge = document.createElement('span');
-          scoreBadge.className = 'text-xs font-mono px-1.5 py-0.5 rounded shrink-0 ' + style.bg + ' ' + style.text;
-          scoreBadge.textContent = (item.score > 0 ? '+' : '') + item.score;
-          li.appendChild(scoreBadge);
-        }
-
-        container.appendChild(li);
-      });
+      tbody.innerHTML = trace.map(t => {
+        const cls = sevColors[t.severity] || 'text-slate-400 bg-slate-500/10';
+        const sign = t.score > 0 ? '+' : '';
+        return `<tr>
+          <td class="px-2 py-1.5 text-center text-slate-500 font-mono">${t.step}</td>
+          <td class="px-2 py-1.5 font-mono text-white text-[11px]">${esc(t.code)}</td>
+          <td class="px-2 py-1.5 text-[10px] text-slate-500 font-mono">${esc(t.source)}</td>
+          <td class="px-2 py-1.5 text-center"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${cls}">${t.severity}</span></td>
+          <td class="px-2 py-1.5 text-center font-mono font-bold ${t.score >= 0 ? 'text-rose-400' : 'text-emerald-400'}">${sign}${t.score}</td>
+          <td class="px-2 py-1.5 text-center font-mono text-indigo-300">${t.running_total}</td>
+        </tr>`;
+      }).join('');
     }
 
     function renderCategories(container, categories) {
+      const styles = {
+        critical: 'bg-rose-500/15 text-rose-300',
+        high: 'bg-orange-500/15 text-orange-300',
+        medium: 'bg-amber-500/15 text-amber-300',
+        low: 'bg-yellow-500/15 text-yellow-300',
+        human: 'bg-emerald-500/15 text-emerald-300',
+      };
+      const icons = { critical: '🚨', high: '⚠️', medium: '⚡', low: '💡', human: '✅' };
       container.innerHTML = '';
       if (!categories) return;
-      const order = ['critical', 'high', 'medium', 'low', 'human'];
-      order.forEach(function (sev) {
+      ['critical', 'high', 'medium', 'low', 'human'].forEach(sev => {
         const n = Number(categories[sev] || 0);
         if (n <= 0) return;
-        const style = SEVERITY_STYLE[sev];
         const chip = document.createElement('span');
-        chip.className = 'cat-chip ' + style.bg + ' ' + style.text;
-        chip.textContent = style.icon + ' ' + style.label + ' × ' + n;
+        chip.className = 'cat-chip ' + (styles[sev] || '');
+        chip.textContent = (icons[sev] || '') + ' ' + sev + ' × ' + n;
         container.appendChild(chip);
       });
     }
@@ -296,7 +282,6 @@
       document.getElementById('vClicks').textContent = d.clicks;
       document.getElementById('vScrolls').textContent = d.scrolls;
 
-      // Verdict styling
       const badge = document.getElementById('vBadge');
       const circle = document.getElementById('scoreCircle');
       const verdictText = document.getElementById('vVerdictText');
@@ -320,7 +305,6 @@
       badge.textContent = d.verdict.toUpperCase();
       circle.style.stroke = color;
 
-      // Phase 4: raw_score + confidence
       if (typeof d.raw_score === 'number' && d.raw_score !== d.score) {
         document.getElementById('vRawScore').textContent = 'Raw: ' + d.raw_score + ' → Capped: ' + d.score;
       } else if (typeof d.raw_score === 'number') {
@@ -339,10 +323,8 @@
         confBadge.classList.remove('hidden');
       }
 
-      // Phase 4: categories chips
       renderCategories(document.getElementById('vCategories'), d.categories);
 
-      // VPN
       const vpnEl = document.getElementById('vVpn');
       if (d.is_vpn) {
         vpnEl.className = 'text-rose-400 font-bold';
@@ -352,10 +334,9 @@
         vpnEl.textContent = 'NO';
       }
 
-      // Phase 4: evidence (structured + legacy support)
-      renderEvidence(document.getElementById('vEvidence'), d.evidence);
+      renderGroundTruth(d.ground_truth, d.ground_truth_at, d.ground_truth_by);
+      renderTrace(d.trace || []);
 
-      // Animate score ring
       setTimeout(function () {
         const percentage = Math.min(d.score / 150, 1);
         const offset = 408 - (percentage * 408);
@@ -366,4 +347,4 @@
     loadDetails();
   </script>
 </body>
-</html>
+  </html>
