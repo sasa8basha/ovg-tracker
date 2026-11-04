@@ -23,6 +23,7 @@
     .msg-ok{background:rgba(16,185,129,.1);color:#10B981;border:1px solid rgba(16,185,129,.3)}
     .msg-err{background:rgba(244,63,94,.1);color:#F43F5E;border:1px solid rgba(244,63,94,.2)}
     .back-link{color:#818CF8;text-decoration:none;font-size:14px}
+    .hint{color:#94A3B8;font-size:11px;margin-top:4px}
   </style>
 </head>
 <body>
@@ -30,6 +31,26 @@
     <a href="/dashboard" class="back-link">← العودة للداشبورد</a>
     <h1 style="font-size:26px;font-weight:800;margin:12px 0 4px">الإعدادات</h1>
     <p style="color:#94A3B8;font-size:13px;margin:0">إدارة حسابك وأمانه</p>
+  </div>
+
+  <!-- CPM Settings (Phase 3A) -->
+  <div class="glass">
+    <h2>💰 إعدادات CPM (الربح والخسارة)</h2>
+    <p style="color:#94A3B8;font-size:13px;margin:0 0 16px">
+      السعر اللي بتشتري بيه الزيارة والسعر اللي بتاخده من شبكة الإعلانات. هيتحسب عليهم الربح الصافي لكل زون في "التقارير الذكية".
+    </p>
+    <div style="margin-bottom:12px">
+      <label>سعر الشراء (Buy CPM) — $ لكل 1000 زيارة</label>
+      <input id="inpCpmBuy" type="number" step="0.01" min="0" max="100" class="input">
+      <p class="hint">مثال: 1.0 لو بتشتري من PopAds بـ $1 لكل 1000 زيارة</p>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>سعر البيع (Sell CPM) — $ لكل 1000 impression</label>
+      <input id="inpCpmSell" type="number" step="0.01" min="0" max="100" class="input">
+      <p class="hint">مثال: 1.5 لو Adsterra بتديك $1.5 لكل 1000 impression</p>
+    </div>
+    <button class="btn" onclick="saveCpmSettings()">حفظ إعدادات CPM</button>
+    <p id="cpmMsg" class="msg"></p>
   </div>
 
   <!-- Profile -->
@@ -100,6 +121,8 @@
       const d = await r.json();
       document.getElementById('inpUsername').value = d.username || '';
       document.getElementById('inpEmail').value = d.email || '';
+      document.getElementById('inpCpmBuy').value = d.cpm_buy ?? 1.0;
+      document.getElementById('inpCpmSell').value = d.cpm_sell ?? 1.5;
       const b = document.getElementById('verifyBadge');
       if (!d.email) {
         b.innerHTML = '<span class="badge badge-warn">لا يوجد بريد</span>';
@@ -111,6 +134,21 @@
         b.innerHTML = '<span class="badge badge-warn">غير مفعّل</span>';
         document.getElementById('resendBtn').style.display = 'inline-block';
       }
+    }
+
+    async function saveCpmSettings() {
+      const buy = parseFloat(document.getElementById('inpCpmBuy').value);
+      const sell = parseFloat(document.getElementById('inpCpmSell').value);
+      const msg = document.getElementById('cpmMsg');
+      if (isNaN(buy) || buy < 0 || buy > 100) { show(msg, false, 'سعر الشراء لازم يكون رقم بين 0 و 100'); return; }
+      if (isNaN(sell) || sell < 0 || sell > 100) { show(msg, false, 'سعر البيع لازم يكون رقم بين 0 و 100'); return; }
+      const r = await fetch('/api/settings/cpm', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ cpm_buy: buy, cpm_sell: sell })
+      });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) show(msg, true, 'تم حفظ إعدادات CPM ✅');
+      else show(msg, false, d.detail || 'فشل الحفظ');
     }
 
     async function saveProfile() {
@@ -176,4 +214,4 @@
     loadSettings();
   </script>
 </body>
-</html>
+  </html>
