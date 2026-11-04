@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, SiteModel, VisitModel
 from auth import current_user
-from analysis import calc_confidence, count_categories, normalize_stored_evidence
+from analysis import (
+    calc_confidence, count_categories, normalize_stored_evidence,
+    build_explainability_trace,
+)
 from helpers import (
     _resolve_user_site, _apply_date_filter, _parse_date, _safe_filename, csv_safe,
 )
@@ -141,10 +144,12 @@ def get_visit_detail(visit_id: int, user: UserModel = Depends(current_user),
         raise HTTPException(404, "غير مصرح لك بعرض هذه الزيارة")
     evidence = v.evidence or []
     signals = normalize_stored_evidence(evidence)
+    trace = build_explainability_trace(evidence)
     return {
         "id": v.id, "timestamp": v.timestamp.strftime("%Y-%m-%d %H:%M:%S") if v.timestamp else "",
         "ip": v.ip, "zone_id": v.zone_id, "score": v.score, "verdict": v.verdict,
         "evidence": evidence,
+        "trace": trace,
         "os": v.os, "device": v.device, "browser": v.browser,
         "country": v.country, "country_code": v.country_code, "isp": v.isp,
         "timezone": v.timezone, "canvas_hash": v.canvas_hash, "hardware": v.hardware,
@@ -155,6 +160,9 @@ def get_visit_detail(visit_id: int, user: UserModel = Depends(current_user),
         "confidence": calc_confidence(signals),
         "raw_score": sum(s.get("score", 0) for s in signals),
         "categories": count_categories(signals),
+        "ground_truth": v.ground_truth,
+        "ground_truth_at": v.ground_truth_at.isoformat() if v.ground_truth_at else None,
+        "ground_truth_by": v.ground_truth_by,
     }
 
 
@@ -195,7 +203,8 @@ def export_visits(
             w = csv.writer(out)
             w.writerow(["ID", "Time", "IP", "Country", "Country Code", "Zone",
                         "Verdict", "Score", "OS", "Browser", "Device",
-                        "Time on Page (s)", "Clicks", "Scrolls", "ISP", "ASN", "VPN"])
+                        "Time on Page (s)", "Clicks", "Scrolls", "ISP", "ASN", "VPN",
+                        "Ground Truth"])
             yield out.getvalue()
             out.seek(0); out.truncate(0)
             for v in q.yield_per(500):
@@ -203,7 +212,8 @@ def export_visits(
                        v.ip, v.country, v.country_code or "", v.zone_id, v.verdict, v.score,
                        v.os, v.browser, v.device,
                        round(v.time_on_page / 1000, 1) if v.time_on_page else 0,
-                       v.clicks, v.scrolls, v.isp, v.asn, v.is_vpn]
+                       v.clicks, v.scrolls, v.isp, v.asn, v.is_vpn,
+                       v.ground_truth or ""]
                 w.writerow([csv_safe(x) for x in row])
                 yield out.getvalue()
                 out.seek(0); out.truncate(0)
@@ -219,4 +229,4 @@ def export_visits(
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-store",
         },
-             )
+        )
