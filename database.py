@@ -20,7 +20,6 @@ def _safe_alter(conn, sql: str, label: str):
 
 
 def migrate_auth_columns():
-    """Phase 5 — adds email, email_verified, token_version to users."""
     try:
         insp = inspect(engine)
         if "users" not in insp.get_table_names():
@@ -39,7 +38,6 @@ def migrate_auth_columns():
 
 
 def migrate_cpm_columns():
-    """Phase 3A — adds cpm_buy, cpm_sell to users for P&L calculation."""
     try:
         insp = inspect(engine)
         if "users" not in insp.get_table_names():
@@ -47,19 +45,30 @@ def migrate_cpm_columns():
         cols = [c["name"] for c in insp.get_columns("users")]
         with engine.connect() as conn:
             if "cpm_buy" not in cols:
-                _safe_alter(
-                    conn,
-                    "ALTER TABLE users ADD COLUMN cpm_buy FLOAT NOT NULL DEFAULT 1.0",
-                    "users.cpm_buy",
-                )
+                _safe_alter(conn, "ALTER TABLE users ADD COLUMN cpm_buy FLOAT NOT NULL DEFAULT 1.0", "users.cpm_buy")
             if "cpm_sell" not in cols:
-                _safe_alter(
-                    conn,
-                    "ALTER TABLE users ADD COLUMN cpm_sell FLOAT NOT NULL DEFAULT 1.5",
-                    "users.cpm_sell",
-                )
+                _safe_alter(conn, "ALTER TABLE users ADD COLUMN cpm_sell FLOAT NOT NULL DEFAULT 1.5", "users.cpm_sell")
     except Exception as e:
         print(f"⚠️ migrate_cpm_columns skipped: {e}")
+
+
+def migrate_ground_truth_columns():
+    try:
+        insp = inspect(engine)
+        if "visits" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("visits")]
+        with engine.connect() as conn:
+            if "ground_truth" not in cols:
+                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN ground_truth VARCHAR(10)", "visits.ground_truth")
+                _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_ground_truth ON visits (ground_truth)", "ix_visits_ground_truth")
+            if "ground_truth_at" not in cols:
+                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN ground_truth_at TIMESTAMP", "visits.ground_truth_at")
+            if "ground_truth_by" not in cols:
+                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN ground_truth_by VARCHAR(64)", "visits.ground_truth_by")
+            _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_gt_verdict ON visits (ground_truth, verdict)", "ix_visits_gt_verdict")
+    except Exception as e:
+        print(f"⚠️ migrate_ground_truth_columns skipped: {e}")
 
 
 def migrate_country_code():
@@ -82,6 +91,7 @@ def migrate_country_code():
 def run_migrations():
     migrate_auth_columns()
     migrate_cpm_columns()
+    migrate_ground_truth_columns()
     migrate_country_code()
 
 
