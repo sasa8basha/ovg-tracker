@@ -11,11 +11,9 @@ class UserModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    # Phase 5 — Auth System
     email = Column(String(255), unique=True, nullable=True, index=True)
     email_verified = Column(Boolean, default=False, nullable=False)
     token_version = Column(Integer, default=1, nullable=False)
-    # Phase 3A — CPM Arbitrage P&L settings (global per user)
     cpm_buy = Column(Float, default=1.0, server_default="1.0", nullable=False)
     cpm_sell = Column(Float, default=1.5, server_default="1.5", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -62,16 +60,17 @@ class VisitModel(Base):
     scrolls = Column(Integer, default=0)
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
+    ground_truth = Column(String(10), nullable=True, index=True)  # "human" | "bot" | None
+    ground_truth_at = Column(DateTime, nullable=True)
+    ground_truth_by = Column(String(64), nullable=True)
 
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
+        Index("ix_visits_gt_verdict", "ground_truth", "verdict"),
     )
 
 
-# =========================================================
-# Phase 5 — Auth Tokens
-# =========================================================
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
     id = Column(Integer, primary_key=True)
