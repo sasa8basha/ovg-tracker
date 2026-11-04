@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · جودة البيانات</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/design-tokens.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <style>
+    body{font-family:'Cairo',sans-serif;background:var(--bg-page);color:var(--text-primary)}
+    .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; }
+    .score-circle { width: 180px; height: 180px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
+    .score-circle svg { position: absolute; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .score-circle circle { fill: none; stroke-width: 12; stroke-linecap: round; }
+    .field-row { border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .progress-mini { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+    .progress-mini > div { height: 100%; transition: width 0.3s; }
+    .health-ok { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .health-degraded { background: rgba(245,158,11,0.15); color: #fcd34d; }
+    .health-critical { background: rgba(244,63,94,0.15); color: #fda4af; }
+    table { color: var(--text-primary); }
+    thead { background: rgba(0,0,0,0.4) !important; color: var(--text-secondary); }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+  <div class="max-w-[1500px] mx-auto">
+
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-extrabold text-white">📊 جودة البيانات</h1>
+        <p class="text-slate-400 text-sm mt-1">تأكد إن كل الحقول بتتجمع صح — بيانات ناقصة = تحليل ضعيف</p>
+      </div>
+      <button onclick="window.location.href='/dashboard'" class="btn-ghost border border-slate-600">← العودة</button>
+    </div>
+
+    <div class="glass p-4 mb-6 flex flex-wrap gap-4 items-end">
+      <div class="flex-1 min-w-[150px]">
+        <label class="block text-[11px] font-bold text-slate-400 mb-1">📅 من</label>
+        <input type="date" id="filterFrom" class="bg-black/30 border border-white/10 text-white text-sm rounded-lg px-3 py-2 w-full">
+      </div>
+      <div class="flex-1 min-w-[150px]">
+        <label class="block text-[11px] font-bold text-slate-400 mb-1">📅 إلى</label>
+        <input type="date" id="filterTo" class="bg-black/30 border border-white/10 text-white text-sm rounded-lg px-3 py-2 w-full">
+      </div>
+      <button onclick="applyFilters()" class="btn-primary">تطبيق</button>
+      <button onclick="clearFilters()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold text-sm">مسح</button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="glass p-6 flex flex-col items-center justify-center">
+        <div class="score-circle">
+          <svg viewBox="0 0 180 180">
+            <circle cx="90" cy="90" r="78" stroke="rgba(255,255,255,0.05)"></circle>
+            <circle id="scoreProgress" cx="90" cy="90" r="78" stroke="#6366f1"
+                    stroke-dasharray="490" stroke-dashoffset="490"
+                    style="transition: stroke-dashoffset 1s, stroke 0.5s"></circle>
+          </svg>
+          <div class="text-center z-10">
+            <div id="scoreValue" class="text-4xl font-extrabold text-white font-mono">0</div>
+            <div id="scoreLabel" class="text-xs font-bold text-slate-400 mt-1">—</div>
+          </div>
+        </div>
+        <div class="text-xs text-slate-500 mt-4 text-center" id="totalText">—</div>
+      </div>
+
+      <div class="glass p-6 col-span-1 lg:col-span-2">
+        <h3 class="text-sm font-bold text-white mb-4">🚦 حالة الـ Collector</h3>
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div class="text-center">
+            <div class="text-xs text-slate-400 mb-1">آخر ساعة</div>
+            <div id="lastHourCount" class="text-2xl font-bold text-white font-mono">—</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xs text-slate-400 mb-1">Baseline (7ي)</div>
+            <div id="baselineCount" class="text-2xl font-bold text-slate-400 font-mono">—</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xs text-slate-400 mb-1">الحالة</div>
+            <div id="healthBadge" class="inline-block px-3 py-1 rounded text-xs font-bold mt-1">—</div>
+          </div>
+        </div>
+        <div class="h-40"><canvas id="collectorChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="glass overflow-hidden mb-6">
+      <div class="p-4 border-b border-white/5">
+        <h3 class="text-sm font-bold text-white">📋 اكتمال الحقول</h3>
+        <p class="text-xs text-slate-500 mt-1">كل حقل له وزن في الـ score النهائي.</p>
+      </div>
+      <table class="w-full text-sm text-right">
+        <thead class="text-xs">
+          <tr>
+            <th class="px-4 py-3">الحقل</th>
+            <th class="px-4 py-3 text-center">Valid</th>
+            <th class="px-4 py-3 text-center">Invalid</th>
+            <th class="px-4 py-3 text-center">الوزن</th>
+            <th class="px-4 py-3">الاكتمال</th>
+          </tr>
+        </thead>
+        <tbody id="fieldsBody" class="divide-y divide-white/5"></tbody>
+      </table>
+    </div>
+
+    <div class="glass p-6">
+      <h3 class="text-sm font-bold text-white mb-4">📈 الاكتمال عبر الزمن (آخر 30 يوم)</h3>
+      <div class="h-64"><canvas id="timelineChart"></canvas></div>
+    </div>
+
+  </div>
+
+  <script>
+    const siteKey = new URL(location.href).searchParams.get('site');
+    let dateFilters = { from: null, to: null };
+    let collectorChartObj = null;
+    let timelineChartObj = null;
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function fieldLabel(f) {
+      const map = {
+        canvas_hash: 'Canvas Hash', asn: 'ASN', country: 'الدولة',
+        timezone: 'Timezone', isp: 'ISP', hardware: 'الهاردوير',
+        webrtc_ip: 'WebRTC', evidence: 'Evidence',
+      };
+      return map[f] || f;
+    }
+
+    function scoreColor(s) {
+      if (s >= 95) return '#10b981';
+      if (s >= 85) return '#34d399';
+      if (s >= 70) return '#f59e0b';
+      if (s >= 50) return '#f97316';
+      return '#f43f5e';
+    }
+
+    function buildUrl(base) {
+      const p = new URLSearchParams();
+      if (siteKey) p.set('site', siteKey);
+      if (dateFilters.from) p.set('from_date', dateFilters.from);
+      if (dateFilters.to) p.set('to_date', dateFilters.to);
+      const qs = p.toString();
+      return qs ? base + '?' + qs : base;
+    }
+
+    function applyFilters() {
+      dateFilters.from = document.getElementById('filterFrom').value || null;
+      dateFilters.to = document.getElementById('filterTo').value || null;
+      loadOverview();
+    }
+    function clearFilters() {
+      document.getElementById('filterFrom').value = '';
+      document.getElementById('filterTo').value = '';
+      dateFilters.from = null; dateFilters.to = null;
+      loadOverview();
+    }
+
+    async function loadOverview() {
+      try {
+        const r = await fetch(buildUrl('/api/data-quality/overview'));
+        if (!r.ok) return;
+        const d = await r.json();
+
+        if (d.total === 0) {
+          document.getElementById('totalText').textContent = 'لا توجد بيانات في الفترة المحددة';
+          document.getElementById('fieldsBody').innerHTML = '<tr><td colspan="5" class="text-center py-10 text-slate-500">لا توجد بيانات</td></tr>';
+          return;
+        }
+
+        document.getElementById('scoreValue').textContent = d.score.toFixed(0);
+        const labels = { excellent: 'ممتاز', good: 'جيد', fair: 'مقبول', poor: 'ضعيف', critical: 'حرج' };
+        document.getElementById('scoreLabel').textContent = labels[d.score_label] || d.score_label;
+        document.getElementById('totalText').textContent = `${d.total.toLocaleString()} زيارة`;
+
+        const circle = document.getElementById('scoreProgress');
+        const c = scoreColor(d.score);
+        const circumference = 490;
+        const offset = circumference - (d.score / 100) * circumference;
+        setTimeout(() => {
+          circle.style.strokeDashoffset = offset;
+          circle.style.stroke = c;
+        }, 100);
+
+        const tb = document.getElementById('fieldsBody');
+        tb.innerHTML = d.fields.map(f => {
+          if (f.completeness === null) {
+            return `<tr class="field-row">
+              <td class="px-4 py-3 font-mono text-xs text-slate-300">${esc(fieldLabel(f.field))}</td>
+              <td class="px-4 py-3 text-center text-slate-500">—</td>
+              <td class="px-4 py-3 text-center text-slate-500">—</td>
+              <td class="px-4 py-3 text-center text-xs text-slate-500">${f.weight}</td>
+              <td class="px-4 py-3 text-xs text-rose-400">خطأ في الحساب</td>
+            </tr>`;
+          }
+          const col = scoreColor(f.completeness);
+          return `<tr class="field-row">
+            <td class="px-4 py-3 font-mono text-xs text-white">${esc(fieldLabel(f.field))}</td>
+            <td class="px-4 py-3 text-center text-emerald-400 font-mono text-xs">${f.valid.toLocaleString()}</td>
+            <td class="px-4 py-3 text-center text-rose-400 font-mono text-xs">${f.invalid.toLocaleString()}</td>
+            <td class="px-4 py-3 text-center text-slate-400 text-xs font-mono">${f.weight}</td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-mini flex-1"><div style="width:${f.completeness}%;background:${col}"></div></div>
+                <span class="text-xs font-mono font-bold" style="color:${col}">${f.completeness.toFixed(1)}%</span>
+                ${!f.reliable ? '<span class="text-[10px] text-amber-400">(عينة صغيرة)</span>' : ''}
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      } catch (e) { console.error(e); }
+    }
+
+    async function loadCollector() {
+      try {
+        const url = new URL('/api/data-quality/collector-rate', location.origin);
+        if (siteKey) url.searchParams.set('site', siteKey);
+        url.searchParams.set('hours', '24');
+        const r = await fetch(url);
+        if (!r.ok) return;
+        const d = await r.json();
+
+        document.getElementById('lastHourCount').textContent = d.last_hour_count;
+        document.getElementById('baselineCount').textContent = d.baseline_per_hour;
+
+        const badge = document.getElementById('healthBadge');
+        const healthLabels = { ok: '✓ سليم', degraded: '⚠️ ضعيف', critical: '🚨 حرج' };
+        badge.textContent = healthLabels[d.health] || d.health;
+        badge.className = 'inline-block px-3 py-1 rounded text-xs font-bold mt-1 health-' + d.health;
+
+        const labels = d.series.map(s => s.hour.slice(11, 16));
+        const data = d.series.map(s => s.count);
+        const baseline = d.series.map(() => d.baseline_per_hour);
+
+        if (collectorChartObj) collectorChartObj.destroy();
+        collectorChartObj = new Chart(document.getElementById('collectorChart'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'زيارات/ساعة', data, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)', fill: true, tension: 0.3, pointRadius: 0 },
+              { label: 'Baseline', data: baseline, borderColor: '#94a3b8', borderDash: [5, 5], fill: false, pointRadius: 0 },
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#cbd5e1', font: { family: 'Cairo', size: 10 } } } },
+            scales: {
+              x: { ticks: { color: '#94a3b8', font: { size: 9 }, maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+              y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            },
+          },
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    async function loadTimeline() {
+      try {
+        const url = new URL('/api/data-quality/timeline', location.origin);
+        if (siteKey) url.searchParams.set('site', siteKey);
+        url.searchParams.set('days', '30');
+        const r = await fetch(url);
+        if (!r.ok) return;
+        const d = await r.json();
+        const labels = d.timeline.map(t => t.day);
+        const canvasData = d.timeline.map(t => t.canvas_completeness);
+        const asnData = d.timeline.map(t => t.asn_completeness);
+
+        if (timelineChartObj) timelineChartObj.destroy();
+        timelineChartObj = new Chart(document.getElementById('timelineChart'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Canvas %', data: canvasData, borderColor: '#10b981', tension: 0.3, pointRadius: 2 },
+              { label: 'ASN %', data: asnData, borderColor: '#6366f1', tension: 0.3, pointRadius: 2 },
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#cbd5e1', font: { family: 'Cairo' } } } },
+            scales: {
+              x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+              y: { min: 0, max: 100, ticks: { color: '#94a3b8', font: { size: 10 }, callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            },
+          },
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    loadOverview();
+    loadCollector();
+    loadTimeline();
+    setInterval(() => { loadCollector(); }, 60000);
+  </script>
+</body>
+  </html>
