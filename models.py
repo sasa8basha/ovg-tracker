@@ -15,6 +15,9 @@ class UserModel(Base):
     email = Column(String(255), unique=True, nullable=True, index=True)
     email_verified = Column(Boolean, default=False, nullable=False)
     token_version = Column(Integer, default=1, nullable=False)
+    # Phase 3A — CPM Arbitrage P&L settings (global per user)
+    cpm_buy = Column(Float, default=1.0, server_default="1.0", nullable=False)
+    cpm_sell = Column(Float, default=1.5, server_default="1.5", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     sites = relationship("SiteModel", back_populates="user", cascade="all, delete-orphan")
 
