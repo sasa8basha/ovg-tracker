@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · لوحة التحكم</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/design-tokens.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+
+  <style>
+    body{font-family:'Cairo',sans-serif;background:var(--bg-page);color:var(--text-primary)}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    .site-card{transition:all .3s ease; background: var(--bg-card); border: 1px solid var(--border);}
+    .site-card:hover{transform:translateY(-5px);box-shadow:0 20px 40px -12px rgba(0,0,0,.5); border-color: var(--primary-500);}
+    .nav-btn.active{background:rgba(99,102,241,.15);color:var(--primary-500);font-weight:700}
+    .modal-bg{background:rgba(0,0,0,.7);backdrop-filter:blur(8px)}
+    .toast{animation:slideUp .3s ease}
+    @keyframes slideUp{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+    .topbar { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    table { color: var(--text-primary); }
+    thead { background: var(--bg-page) !important; color: var(--text-secondary); }
+    tbody tr:hover { background: rgba(255,255,255,0.02) !important; }
+    .bg-white { background-color: var(--bg-card) !important; border-color: var(--border) !important; }
+    .text-slate-900, .text-slate-800 { color: var(--text-primary) !important; }
+    .text-slate-500, .text-slate-400, .text-slate-600 { color: var(--text-secondary) !important; }
+
+    /* Command Palette */
+    .cmd-palette { background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- Command Palette (Ctrl+K) -->
+<div id="cmdPalette" class="fixed inset-0 modal-bg hidden items-start justify-center pt-[10vh] z-[100]">
+  <div class="cmd-palette w-full max-w-xl rounded-2xl overflow-hidden animate-fade-up">
+    <div class="flex items-center px-4 py-3 border-b border-white/10">
+      <span class="text-slate-400 text-lg mr-3">🔍</span>
+      <input type="text" id="cmdInput" class="w-full bg-transparent text-white outline-none placeholder-slate-500 text-lg" placeholder="ابحث عن صفحة، موقع، أو زيارة...">
+      <span class="text-xs text-slate-500 border border-slate-600 px-2 py-1 rounded">ESC</span>
+    </div>
+    <div id="cmdResults" class="max-h-80 overflow-y-auto p-2">
+      <!-- النتائج تظهر هنا -->
+    </div>
+  </div>
+</div>
+
+<aside class="fixed right-0 top-0 h-screen w-72 glass-sidebar flex flex-col z-40">
+  <div class="p-6 border-b border-white/5">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-extrabold shadow-lg shadow-indigo-500/30">O</div>
+      <div>
+        <h1 class="font-extrabold text-white leading-tight">OVG Tracker</h1>
+        <p class="text-[11px] text-slate-400 font-semibold">ULTIMATE · V5.1</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="siteContext" class="p-3 border-b border-white/5 hidden relative">
+    <button onclick="toggleSiteMenu(event)" class="w-full flex items-center justify-between p-3 bg-black/20 hover:bg-black/40 rounded-xl transition border border-white/5">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-lg">🌐</span>
+        <span id="currentSiteName" class="font-semibold text-sm text-slate-200 truncate">...</span>
+      </div>
+      <span class="text-slate-400 text-xs">▼</span>
+    </button>
+    <div id="siteMenu" class="hidden absolute right-3 left-3 top-full mt-1 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 py-2 z-50 max-h-80 overflow-y-auto"></div>
+  </div>
+
+  <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+    <p class="px-4 text-xs font-bold text-slate-500 mt-4 mb-2">مساحة العمل</p>
+    <button onclick="navTo('sites')" data-nav="sites" class="nav-btn w-full text-right px-4 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 font-semibold text-sm flex items-center gap-3 transition">
+      <span class="text-lg">📊</span> المواقع
+    </button>
+
+    <div id="siteNav" class="hidden space-y-1 pt-1">
+      <p class="px-4 text-xs font-bold text-slate-500 mt-4 mb-2">التحليل</p>
+      <button onclick="navTo('overview')" data-nav="overview" class="nav-btn w-full text-right px-4 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 font-semibold text-sm flex items-center gap-3 transition">
+        <span class="text-lg">🏠</span> نظرة عامة
+      </button>
+      <button onclick="if(state.currentSite) window.location.href='/visits?site=' + state.currentSite.site_key" class="nav-btn w-full text-right px-4 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 font-semibold text-sm flex items-center gap-3 transition">
+        <span class="text-lg">📋</span> كل الزيارات
+      </button>
+      <button onclick="if(state.currentSite) window.location.href='/reports?site=' + state.currentSite.site_key" class="nav-btn w-full text-right px-4 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 font-semibold text-sm flex items-center gap-3 transition">
+        <span class="text-lg">📈</span> التقارير والخريطة
+      </button>
+      <button onclick="if(state.currentSite) window.location.href='/smart-reports?site=' + state.currentSite.site_key" class="nav-btn w-full text-right px-4 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 font-semibold text-sm flex items-center gap-3 transition">
+        <span class="text-lg">🧠</span> التقارير الذكية
+      </button>
+
+      <p class="px-4 text-xs font-bold text-slate-500 mt-4 mb-2">الأدوات</p>
+      <button onclick="navTo('tracker')" data-nav="tracker" class="nav-btn w-full text-right px-4 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 font-semibold text-sm flex items-center gap-3 transition">
+        <span class="text-lg">🔧</span> كود التتبع
+      </button>
+      <button onclick="navTo('settings')" data-nav="settings" class="nav-btn w-full text-right px-4 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 font-semibold text-sm flex items-center gap-3 transition">
+        <span class="text-lg">⚙️</span> إعدادات الموقع
+      </button>
+    </div>
+  </nav>
+
+  <div class="p-3 border-t border-white/5">
+    <div class="flex items-center gap-3 p-2 mb-1">
+      <div class="w-9 h-9 bg-slate-700 rounded-full flex items-center justify-center text-white font-bold">👤</div>
+      <div class="min-w-0 flex-1">
+        <p id="userName" class="font-bold text-sm text-white truncate">...</p>
+        <p class="text-[11px] text-slate-400">مسجل دخول</p>
+      </div>
+    </div>
+    <button onclick="doLogout()" class="w-full text-right px-3 py-2 text-sm text-rose-400 hover:bg-rose-500/10 rounded-lg font-semibold transition">← تسجيل الخروج</button>
+  </div>
+</aside>
+
+<main class="mr-72 min-h-screen flex flex-col">
+  <header class="topbar sticky top-0 z-30 px-8 py-4 flex justify-between items-center">
+    <div class="flex items-center gap-2 text-sm text-slate-400">
+      <span class="font-bold text-white">OVG</span>
+      <span>/</span>
+      <span id="breadcrumb-site" class="hidden">موقع</span>
+      <span id="breadcrumb-view" class="text-indigo-400 font-semibold">لوحة التحكم</span>
+    </div>
+    <div class="flex items-center gap-4">
+       <button onclick="openCmdPalette()" class="text-slate-400 hover:text-white transition flex items-center gap-2 text-sm bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+         <span>🔍 بحث سريع</span> <span class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded font-mono">Ctrl+K</span>
+       </button>
+    </div>
+  </header>
+
+  <div class="p-6 md:p-8 max-w-7xl mx-auto w-full">
+
+    <div id="view-sites" class="view animate-fade-up">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-3xl font-extrabold text-white">مواقعي</h1>
+          <p class="text-slate-400 text-sm mt-1">أدر كل مواقعك من مكان واحد · <span id="siteLimit">0/20</span></p>
+        </div>
+        <button onclick="openSiteModal()" class="btn-primary flex items-center gap-2">
+          <span class="text-lg leading-none">+</span> موقع جديد
+        </button>
+      </div>
+      <div id="sitesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </div>
+
+    <div id="view-overview" class="view hidden">
+      <div class="flex items-center justify-between mb-8 animate-fade-up">
+        <div>
+          <h1 class="text-3xl font-extrabold text-white">نظرة عامة</h1>
+          <p id="overviewSubtitle" class="text-slate-400 text-sm mt-1">—</p>
+        </div>
+        <button onclick="runMock()" class="btn-ghost border border-slate-600">🧪 بيانات تجريبية</button>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div class="card animate-fade-up delay-1">
+          <p class="text-slate-400 text-xs font-bold mb-2">إجمالي الزيارات</p>
+          <p id="kpi-total" class="text-4xl font-extrabold text-white">0</p>
+        </div>
+        <div class="card animate-fade-up delay-2" style="border-bottom: 3px solid var(--valid)">
+          <p class="text-slate-400 text-xs font-bold mb-2">زيارات صالحة</p>
+          <p id="kpi-valid" class="text-4xl font-extrabold text-emerald-400">0</p>
+        </div>
+        <div class="card animate-fade-up delay-3" style="border-bottom: 3px solid var(--invalid)">
+          <p class="text-slate-400 text-xs font-bold mb-2">بوتات (Invalid)</p>
+          <p id="kpi-invalid" class="text-4xl font-extrabold text-rose-400">0</p>
+        </div>
+        <div class="card animate-fade-up delay-4" style="border-bottom: 3px solid var(--suspicious)">
+          <p class="text-slate-400 text-xs font-bold mb-2">مشبوهة</p>
+          <p id="kpi-suspicious" class="text-4xl font-extrabold text-amber-400">0</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="card animate-fade-up delay-2">
+          <h2 class="text-sm font-bold text-white mb-6">نسبة جودة الترافيك</h2>
+          <div class="h-56 flex justify-center"><canvas id="qualityChart"></canvas></div>
+        </div>
+
+        <div class="card col-span-1 lg:col-span-2 overflow-hidden p-0 animate-fade-up delay-3">
+          <div class="p-5 border-b border-white/5 flex justify-between items-center bg-black/10">
+            <h2 class="text-sm font-bold text-white">أحدث الزيارات (Live)</h2>
+            <span class="text-[10px] text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full font-bold flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> مباشر
+            </span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right">
+              <thead class="text-[11px] text-slate-400 bg-black/20">
+                <tr>
+                  <th class="px-4 py-4 text-center">الوقت</th>
+                  <th class="px-4 py-4">الزون</th>
+                  <th class="px-4 py-4 text-center">الدولة/الشبكة</th>
+                  <th class="px-4 py-4 text-center">Score</th>
+                  <th class="px-4 py-4 text-center">الحكم</th>
+                  <th class="px-4 py-4 text-center">تفاصيل</th>
+                </tr>
+              </thead>
+              <tbody id="live-table" class="divide-y divide-white/5"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-tracker" class="view hidden animate-fade-up">
+      <h1 class="text-3xl font-extrabold text-white mb-2">كود التتبع</h1>
+      <p class="text-slate-400 text-sm mb-6">انسخ الكود ده وحطه في موقعك (في &lt;head&gt; أو قبل &lt;/body&gt; مباشرة)</p>
+
+      <div class="card mb-5">
+        <label class="text-xs font-bold text-slate-400 mb-2 block">Site Key</label>
+        <div class="flex gap-2">
+          <input id="siteKeyInput" readonly class="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 font-mono text-sm text-indigo-300">
+          <button onclick="copyText(document.getElementById('siteKeyInput').value)" class="btn-ghost border border-slate-600">نسخ</button>
+        </div>
+      </div>
+
+      <div class="bg-[#0d1117] border border-white/10 rounded-2xl shadow-lg p-6">
+        <div class="flex justify-between items-center mb-3">
+          <label class="text-xs font-bold text-slate-400">الكود الكامل (جاهز للنسخ)</label>
+          <button onclick="copyText(document.getElementById('embedCode').textContent)" class="text-indigo-400 hover:text-indigo-300 text-xs font-bold">نسخ الكود</button>
+        </div>
+        <pre id="embedCode" class="text-emerald-400 text-xs font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">جاري التحميل...</pre>
+      </div>
+
+      <div class="mt-5 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-200">
+        <p class="font-bold mb-1">⚠️ ملاحظة مهمة</p>
+        <p class="text-xs leading-relaxed">لازم تضيف <code class="bg-amber-500/20 px-1 rounded">?zoneId=XXX</code> في روابط صفحات موقعك عشان الزون يظهر في التقارير.</p>
+      </div>
+    </div>
+
+    <div id="view-settings" class="view hidden animate-fade-up">
+      <h1 class="text-3xl font-extrabold text-white mb-6">إعدادات الموقع</h1>
+      <div class="card max-w-xl mb-5">
+        <h2 class="text-sm font-bold text-white mb-4">بيانات الموقع</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs font-bold text-slate-400 mb-1.5 block">اسم الموقع</label>
+            <input id="editName" class="input w-full">
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-400 mb-1.5 block">الدومين (اختياري)</label>
+            <input id="editDomain" class="input w-full">
+          </div>
+          <button onclick="saveSiteSettings()" class="btn-primary">حفظ التعديلات</button>
+        </div>
+      </div>
+      <div class="card max-w-xl mb-5">
+        <h2 class="text-sm font-bold text-white mb-2">تجديد المفتاح</h2>
+        <p class="text-xs text-slate-400 mb-4">لو المفتاح اتسرّب، اعمله rotate. الكود القديم هيبطّل يشتغل فوراً.</p>
+        <button onclick="rotateSiteKey()" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition">🔄 تجديد المفتاح</button>
+      </div>
+      <div class="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-6 max-w-xl">
+        <h2 class="text-sm font-bold text-rose-400 mb-2">منطقة الخطر</h2>
+        <p class="text-xs text-rose-300 mb-4">حذف الموقع هيمسح كل البيانات المرتبطة بيه نهائياً</p>
+        <button onclick="deleteCurrentSite()" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition">حذف الموقع نهائياً</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="siteModal" class="fixed inset-0 modal-bg hidden items-center justify-center z-50 p-4">
+  <div class="bg-slate-800 border border-white/10 rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-fade-up">
+    <h3 class="text-lg font-extrabold text-white mb-1">موقع جديد</h3>
+    <p class="text-slate-400 text-xs mb-5">أضف موقع وابدأ تتبع الزيارات</p>
+    <form id="siteForm" class="space-y-4">
+      <div>
+        <label class="text-xs font-bold text-slate-400 mb-1.5 block">اسم الموقع *</label>
+        <input id="newName" required maxlength="100" class="input w-full" placeholder="مثال: متجر الأناقة">
+      </div>
+      <div>
+        <label class="text-xs font-bold text-slate-400 mb-1.5 block">الدومين (اختياري)</label>
+        <input id="newDomain" maxlength="253" class="input w-full" placeholder="shop.example.com">
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeSiteModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl font-bold text-sm transition">إلغاء</button>
+        <button type="submit" class="flex-1 btn-primary">إنشاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="createdModal" class="fixed inset-0 modal-bg hidden items-center justify-center z-50 p-4">
+  <div class="bg-slate-800 border border-white/10 rounded-3xl p-6 md:p-8 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-up">
+    <div class="text-center mb-5">
+      <div class="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+        <span class="text-3xl">✅</span>
+      </div>
+      <h3 class="text-xl font-extrabold text-white mb-1">تم إنشاء الموقع بنجاح!</h3>
+      <p class="text-slate-400 text-sm">الموقع <span id="createdSiteName" class="font-bold text-indigo-400"></span> جاهز للتتبع</p>
+    </div>
+    <div class="mb-4">
+      <label class="text-xs font-bold text-slate-400 mb-1.5 block">Site Key</label>
+      <div class="flex gap-2">
+        <input id="createdKey" readonly class="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 font-mono text-xs text-indigo-300">
+        <button onclick="copyText(document.getElementById('createdKey').value)" class="btn-ghost border border-slate-600">نسخ</button>
+      </div>
+    </div>
+    <div class="mb-5">
+      <div class="flex justify-between items-center mb-2">
+        <label class="text-xs font-bold text-slate-400">كود التتبع الكامل</label>
+        <button onclick="copyText(document.getElementById('createdCode').textContent)" class="text-indigo-400 hover:text-indigo-300 text-xs font-bold">نسخ الكود</button>
+      </div>
+      <pre id="createdCode" class="bg-[#0d1117] border border-white/10 text-emerald-400 text-xs font-mono p-4 rounded-xl overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">جاري التحميل...</pre>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="closeCreatedModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl font-bold text-sm transition">+ إضافة موقع آخر</button>
+      <button onclick="goToCreatedDashboard()" class="flex-1 btn-primary">روح للداشبورد ←</button>
+    </div>
+  </div>
+</div>
+
+<div id="details-modal" class="fixed inset-0 modal-bg hidden items-center justify-center z-50 p-4">
+  <div class="bg-slate-800 border border-white/10 rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-fade-up">
+    <h3 class="text-lg font-extrabold text-indigo-400 mb-4">تفاصيل التحليل</h3>
+    <div id="modal-content" class="space-y-2 text-sm text-slate-300 mb-6 max-h-96 overflow-y-auto"></div>
+    <button onclick="closeDetails()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl font-bold transition">إغلاق</button>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 hidden bg-slate-800 text-white border border-slate-600 px-6 py-3 rounded-xl font-semibold text-sm shadow-2xl z-[100] toast"></div>
+
+<script>
+const state = {
+  user: null, sites: [], currentSite: null, view: 'sites',
+  chart: null, visitsData: {}
+};
+const MAX_SITES = 20;
+
+// ---------------- Command Palette Logic ----------------
+const cmdPalette = document.getElementById('cmdPalette');
+const cmdInput = document.getElementById('cmdInput');
+const cmdResults = document.getElementById('cmdResults');
+
+const commands = [
+  { title: "لوحة التحكم (المواقع)", action: () => { cmdPalette.classList.add('hidden'); navTo('sites'); }, icon: "📊" },
+  { title: "نظرة عامة", action: () => { cmdPalette.classList.add('hidden'); navTo('overview'); }, icon: "🏠" },
+  { title: "كل الزيارات", action: () => { cmdPalette.classList.add('hidden'); if(state.currentSite) location.href='/visits?site='+state.currentSite.site_key; }, icon: "📋" },
+  { title: "التقارير والخريطة", action: () => { cmdPalette.classList.add('hidden'); if(state.currentSite) location.href='/reports?site='+state.currentSite.site_key; }, icon: "📈" },
+  { title: "التقارير الذكية", action: () => { cmdPalette.classList.add('hidden'); if(state.currentSite) location.href='/smart-reports?site='+state.currentSite.site_key; }, icon: "🧠" },
+  { title: "كود التتبع", action: () => { cmdPalette.classList.add('hidden'); navTo('tracker'); }, icon: "🔧" },
+  { title: "إعدادات الموقع", action: () => { cmdPalette.classList.add('hidden'); navTo('settings'); }, icon: "⚙️" },
+];
+
+function openCmdPalette() {
+  cmdPalette.classList.remove('hidden');
+  cmdPalette.classList.add('flex');
+  cmdInput.value = '';
+  renderCmdResults('');
+  setTimeout(() => cmdInput.focus(), 50);
+}
+
+function renderCmdResults(query) {
+  let filtered = commands;
+  if (query) {
+    filtered = commands.filter(c => c.title.includes(query));
+  }
+  if (query && state.sites.length) {
+    const matchedSites = state.sites.filter(s => s.name.includes(query));
+    matchedSites.forEach(s => {
+      filtered.push({ title: `الذهاب للموقع: ${s.name}`, action: () => { cmdPalette.classList.add('hidden'); openSite(s.site_key); }, icon: "🌐" });
+    });
+  }
+
+  if (!filtered.length) {
+    cmdResults.innerHTML = `<div class="p-4 text-center text-slate-500 text-sm">لا توجد نتائج</div>`;
+    return;
+  }
+
+  cmdResults.innerHTML = filtered.map((c, i) => `
+    <button onclick="runCmd(${i})" class="w-full text-right px-4 py-3 hover:bg-white/10 rounded-xl flex items-center gap-3 text-sm text-slate-200 transition">
+      <span class="text-lg opacity-70">${c.icon}</span>
+      <span>${c.title}</span>
+    </button>
+  `).join('');
+  window._currentCmds = filtered;
+}
+
+function runCmd(index) {
+  if(window._currentCmds && window._currentCmds[index]) window._currentCmds[index].action();
+}
+
+cmdInput.addEventListener('input', (e) => renderCmdResults(e.target.value));
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    openCmdPalette();
+  }
+  if (e.key === 'Escape') {
+    cmdPalette.classList.add('hidden');
+    cmdPalette.classList.remove('flex');
+  }
+});
+cmdPalette.addEventListener('click', (e) => {
+  if (e.target === cmdPalette) {
+    cmdPalette.classList.add('hidden');
+    cmdPalette.classList.remove('flex');
+  }
+});
+// --------------------------------------------------------
+
+function animateValue(id, start, end, duration) {
+  const obj = document.getElementById(id);
+  if (!obj) return;
+  let startTimestamp = null;
+  const step = (timestamp) => {
+    if (!startTimestamp) startTimestamp = timestamp;
+    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+    obj.innerHTML = Math.floor(progress * (end - start) + start).toLocaleString();
+    if (progress < 1) window.requestAnimationFrame(step);
+    else obj.innerHTML = end.toLocaleString();
+  };
+  window.requestAnimationFrame(step);
+}
+
+async function init() {
+  const me = await fetch('/api/auth/me').then(r => r.ok ? r.json() : null).catch(() => null);
+  if (!me) { location.href = '/'; return; }
+  state.user = me;
+  document.getElementById('userName').textContent = me.username;
+  await loadSites();
+  const siteKey = new URL(location.href).searchParams.get('site');
+  if (siteKey) {
+    const s = state.sites.find(x => x.site_key === siteKey);
+    if (s) { selectSite(s, false); return; }
+  }
+  navTo('sites');
+  if (state.sites.length === 0) setTimeout(openSiteModal, 400);
+}
+
+async function loadSites() {
+  try {
+    const r = await fetch('/api/sites');
+    state.sites = await r.json();
+    renderSites();
+    renderSiteMenu();
+    document.getElementById('siteLimit').textContent = state.sites.length + '/' + MAX_SITES;
+  } catch (e) { toast('خطأ في تحميل المواقع'); }
+}
+
+function renderSites() {
+  const grid = document.getElementById('sitesGrid');
+  if (!state.sites.length) {
+    grid.innerHTML = `
+      <div class="col-span-full text-center py-20 card border-dashed border-2 border-slate-600 bg-transparent">
+        <div class="text-6xl mb-4 opacity-50">🌐</div>
+        <h3 class="font-extrabold text-white text-xl mb-2">مفيش مواقع لسه</h3>
+        <p class="text-slate-400 text-sm mb-6">أضف أول موقع ليك وابدأ تبعت الزيارات</p>
+        <button onclick="openSiteModal()" class="btn-primary mx-auto">+ أضف موقعك الأول</button>
+      </div>`;
+    return;
+  }
+  grid.innerHTML = state.sites.map((s, index) => {
+    const total = s.total || 0;
+    const valid = s.valid || 0;
+    const quality = total > 0 ? Math.round(valid / total * 100) : 0;
+    const qColor = quality >= 80 ? 'text-emerald-400' : quality >= 50 ? 'text-amber-400' : 'text-rose-400';
+    const last = s.last_visit ? timeAgo(new Date(s.last_visit)) : 'لا يوجد نشاط';
+    const delay = `delay-${(index % 4) + 1}`;
+
+    return `
+      <div class="site-card rounded-2xl p-6 cursor-pointer relative group animate-fade-up ${delay}" onclick="openSite('${s.site_key}')">
+        <div class="flex justify-between items-start mb-6">
+          <div class="min-w-0 flex-1">
+            <h3 class="font-extrabold text-white text-xl truncate">${esc(s.name)}</h3>
+            <p class="text-slate-400 text-xs truncate mt-1">${esc(s.domain || 'بدون دومين')}</p>
+          </div>
+          <div class="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center text-2xl shrink-0">🌐</div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center py-4 border-y border-white/5 mb-4">
+          <div><p class="text-[10px] text-slate-400 font-semibold mb-1">إجمالي</p><p class="text-lg font-extrabold text-white">${total}</p></div>
+          <div><p class="text-[10px] text-slate-400 font-semibold mb-1">صالح</p><p class="text-lg font-extrabold text-emerald-400">${valid}</p></div>
+          <div><p class="text-[10px] text-slate-400 font-semibold mb-1">بوتات</p><p class="text-lg font-extrabold text-rose-400">${s.invalid || 0}</p></div>
+        </div>
+        <div class="flex justify-between items-center text-xs font-semibold">
+          <span class="text-slate-500">${last}</span>
+          <span class="${qColor} bg-black/20 px-2 py-1 rounded-md">${quality}% جودة</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderSiteMenu() {
+  const menu = document.getElementById('siteMenu');
+  menu.innerHTML = state.sites.map(s =>
+    `<button onclick="openSite('${s.site_key}')" class="w-full text-right px-3 py-2 hover:bg-white/5 rounded-lg text-sm ${state.currentSite?.id === s.id ? 'bg-indigo-500/20 text-indigo-300 font-bold' : 'text-slate-300'}">${esc(s.name)}</button>`
+  ).join('') + `<hr class="my-1 border-white/5"><button onclick="clearSite()" class="w-full text-right px-3 py-2 hover:bg-white/5 rounded-lg text-sm text-slate-400">← كل المواقع</button>`;
+}
+
+function toggleSiteMenu(e) {
+  e.stopPropagation();
+  document.getElementById('siteMenu').classList.toggle('hidden');
+}
+document.addEventListener('click', e => {
+  const m = document.getElementById('siteMenu');
+  if (m && !m.classList.contains('hidden') && !e.target.closest('#siteContext')) m.classList.add('hidden');
+});
+
+function openSite(key) {
+  const s = state.sites.find(x => x.site_key === key);
+  if (!s) return;
+  selectSite(s, true);
+}
+
+function selectSite(site, push) {
+  state.currentSite = site;
+  document.getElementById('currentSiteName').textContent = site.name;
+  document.getElementById('siteContext').classList.remove('hidden');
+  document.getElementById('siteNav').classList.remove('hidden');
+  if (push) history.pushState({}, '', '/dashboard?site=' + site.site_key);
+  renderSiteMenu();
+  navTo('overview');
+}
+
+function clearSite() {
+  state.currentSite = null;
+  document.getElementById('siteContext').classList.add('hidden');
+  document.getElementById('siteNav').classList.add('hidden');
+  history.pushState({}, '', '/dashboard');
+  navTo('sites');
+}
+
+function navTo(view) {
+  state.view = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.getElementById('view-' + view).classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.dataset.nav === view) b.classList.add('active');
+  });
+
+  const titles = { 'sites': 'المواقع', 'overview': 'نظرة عامة', 'tracker': 'كود التتبع', 'settings': 'الإعدادات' };
+  document.getElementById('breadcrumb-view').textContent = titles[view] || 'لوحة التحكم';
+
+  if (view === 'sites') { document.getElementById('breadcrumb-site').classList.add('hidden'); loadSites(); }
+  if (view === 'overview') loadOverview();
+  if (view === 'tracker') renderTracker();
+  if (view === 'settings') renderSettings();
+}
+
+async function loadOverview() {
+  if (!state.currentSite) return;
+  document.getElementById('overviewSubtitle').textContent = state.currentSite.name + (state.currentSite.domain ? ' · ' + state.currentSite.domain : '');
+  document.getElementById('breadcrumb-site').classList.remove('hidden');
+  document.getElementById('breadcrumb-site').textContent = state.currentSite.name;
+
+  try {
+    const r = await fetch('/api/stats?site=' + state.currentSite.site_key);
+    if (!r.ok) return;
+    const d = await r.json();
+
+    animateValue("kpi-total", 0, d.total, 1000);
+    animateValue("kpi-valid", 0, d.valid, 1000);
+    animateValue("kpi-invalid", 0, d.invalid, 1000);
+    animateValue("kpi-suspicious", 0, d.suspicious, 1000);
+
+    const tb = document.getElementById('live-table');
+    state.visitsData = {};
+    if (!d.recent.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400 text-sm">مفيش زيارات لسه — ركّب كود التتبع عشان تبدأ</td></tr>`;
+    } else {
+      tb.innerHTML = d.recent.map(v => {
+        state.visitsData[v.id] = v;
+        const badge = v.verdict === 'valid' ? 'bg-emerald-500/10 text-emerald-400' : v.verdict === 'invalid' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400';
+        const sc = v.score > 80 ? 'text-rose-400' : v.score > 40 ? 'text-amber-400' : 'text-emerald-400';
+        let netIcon = v.conn_type === 'hosting' ? '🚨 DC' : v.conn_type === 'Unknown' ? '❓' : '🏠';
+        if (v.is_vpn) netIcon = '🛡️ VPN';
+        return `<tr class="transition-colors cursor-pointer hover:bg-white/5" onclick="window.location.href='/visits/${v.id}'">
+          <td class="px-4 py-3 text-slate-400 text-xs text-center font-mono">${v.time}</td>
+          <td class="px-4 py-3 font-semibold text-xs text-white">${esc(v.zone)}</td>
+          <td class="px-4 py-3 text-xs text-center text-slate-300">${esc(v.country)} <span class="text-[10px] opacity-70">${netIcon}</span></td>
+          <td class="px-4 py-3 ${sc} text-center font-bold font-mono">${v.score}</td>
+          <td class="px-4 py-3 text-center"><span class="${badge} px-2.5 py-1 rounded-md text-[10px] font-bold border border-white/5">${v.verdict.toUpperCase()}</span></td>
+          <td class="px-4 py-3 text-center text-indigo-400">←</td>
+        </tr>`;
+      }).join('');
+    }
+    renderChart(d);
+  } catch (e) { console.error(e); }
+}
+
+function renderChart(d) {
+  if (state.chart) state.chart.destroy();
+  state.chart = new Chart(document.getElementById('qualityChart').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: ['Valid', 'Invalid', 'Suspicious'], datasets: [{ data: [d.valid, d.invalid, d.suspicious], backgroundColor: ['#10b981', '#f43f5e', '#f59e0b'], borderWidth: 0 }] },
+    options: { cutout: '75%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11, family: 'Cairo' }, color: '#94a3b8' } } } }
+  });
+}
+
+async function renderTracker() {
+  if (!state.currentSite) return;
+  document.getElementById('siteKeyInput').value = state.currentSite.site_key;
+  document.getElementById('embedCode').textContent = 'جاري التحميل...';
+  try {
+    const r = await fetch('/api/sites/' + state.currentSite.id + '/tracker-code');
+    const d = await r.json();
+    document.getElementById('embedCode').textContent = d.code || 'فشل التحميل';
+  } catch (e) {
+    document.getElementById('embedCode').textContent = 'فشل تحميل الكود';
+  }
+}
+
+function renderSettings() {
+  if (!state.currentSite) return;
+  document.getElementById('editName').value = state.currentSite.name;
+  document.getElementById('editDomain').value = state.currentSite.domain || '';
+}
+async function saveSiteSettings() {
+  const name = document.getElementById('editName').value.trim();
+  const domain = document.getElementById('editDomain').value.trim();
+  if (!name) { toast('اسم الموقع مطلوب'); return; }
+  const r = await fetch('/api/sites/' + state.currentSite.id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, domain })
+  });
+  if (r.ok) {
+    toast('تم الحفظ ✅');
+    await loadSites();
+    state.currentSite = state.sites.find(s => s.id === state.currentSite.id);
+    document.getElementById('currentSiteName').textContent = state.currentSite.name;
+    renderSettings();
+  } else toast('فشل الحفظ');
+}
+async function rotateSiteKey() {
+  if (!confirm('تجديد المفتاح هيبطّل الكود القديم. متأكد؟')) return;
+  const r = await fetch('/api/sites/' + state.currentSite.id + '/rotate-key', { method: 'POST' });
+  const d = await r.json().catch(()=>({}));
+  if (r.ok) {
+    toast('تم تجديد المفتاح');
+    await loadSites();
+    state.currentSite = state.sites.find(s => s.id === state.currentSite.id);
+    renderTracker();
+    renderSettings();
+  } else toast(d.detail || 'فشل التجديد');
+}
+async function deleteCurrentSite() {
+  if (!confirm('هل أنت متأكد من حذف "' + state.currentSite.name + '"؟ البيانات مش هترجع تاني.')) return;
+  const r = await fetch('/api/sites/' + state.currentSite.id, { method: 'DELETE' });
+  if (r.ok) { toast('تم الحذف'); clearSite(); }
+  else toast('فشل الحذف');
+}
+
+function openSiteModal() {
+  document.getElementById('siteModal').classList.remove('hidden');
+  document.getElementById('siteModal').classList.add('flex');
+  setTimeout(() => document.getElementById('newName').focus(), 50);
+}
+function closeSiteModal() {
+  document.getElementById('siteModal').classList.add('hidden');
+  document.getElementById('siteModal').classList.remove('flex');
+  document.getElementById('newName').value = '';
+  document.getElementById('newDomain').value = '';
+}
+
+document.getElementById('siteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('newName').value.trim();
+  const domain = document.getElementById('newDomain').value.trim();
+  if (!name) return;
+  const r = await fetch('/api/sites', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name, domain }) });
+  const d = await r.json().catch(()=>({}));
+  if (r.ok) {
+    closeSiteModal();
+    await loadSites();
+    showCreatedModal(d);
+  } else {
+    toast(d.detail || 'فشل الإنشاء');
+  }
+});
+
+async function showCreatedModal(site) {
+  document.getElementById('createdSiteName').textContent = site.name;
+  document.getElementById('createdKey').value = site.site_key;
+  document.getElementById('createdCode').textContent = 'جاري التحميل...';
+  document.getElementById('createdModal').classList.remove('hidden');
+  document.getElementById('createdModal').classList.add('flex');
+  window._justCreatedKey = site.site_key;
+  try {
+    const r = await fetch('/api/sites/' + site.id + '/tracker-code');
+    const d = await r.json();
+    document.getElementById('createdCode').textContent = d.code || 'فشل التحميل';
+  } catch (e) {
+    document.getElementById('createdCode').textContent = 'فشل تحميل الكود';
+  }
+}
+
+function closeCreatedModal() {
+  document.getElementById('createdModal').classList.add('hidden');
+  document.getElementById('createdModal').classList.remove('flex');
+  window._justCreatedKey = null;
+  setTimeout(openSiteModal, 200);
+}
+
+function goToCreatedDashboard() {
+  document.getElementById('createdModal').classList.add('hidden');
+  document.getElementById('createdModal').classList.remove('flex');
+  const key = window._justCreatedKey;
+  window._justCreatedKey = null;
+  if (key) {
+    const s = state.sites.find(x => x.site_key === key);
+    if (s) { selectSite(s, true); return; }
+  }
+  navTo('sites');
+}
+
+async function runMock() {
+  if (!state.currentSite) return;
+  const r = await fetch('/api/mock-data?site=' + state.currentSite.site_key, { method: 'POST' });
+  if (r.ok) { toast('تم توليد 50 زيارة تجريبية'); loadOverview(); }
+  else toast('فشل التوليد');
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function copyText(t) { navigator.clipboard.writeText(t).then(() => toast('تم النسخ ✅')).catch(() => toast('فشل النسخ')); }
+function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.remove('hidden'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 2500); }
+function timeAgo(d) { const s = Math.floor((Date.now() - d.getTime())/1000); if (s < 60) return 'قبل لحظات'; if (s < 3600) return 'قبل ' + Math.floor(s/60) + ' د'; if (s < 86400) return 'قبل ' + Math.floor(s/3600) + ' س'; return 'قبل ' + Math.floor(s/86400) + ' يوم'; }
+
+async function doLogout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  location.href = '/';
+}
+
+setInterval(() => { if (state.view === 'overview' && state.currentSite) loadOverview(); }, 15000);
+
+init();
+</script>
+</body>
+</html>

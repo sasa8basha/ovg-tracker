@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · التقارير الذكية</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/design-tokens.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <style>
+    body{font-family:'Cairo',sans-serif;background:var(--bg-page);color:var(--text-primary)}
+    .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; }
+    .date-input { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 10px; font-size: 14px; font-family: 'Cairo', sans-serif; }
+    .date-input:focus { outline: none; border-color: var(--primary-500); }
+
+    .kpi-card { background: linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9)); border: 1px solid rgba(255,255,255,0.07); border-radius: 1rem; padding: 1.25rem; }
+    .kpi-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi-value { font-size: 1.75rem; font-weight: 800; font-family: 'Courier New', monospace; line-height: 1.1; margin-top: 4px; }
+
+    .grade-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-weight: 800; font-size: 12px; min-width: 32px; text-align: center; }
+    .grade-S { background: rgba(168,85,247,0.2); color: #d8b4fe; border: 1px solid rgba(168,85,247,0.5); }
+    .grade-A { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.5); }
+    .grade-B { background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.5); }
+    .grade-C { background: rgba(245,158,11,0.2); color: #fcd34d; border: 1px solid rgba(245,158,11,0.5); }
+    .grade-D { background: rgba(249,115,22,0.2); color: #fdba74; border: 1px solid rgba(249,115,22,0.5); }
+    .grade-F { background: rgba(244,63,94,0.2); color: #fda4af; border: 1px solid rgba(244,63,94,0.5); }
+
+    .lifecycle-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+    .life-learning { background: rgba(148,163,184,0.15); color: #cbd5e1; }
+    .life-testing  { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .life-scaling  { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .life-declining{ background: rgba(245,158,11,0.15); color: #fcd34d; }
+    .life-kill     { background: rgba(244,63,94,0.15); color: #fda4af; }
+
+    .profit-bar { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+    .profit-bar > div { height: 100%; transition: width 0.4s; }
+
+    table { color: var(--text-primary); }
+    thead { background: rgba(0,0,0,0.4) !important; color: var(--text-secondary); }
+    tbody tr:hover { background: rgba(255,255,255,0.03) !important; }
+
+    .refresh-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; }
+    .refresh-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
+    .refresh-badge.stale .dot { background: #f59e0b; }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+  <div class="max-w-[1600px] mx-auto">
+
+    <!-- Header -->
+    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+      <div>
+        <h1 class="text-3xl font-extrabold text-white flex items-center gap-3">
+          🧠 التقارير الذكية
+          <span class="refresh-badge" id="refreshBadge">
+            <span class="dot"></span>
+            <span id="refreshTime">—</span>
+          </span>
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">الأرقام الحقيقية: تكلفة، إيراد، ربح، و ROI لكل زون</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="openCpmSettings()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition">💰 إعدادات CPM</button>
+        <button onclick="window.location.href='/dashboard'" class="btn-ghost border border-slate-600">← العودة</button>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="glass p-4 mb-6 flex flex-wrap gap-4 items-end">
+      <div class="flex-1 min-w-[180px]">
+        <label class="block text-xs font-bold text-slate-400 mb-1">📅 من تاريخ</label>
+        <input type="date" id="filterFrom" class="date-input w-full">
+      </div>
+      <div class="flex-1 min-w-[180px]">
+        <label class="block text-xs font-bold text-slate-400 mb-1">📅 إلى تاريخ</label>
+        <input type="date" id="filterTo" class="date-input w-full">
+      </div>
+      <button onclick="applyFilters()" class="btn-primary">تطبيق</button>
+      <button onclick="clearFilters()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition">مسح</button>
+      <div class="flex-1"></div>
+      <div class="text-xs text-slate-400 text-left" id="cpmInfo"></div>
+    </div>
+
+    <!-- Summary KPI cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div class="kpi-card">
+        <div class="kpi-label">إجمالي الزيارات</div>
+        <div class="kpi-value text-white" id="kpiTotal">0</div>
+        <div class="text-[11px] text-slate-500 mt-1" id="kpiTotalSub">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">💸 التكلفة (Cost)</div>
+        <div class="kpi-value text-rose-400" id="kpiCost">$0.00</div>
+        <div class="text-[11px] text-slate-500 mt-1">اللي دفعته</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">💰 الإيراد (Revenue)</div>
+        <div class="kpi-value text-emerald-400" id="kpiRevenue">$0.00</div>
+        <div class="text-[11px] text-slate-500 mt-1">اللي كسبته</div>
+      </div>
+      <div class="kpi-card" id="profitCard">
+        <div class="kpi-label">📊 الربح (Profit)</div>
+        <div class="kpi-value" id="kpiProfit">$0.00</div>
+        <div class="text-[11px] text-slate-500 mt-1" id="kpiProfitSub">—</div>
+      </div>
+      <div class="kpi-card" id="roiCard">
+        <div class="kpi-label">📈 ROI</div>
+        <div class="kpi-value" id="kpiRoi">0%</div>
+        <div class="text-[11px] text-slate-500 mt-1">العائد على الاستثمار</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">🎯 Effective Rate</div>
+        <div class="kpi-value text-indigo-400" id="kpiEffective">0%</div>
+        <div class="text-[11px] text-slate-500 mt-1" id="kpiEffectiveSub">—</div>
+      </div>
+    </div>
+
+    <!-- Break-even alert -->
+    <div id="breakevenAlert" class="hidden mb-6 p-4 rounded-2xl border"></div>
+
+    <!-- Zones table -->
+    <div class="glass overflow-hidden">
+      <div class="p-4 border-b border-white/5 flex justify-between items-center">
+        <h2 class="text-sm font-bold text-white">📋 Zone Scorecards (مرتبة بالأرباح)</h2>
+        <span class="text-xs text-slate-500" id="zoneCount">0 زون</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-right">
+          <thead class="text-[11px] uppercase font-bold">
+            <tr>
+              <th class="px-3 py-3">الزون</th>
+              <th class="px-3 py-3">المصدر</th>
+              <th class="px-3 py-3 text-center">الإجمالي</th>
+              <th class="px-3 py-3 text-center text-emerald-400">Valid</th>
+              <th class="px-3 py-3 text-center text-rose-400">Invalid</th>
+              <th class="px-3 py-3 text-center text-amber-400">Wasted</th>
+              <th class="px-3 py-3 text-center">Bot %</th>
+              <th class="px-3 py-3 text-center">Wasted %</th>
+              <th class="px-3 py-3 text-center">Cost</th>
+              <th class="px-3 py-3 text-center">Revenue</th>
+              <th class="px-3 py-3 text-center">Profit</th>
+              <th class="px-3 py-3 text-center">ROI %</th>
+              <th class="px-3 py-3 text-center">Score</th>
+              <th class="px-3 py-3 text-center">Grade</th>
+              <th class="px-3 py-3 text-center">Lifecycle</th>
+            </tr>
+          </thead>
+          <tbody id="zonesTable" class="divide-y divide-white/5"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="hidden p-10 text-center text-slate-500 text-sm">
+        مفيش بيانات لسه. اسحب كود التتبع على موقعك الأول.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CPM Settings Modal -->
+  <div id="cpmModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+      <h3 class="text-lg font-extrabold text-white mb-1">💰 إعدادات CPM</h3>
+      <p class="text-xs text-slate-400 mb-5">السعر اللي بتشتري بيه واللي بتاخده من شبكة الإعلانات — بيتحسب عليهم الربح الصافي.</p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">سعر الشراء (Buy CPM) $ لكل 1000 زيارة</label>
+          <input id="inpCpmBuy" type="number" step="0.01" min="0" max="100" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">سعر البيع (Sell CPM) $ لكل 1000 impression</label>
+          <input id="inpCpmSell" type="number" step="0.01" min="0" max="100" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white">
+        </div>
+        <p id="cpmModalMsg" class="text-xs hidden"></p>
+      </div>
+      <div class="flex gap-2 mt-6">
+        <button onclick="closeCpmSettings()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl font-bold text-sm">إلغاء</button>
+        <button onclick="saveCpmSettings()" class="flex-1 btn-primary">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const siteKey = new URL(location.href).searchParams.get('site');
+    let dateFilters = { from: null, to: null };
+    let lastRefresh = null;
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtMoney(n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); }
+    function fmtPct(n) { return (Math.round(n * 10) / 10).toFixed(1) + '%'; }
+
+    function buildUrl(base) {
+      const p = new URLSearchParams();
+      if (siteKey) p.set('site', siteKey);
+      if (dateFilters.from) p.set('from_date', dateFilters.from);
+      if (dateFilters.to) p.set('to_date', dateFilters.to);
+      const qs = p.toString();
+      return qs ? base + '?' + qs : base;
+    }
+
+    function applyFilters() {
+      dateFilters.from = document.getElementById('filterFrom').value || null;
+      dateFilters.to = document.getElementById('filterTo').value || null;
+      loadReport();
+    }
+
+    function clearFilters() {
+      document.getElementById('filterFrom').value = '';
+      document.getElementById('filterTo').value = '';
+      dateFilters.from = null;
+      dateFilters.to = null;
+      loadReport();
+    }
+
+    function updateRefreshTime() {
+      lastRefresh = new Date();
+      const t = lastRefresh.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById('refreshTime').textContent = 'آخر تحديث: ' + t;
+    }
+
+    function renderSummary(s) {
+      document.getElementById('kpiTotal').textContent = s.total.toLocaleString();
+      document.getElementById('kpiTotalSub').textContent = `بوت: ${s.invalid} · مشبوه: ${s.suspicious}`;
+
+      document.getElementById('kpiCost').textContent = fmtMoney(s.pl.cost);
+      document.getElementById('kpiRevenue').textContent = fmtMoney(s.pl.revenue);
+
+      const profitEl = document.getElementById('kpiProfit');
+      const profitCard = document.getElementById('profitCard');
+      const profitSub = document.getElementById('kpiProfitSub');
+      profitEl.textContent = (s.pl.profit >= 0 ? '+' : '') + fmtMoney(s.pl.profit);
+      profitEl.className = 'kpi-value ' + (s.pl.profit >= 0 ? 'text-emerald-400' : 'text-rose-400');
+      profitCard.style.borderColor = s.pl.profit >= 0 ? 'rgba(16,185,129,0.4)' : 'rgba(244,63,94,0.4)';
+      profitSub.textContent = s.pl.profit >= 0 ? 'رابح ✅' : 'خاسر ⚠️';
+
+      const roiEl = document.getElementById('kpiRoi');
+      const roiCard = document.getElementById('roiCard');
+      roiEl.textContent = (s.pl.roi >= 0 ? '+' : '') + s.pl.roi + '%';
+      roiEl.className = 'kpi-value ' + (s.pl.roi >= 0 ? 'text-emerald-400' : 'text-rose-400');
+      roiCard.style.borderColor = s.pl.roi >= 0 ? 'rgba(16,185,129,0.4)' : 'rgba(244,63,94,0.4)';
+
+      const effEl = document.getElementById('kpiEffective');
+      effEl.textContent = s.pl.effective_ratio + '%';
+      effEl.className = 'kpi-value ' + (s.pl.effective_ratio >= s.pl.needed_ratio ? 'text-emerald-400' : 'text-rose-400');
+      document.getElementById('kpiEffectiveSub').textContent = `محتاج ≥ ${s.pl.needed_ratio}% للتعادل`;
+
+      // Break-even alert
+      const alert = document.getElementById('breakevenAlert');
+      if (s.pl.effective_ratio < s.pl.needed_ratio) {
+        const gap = (s.pl.needed_ratio - s.pl.effective_ratio).toFixed(1);
+        alert.className = 'mb-6 p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10';
+        alert.innerHTML = `
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">🚨</span>
+            <div class="flex-1">
+              <div class="font-bold text-rose-300 mb-1">أقل من نقطة التعادل!</div>
+              <div class="text-xs text-rose-200 leading-relaxed">
+                نسبة الـ impressions الفعالة عندك <b>${s.pl.effective_ratio}%</b>، والمطلوب <b>${s.pl.needed_ratio}%</b> للتعادل.
+                فيه فرق <b>${gap}%</b> = خسارة صافية.
+                الأسباب: بوتات (${s.bot_rate}%) + wasted (${s.wasted_rate}%).
+              </div>
+            </div>
+          </div>`;
+        alert.classList.remove('hidden');
+      } else {
+        alert.className = 'mb-6 p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10';
+        alert.innerHTML = `
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">✅</span>
+            <div class="flex-1">
+              <div class="font-bold text-emerald-300 mb-1">فوق نقطة التعادل</div>
+              <div class="text-xs text-emerald-200 leading-relaxed">
+                نسبة الـ impressions الفعالة <b>${s.pl.effective_ratio}%</b> فوق المطلوب <b>${s.pl.needed_ratio}%</b>.
+                هامش أمان <b>${(s.pl.effective_ratio - s.pl.needed_ratio).toFixed(1)}%</b>.
+              </div>
+            </div>
+          </div>`;
+        alert.classList.remove('hidden');
+      }
+    }
+
+    function renderZones(zones) {
+      const tb = document.getElementById('zonesTable');
+      document.getElementById('zoneCount').textContent = zones.length + ' زون';
+
+      if (!zones.length) {
+        tb.innerHTML = '';
+        document.getElementById('emptyState').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('emptyState').classList.add('hidden');
+
+      tb.innerHTML = zones.map(z => {
+        const profitColor = z.pl.profit >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        const roiColor = z.pl.roi >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        const botColor = z.bot_rate > 30 ? 'text-rose-400' : z.bot_rate > 15 ? 'text-amber-400' : 'text-emerald-400';
+        const wastedColor = z.wasted_rate > 30 ? 'text-rose-400' : z.wasted_rate > 15 ? 'text-amber-400' : 'text-slate-300';
+
+        // Profit bar: normalized to [-1, +1] based on cost
+        const barMax = Math.max(z.pl.cost, z.pl.revenue, Math.abs(z.pl.profit), 0.01);
+        const barPct = Math.min(100, Math.abs(z.pl.profit) / barMax * 100);
+        const barColor = z.pl.profit >= 0 ? '#10b981' : '#f43f5e';
+
+        const scoreTitle = `Profit: ${z.score.profit_score} | Safety: ${z.score.safety_score} | Volume: ${z.score.volume_score} | Stability: ${z.score.stability_score}`;
+
+        return `<tr class="transition-colors">
+          <td class="px-3 py-3 font-mono text-xs text-white font-bold">${esc(z.zone)}</td>
+          <td class="px-3 py-3 text-[10px] text-slate-400 font-mono">${esc(z.source)}</td>
+          <td class="px-3 py-3 text-center text-slate-300 font-mono">${z.total.toLocaleString()}</td>
+          <td class="px-3 py-3 text-center text-emerald-400 font-mono">${z.valid}</td>
+          <td class="px-3 py-3 text-center text-rose-400 font-mono">${z.invalid}</td>
+          <td class="px-3 py-3 text-center text-amber-400 font-mono">${z.wasted}</td>
+          <td class="px-3 py-3 text-center ${botColor} font-mono font-bold">${z.bot_rate}%</td>
+          <td class="px-3 py-3 text-center ${wastedColor} font-mono">${z.wasted_rate}%</td>
+          <td class="px-3 py-3 text-center text-rose-300 font-mono text-xs">${fmtMoney(z.pl.cost)}</td>
+          <td class="px-3 py-3 text-center text-emerald-300 font-mono text-xs">${fmtMoney(z.pl.revenue)}</td>
+          <td class="px-3 py-3 text-center ${profitColor} font-mono font-bold">
+            ${(z.pl.profit >= 0 ? '+' : '') + fmtMoney(z.pl.profit)}
+            <div class="profit-bar"><div style="width:${barPct}%;background:${barColor}"></div></div>
+          </td>
+          <td class="px-3 py-3 text-center ${roiColor} font-mono font-bold">${(z.pl.roi >= 0 ? '+' : '') + z.pl.roi}%</td>
+          <td class="px-3 py-3 text-center text-slate-300 font-mono" title="${scoreTitle}">${z.score.composite}</td>
+          <td class="px-3 py-3 text-center"><span class="grade-badge grade-${z.score.grade}">${z.score.grade}</span></td>
+          <td class="px-3 py-3 text-center"><span class="lifecycle-pill life-${z.lifecycle}">${z.lifecycle}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadReport() {
+      try {
+        const r = await fetch(buildUrl('/api/reports/smart'));
+        if (!r.ok) return;
+        const d = await r.json();
+        renderSummary(d.summary);
+        renderZones(d.zones);
+        document.getElementById('cpmInfo').textContent =
+          `Buy: $${d.summary.cpm_buy}/1k · Sell: $${d.summary.cpm_sell}/1k`;
+        updateRefreshTime();
+      } catch (e) {
+        console.error('loadReport error:', e);
+      }
+    }
+
+    // CPM Settings
+    function openCpmSettings() {
+      document.getElementById('cpmModal').classList.remove('hidden');
+      document.getElementById('cpmModal').classList.add('flex');
+      loadCpmValues();
+    }
+    function closeCpmSettings() {
+      document.getElementById('cpmModal').classList.add('hidden');
+      document.getElementById('cpmModal').classList.remove('flex');
+      document.getElementById('cpmModalMsg').classList.add('hidden');
+    }
+    async function loadCpmValues() {
+      try {
+        const r = await fetch('/api/settings/cpm');
+        if (!r.ok) return;
+        const d = await r.json();
+        document.getElementById('inpCpmBuy').value = d.cpm_buy;
+        document.getElementById('inpCpmSell').value = d.cpm_sell;
+      } catch (e) {}
+    }
+    async function saveCpmSettings() {
+      const buy = parseFloat(document.getElementById('inpCpmBuy').value);
+      const sell = parseFloat(document.getElementById('inpCpmSell').value);
+      const msg = document.getElementById('cpmModalMsg');
+      if (isNaN(buy) || buy < 0 || buy > 100) { msg.textContent = 'سعر الشراء لازم 0-100'; msg.className = 'text-xs text-rose-400'; msg.classList.remove('hidden'); return; }
+      if (isNaN(sell) || sell < 0 || sell > 100) { msg.textContent = 'سعر البيع لازم 0-100'; msg.className = 'text-xs text-rose-400'; msg.classList.remove('hidden'); return; }
+      const r = await fetch('/api/settings/cpm', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ cpm_buy: buy, cpm_sell: sell })
+      });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) {
+        msg.textContent = 'تم الحفظ ✅'; msg.className = 'text-xs text-emerald-400'; msg.classList.remove('hidden');
+        setTimeout(() => { closeCpmSettings(); loadReport(); }, 600);
+      } else {
+        msg.textContent = d.detail || 'فشل الحفظ'; msg.className = 'text-xs text-rose-400'; msg.classList.remove('hidden');
+      }
+    }
+    document.getElementById('cpmModal').addEventListener('click', e => {
+      if (e.target.id === 'cpmModal') closeCpmSettings();
+    });
+
+    // Init
+    loadReport();
+    setInterval(loadReport, 60000); // auto-refresh every 60s
+  </script>
+</body>
+</html>
