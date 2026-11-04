@@ -136,6 +136,13 @@ def tracker_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(read_template("tracker.html"))
 
 
+@router.get("/live", response_class=HTMLResponse)
+def live_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("live.html"))
+
+
 @router.get("/api/_debug/stats")
 def debug_stats(user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
     total_visits = db.query(VisitModel).count()
@@ -204,4 +211,4 @@ def generate_mock(site: str = Query(None), user: UserModel = Depends(current_use
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "5.5"}
+    return {"status": "ok", "version": "5.6"}
