@@ -1,9 +1,10 @@
 """
-routers/collector_v3.py — Collector v3 (Phase 1.1 + Fix 2.1)
+routers/collector_v3.py — Collector v3 (Phase 2.4 — Full Orchestrator)
 
-Fix:
-  - Pass heartbeat count + first_30s + milestones + ad_events to analyze_visit
-  - Extract zone_id from campaign.destination_url if not in URL
+Wires into:
+  - analysis (v3.1 base)
+  - collector.orchestrator (v3.3 — orchestrator + contradictions + behavior deep)
+  - headers + heartbeats + fingerprint cache
 """
 import json
 from datetime import datetime, timedelta
@@ -27,9 +28,8 @@ from utils import (
     handshake_limiter, heartbeat_limiter, final_limiter,
     stats_cache, zone_evidence_cache,
 )
-from analysis import (
-    get_ip_info, parse_ua, extract_zone_id, analyze_visit,
-)
+from analysis import get_ip_info, parse_ua, extract_zone_id
+from collector.orchestrator import analyze_full
 from helpers import extract_zone_id_from_url
 
 router = APIRouter()
@@ -113,6 +113,9 @@ def _check_flood(session_id: str, ip: str, db: Session):
         raise HTTPException(429, "محاولات كتير — جرب بعد شوية")
 
 
+# =========================================================
+# HANDSHAKE
+# =========================================================
 @router.post("/collect/handshake")
 async def collect_handshake(
     payload: HandshakePayload,
@@ -186,6 +189,9 @@ async def collect_handshake(
     }
 
 
+# =========================================================
+# HEARTBEAT
+# =========================================================
 @router.post("/collect/heartbeat")
 async def collect_heartbeat(
     payload: HeartbeatPayload,
@@ -235,6 +241,9 @@ async def collect_heartbeat(
     return {"ok": True, "duplicate": False}
 
 
+# =========================================================
+# FINAL
+# =========================================================
 @router.post("/collect/final")
 async def collect_final(
     request: Request,
@@ -287,10 +296,9 @@ async def collect_final(
     except Exception:
         os_name, device, browser = "Unknown", "Unknown", "Unknown"
 
-    # ===== Zone ID extraction (v3 fix) =====
+    # ===== Zone ID extraction =====
     zone_id = extract_zone_id(payload.url or "")
     if not zone_id or zone_id == "unknown":
-        # Try campaign
         if session.campaign_id:
             c = db.query(CampaignModel).get(session.campaign_id)
             if c:
@@ -310,6 +318,7 @@ async def collect_final(
     except Exception:
         ip_info = {}
 
+    # ===== Cross-visit aggregation =====
     canvas_raw = str((payload.fingerprint or {}).get("canvas_hash") or "")
     recent_fp_count = 0
     same_ip_last_minute = 0
@@ -346,24 +355,58 @@ async def collect_final(
     except Exception as e:
         print(f"[COLLECT_FINAL] cross-visit failed: {e}")
 
-    # ===== Build data with v3 context =====
+    # ===== Session-level metrics =====
     heartbeat_count = session.total_heartbeats or 0
     time_ms = max(int(payload.t_ms or 0), session.total_time_ms or 0)
 
-    # heartbeats max gap
+    heartbeats = db.query(VisitHeartbeatModel).filter(
+        VisitHeartbeatModel.session_id == session_id
+    ).order_by(VisitHeartbeatModel.seq.asc()).all()
+
+    heartbeats_list = [
+        {
+            "seq": hb.seq,
+            "t_ms": hb.t_ms,
+            "clicks": hb.clicks,
+            "scrolls": hb.scrolls,
+            "mousemoves": hb.mousemoves,
+            "keydowns": hb.keydowns,
+            "is_visible": bool(hb.is_visible),
+            "is_focused": bool(hb.is_focused),
+        }
+        for hb in heartbeats
+    ]
+
     max_gap_ms = 0
-    if heartbeat_count >= 2:
-        hbs = db.query(VisitHeartbeatModel).filter(
-            VisitHeartbeatModel.session_id == session_id
-        ).order_by(VisitHeartbeatModel.seq.asc()).all()
+    if len(heartbeats) >= 2:
         prev = None
-        for hb in hbs:
+        for hb in heartbeats:
             if prev is not None:
                 gap = (hb.received_at - prev.received_at).total_seconds() * 1000
                 if gap > max_gap_ms:
                     max_gap_ms = int(gap)
             prev = hb
 
+    # ===== Data quality =====
+    dq = payload.data_quality or "full"
+    if dq not in ("full", "partial", "failed"):
+        dq = "partial"
+
+    # ===== Headers + HTTP version =====
+    try:
+        headers_dict = {str(k).lower(): str(v) for k, v in request.headers.items()}
+    except Exception:
+        headers_dict = {}
+    http_version = "1.1"
+    try:
+        http_version = str(request.scope.get("http_version", "1.1"))
+    except Exception:
+        pass
+
+    # ===== Fingerprint hash =====
+    fp_hash = session.visitor_fp_hash or _compute_fp_hash(payload.fingerprint or {})
+
+    # ===== Build analysis data =====
     data = {
         "nav": payload.nav or {},
         "fingerprint": payload.fingerprint or {},
@@ -375,7 +418,6 @@ async def collect_final(
         "_same_ip_last_minute": same_ip_last_minute,
         "_same_canvas_ip_count": same_canvas_ip_count,
         "_same_ip_canvas_count": same_ip_canvas_count,
-        # v3 context
         "_heartbeat_count": heartbeat_count,
         "_heartbeat_max_gap_ms": max_gap_ms,
         "_session_duration_ms": time_ms,
@@ -384,12 +426,20 @@ async def collect_final(
         "_ad_events": payload.ad_events or [],
         "_clock_drift_ms": payload.clock_drift_ms or 0,
         "_honeypot_triggered": bool(payload.honeypot_triggered),
+        "_data_quality": dq,
+        "_headers": headers_dict,
+        "_http_version": http_version,
+        "_heartbeats_list": heartbeats_list,
+        "_fp_hash": fp_hash,
+        "_session_started_at": session.started_at,
+        "_session_ended_at": session.ended_at,
     }
 
+    # ===== Full analysis (orchestrator) =====
     try:
-        result = analyze_visit(data, ip_info)
+        result = analyze_full(data, ip_info)
     except Exception as e:
-        print(f"[COLLECT_FINAL] analyze_visit failed: {e}")
+        print(f"[COLLECT_FINAL] analyze_full failed: {e}")
         import traceback as _tb
         _tb.print_exc()
         result = {
@@ -402,8 +452,10 @@ async def collect_final(
             "confidence": 0.0,
             "categories": {"critical": 0, "high": 0, "medium": 0,
                            "low": 0, "human": 0},
+            "data_quality": dq,
         }
 
+    # ===== Persist visit =====
     fp = payload.fingerprint or {}
     behavior = payload.behavior or {}
     events = behavior.get("events") or {}
@@ -414,10 +466,6 @@ async def collect_final(
     canvas_stored = str(fp.get("canvas_hash", "Unknown"))
     if len(canvas_stored) >= 15 and canvas_stored not in ("blocked", "Unknown"):
         canvas_stored = canvas_stored[:15] + "..."
-
-    dq = payload.data_quality or "full"
-    if dq not in ("full", "partial", "failed"):
-        dq = "partial"
 
     visit = VisitModel(
         site_id=session.site_id,
@@ -463,6 +511,7 @@ async def collect_final(
     db.commit()
     db.refresh(visit)
 
+    # ===== Update session =====
     session.visit_id = visit.id
     session.verdict = visit.verdict
     session.score = visit.score
@@ -471,6 +520,7 @@ async def collect_final(
     session.total_time_ms = time_ms
     db.commit()
 
+    # ===== Invalidate caches =====
     if session.site_id:
         stats_cache.invalidate(f"stats:site:{session.site_id}")
     if session.user_id:
@@ -483,4 +533,4 @@ async def collect_final(
         "verdict": visit.verdict,
         "score": visit.score,
         "duplicate": False,
-}
+  }
