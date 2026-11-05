@@ -40,11 +40,16 @@
     .tr-copy-btn:hover { background: #9B80FF; box-shadow: 0 0 24px rgba(124,92,255,0.4); }
     .tr-copy-btn:active { transform: scale(0.97); }
     .tr-copy-btn.copied { background: #10B981; }
+    .tr-copy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .tr-code-wrap { background: #08090D; border: 1px solid #232734; border-radius: 8px; padding: 14px; max-height: 420px; overflow: auto; }
-    .tr-code-wrap pre { margin: 0; color: #10B981; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
-    .tr-code-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .tr-code-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
     .tr-code-actions .label { font-size: 11px; color: #7B8496; font-family: 'JetBrains Mono', monospace; }
+    .tr-code-actions .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .tr-code-wrap { background: #08090D; border: 1px solid #232734; border-radius: 8px; padding: 14px; max-height: 320px; overflow: auto; }
+    .tr-code-wrap pre { margin: 0; color: #10B981; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+    .tr-part-label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(124,92,255,0.15); border: 1px solid rgba(124,92,255,0.3); border-radius: 6px; color: #9B80FF; font-size: 11px; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px; }
 
     .tr-instructions { background: #161822; border-radius: 8px; padding: 14px; margin-top: 12px; }
     .tr-instructions ol { margin: 0; padding-right: 20px; color: #CBD5E1; font-size: 12px; line-height: 1.9; }
@@ -52,10 +57,8 @@
     .tr-instructions code { background: rgba(124,92,255,0.15); color: #9B80FF; padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
 
     .tr-note { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #FCD34D; line-height: 1.7; }
-    .tr-note code { background: rgba(245,158,11,0.15); padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-
     .tr-info { background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.25); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #67E8F9; line-height: 1.7; }
-    .tr-info code { background: rgba(34,211,238,0.15); padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .tr-success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #6EE7B7; line-height: 1.7; }
 
     .tr-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
     .tr-feature { padding: 10px 12px; background: #161822; border-radius: 8px; border-right: 3px solid #7C5CFF; }
@@ -73,7 +76,8 @@
     .tr-empty-icon { font-size: 48px; opacity: 0.4; display: block; margin-bottom: 12px; }
     .tr-empty-title { font-size: 16px; font-weight: 800; color: #F8FAFC; margin-bottom: 6px; }
 
-    .tr-loading { padding: 40px; text-align: center; color: #7B8496; font-size: 13px; }
+    .tr-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: #7B8496; font-family: 'JetBrains Mono', monospace; }
+    .tr-stats strong { color: #F8FAFC; }
   </style>
 </head>
 <body>
@@ -107,82 +111,132 @@
       </div>
 
       <div id="trackerContent" style="display:none;">
-        <div id="v3Features" class="tr-card">
-          <div class="tr-card-title">
-            <span class="badge-num">✨</span>
-            ليه v3 أحسن؟
+
+        <div id="v3Content">
+          <div class="tr-card">
+            <div class="tr-card-title">
+              <span class="badge-num">✨</span>
+              ليه v3 أحسن؟
+            </div>
+            <div class="tr-features">
+              <div class="tr-feature">
+                <div class="tr-feature-title">💓 Heartbeats</div>
+                <div class="tr-feature-desc">نبضة كل 10 ثواني — نعرف الزيارة قعدت قد إيه</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">📊 40+ حقل</div>
+                <div class="tr-feature-desc">scroll depth, mouse velocity, keyboard, idle</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">🍯 Honeypots</div>
+                <div class="tr-feature-desc">فخاخ خفية — البشر مش شايفينها، البوتات بتقع فيها</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">🎯 Ad Tracking</div>
+                <div class="tr-feature-desc">نعرف الإعلان ظهر ولا لأ، وكام نسبة ظهور</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">💾 Offline Queue</div>
+                <div class="tr-feature-desc">لو النت قطع، البيانات بتتحفظ وتبعت لاحقاً</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">🛡️ Anti-Detection</div>
+                <div class="tr-feature-desc">مفيش globals، jitter، endpoints خفية</div>
+              </div>
+            </div>
           </div>
-          <div class="tr-features">
-            <div class="tr-feature">
-              <div class="tr-feature-title">💓 Heartbeats</div>
-              <div class="tr-feature-desc">نبضة كل 10 ثواني — نعرف الزيارة قعدت قد إيه فعلاً</div>
+
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">1</span> Site Key</div>
+            <div class="tr-key-row">
+              <input type="text" id="siteKeyInput" class="tr-key-input" readonly>
+              <button class="tr-copy-btn" id="copyKeyBtn" type="button">نسخ</button>
             </div>
-            <div class="tr-feature">
-              <div class="tr-feature-title">📊 40+ حقل</div>
-              <div class="tr-feature-desc">scroll depth, mouse velocity, keyboard, idle, ...</div>
+          </div>
+
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">2</span> كود التتبع — <strong>جزئين</strong></div>
+            <div class="tr-info">
+              💡 <b>ليه جزئين؟</b> الكود كبير، ومتصفحك ممكن يقطع النسخ لو نسخت كله مرة واحدة.
+              <b>انسخ الجزء 1، بعدين الجزء 2، وحطهم ورا بعض في نفس المكان.</b>
+              أو استخدم زرار "تحميل الملف" وجيب الكود كملف كامل.
             </div>
-            <div class="tr-feature">
-              <div class="tr-feature-title">🍯 Honeypots</div>
-              <div class="tr-feature-desc">فخاخ خفية — البشر مش شايفينها، البوتات بتقع فيها</div>
+            <div class="tr-stats" id="codeStats"></div>
+
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <div class="tr-part-label">📄 الجزء 1</div>
+              <div class="actions">
+                <button class="tr-copy-btn" id="copyPart1Btn" type="button">نسخ الجزء 1</button>
+              </div>
             </div>
-            <div class="tr-feature">
-              <div class="tr-feature-title">🎯 Ad Tracking</div>
-              <div class="tr-feature-desc">نعرف الإعلان ظهر ولا لأ، وكام نسبة ظهور</div>
+            <div class="tr-code-wrap" style="max-height: 240px;">
+              <pre id="part1Code">جاري التحميل…</pre>
             </div>
-            <div class="tr-feature">
-              <div class="tr-feature-title">💾 Offline Queue</div>
-              <div class="tr-feature-desc">لو النت قطع، البيانات بتتحفظ وتبعت لاحقاً</div>
+
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <div class="tr-part-label">📄 الجزء 2</div>
+              <div class="actions">
+                <button class="tr-copy-btn" id="copyPart2Btn" type="button">نسخ الجزء 2</button>
+              </div>
             </div>
-            <div class="tr-feature">
-              <div class="tr-feature-title">🛡️ Anti-Detection</div>
-              <div class="tr-feature-desc">مفيش globals، jitter، endpoints خفية</div>
+            <div class="tr-code-wrap" style="max-height: 240px;">
+              <pre id="part2Code">جاري التحميل…</pre>
+            </div>
+
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <div class="tr-part-label" style="background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); color: #6EE7B7;">📦 الملف كامل</div>
+              <div class="actions">
+                <button class="tr-copy-btn" id="downloadBtn" type="button" style="background: #10B981;">⬇ تحميل الملف</button>
+                <button class="tr-copy-btn" id="copyFullBtn" type="button">نسخ الكل مرة واحدة</button>
+              </div>
+            </div>
+            <div class="tr-success">
+              ✅ <b>مهم:</b> الحل الأسهل — استخدم <b>"تحميل الملف"</b>، هتلاقي ملف <code>.txt</code> فيه الكود كامل. افتحه، انسخ اللي فيه، وحطه في موقعك.
+            </div>
+          </div>
+
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">3</span> خطوات التركيب</div>
+            <div class="tr-instructions">
+              <ol>
+                <li>انسخ الجزئين (أو حمّل الملف) وحطهم ورا بعض</li>
+                <li>افتح موقعك واختار الصفحات اللي عايز تتبعها</li>
+                <li>حط الكود في <code>&lt;head&gt;</code> أو قبل <code>&lt;/body&gt;</code> مباشرة</li>
+                <li>لو بتستخدم ووردبريس: استخدم إضافة "Insert Headers and Footers"</li>
+                <li>تأكد إن روابطك فيها <code>?zoneId=XXX</code> عشان نعرف الزون</li>
+              </ol>
+            </div>
+            <div class="tr-note">
+              ⚠️ <b>مهم:</b> الكود لازم يتحمّل على كل صفحة عايز تتبعها.
+            </div>
+          </div>
+
+          <div class="tr-danger">
+            <h3 class="tr-danger-title">⚠️ تجديد المفتاح</h3>
+            <p class="tr-danger-desc">لو المفتاح اتسرّب، اعمله rotate. الكود القديم هيبطّل يشتغل فوراً.</p>
+            <button class="tr-btn-warn" id="rotateBtn" type="button">🔄 تجديد المفتاح</button>
+          </div>
+        </div>
+
+        <div id="v2Content" style="display:none;">
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">1</span> كود التتبع v2</div>
+            <div class="tr-note">
+              ⚠️ <b>ملاحظة:</b> v2 بيبعت البيانات مرة واحدة بعد 2 ثانية. معظم الزيارات بتتجمد على <code>time_on_page = 2000ms</code>.
+              الأفضل تستخدم v3.
+            </div>
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <span class="label">v2 — Legacy</span>
+              <div class="actions">
+                <button class="tr-copy-btn" id="copyV2Btn" type="button">نسخ الكود</button>
+              </div>
+            </div>
+            <div class="tr-code-wrap">
+              <pre id="v2Code">جاري التحميل…</pre>
             </div>
           </div>
         </div>
 
-        <div class="tr-card">
-          <div class="tr-card-title"><span class="badge-num">1</span> Site Key</div>
-          <div class="tr-key-row">
-            <input type="text" id="siteKeyInput" class="tr-key-input" readonly>
-            <button class="tr-copy-btn" id="copyKeyBtn" type="button">نسخ</button>
-          </div>
-        </div>
-
-        <div class="tr-card">
-          <div class="tr-card-title"><span class="badge-num">2</span> كود التتبع الكامل</div>
-          <div class="tr-code-actions">
-            <span class="label" id="codeLabel">جاري التحميل…</span>
-            <button class="tr-copy-btn" id="copyCodeBtn" type="button">نسخ الكود</button>
-          </div>
-          <div class="tr-code-wrap">
-            <pre id="embedCode">جاري التحميل…</pre>
-          </div>
-        </div>
-
-        <div class="tr-card">
-          <div class="tr-card-title"><span class="badge-num">3</span> خطوات التركيب</div>
-          <div class="tr-instructions">
-            <ol>
-              <li>انسخ الكود من فوق</li>
-              <li>افتح موقعك واختار الصفحات اللي عايز تتبعها</li>
-              <li>حط الكود في <code>&lt;head&gt;</code> أو قبل <code>&lt;/body&gt;</code> مباشرة</li>
-              <li>لو بتستخدم ووردبريس: استخدم إضافة "Insert Headers and Footers"</li>
-              <li>تأكد إن روابطك فيها <code>?zoneId=XXX</code> عشان نعرف الزون</li>
-            </ol>
-          </div>
-          <div class="tr-note">
-            ⚠️ <b>مهم:</b> الكود لازم يتحمّل على كل صفحة عايز تتبعها. لو بس على الصفحة الرئيسية، الزيارات على صفحات تانية مش هتتجمع.
-          </div>
-          <div class="tr-info" id="v3Info">
-            💡 <b>v3 Info:</b> الكود ده بيعمل <code>handshake</code> بعد 500ms، وبعدين <code>heartbeats</code> كل 10 ثواني، ولما الزائر يمشي بيبعت <code>final beacon</code> بكل البيانات. لو النت قطع، البيانات بتتحفظ في المتصفح وتبعت في الزيارة الجاية.
-          </div>
-        </div>
-
-        <div class="tr-danger">
-          <h3 class="tr-danger-title">⚠️ تجديد المفتاح</h3>
-          <p class="tr-danger-desc">لو المفتاح اتسرّب، اعمله rotate. الكود القديم هيبطّل يشتغل فوراً وكل الصفحات هتحتاج الكود الجديد.</p>
-          <button class="tr-btn-warn" id="rotateBtn" type="button">🔄 تجديد المفتاح</button>
-        </div>
       </div>
 
       <div id="trackerEmpty" class="tr-empty" style="display:none;">
@@ -196,7 +250,13 @@
 
   <script src="/static/js/shell.js"></script>
   <script>
-    const TR = { sites: [], currentSite: null, currentCode: '', currentVersion: 'v3' };
+    const TR = {
+      sites: [],
+      currentSite: null,
+      currentVersion: 'v3',
+      v3Data: null,
+      v2Code: '',
+    };
 
     async function boot() {
       try {
@@ -246,8 +306,18 @@
         document.getElementById('copyKeyBtn').addEventListener('click', () => {
           copyText(document.getElementById('siteKeyInput').value, document.getElementById('copyKeyBtn'));
         });
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-          copyText(TR.currentCode, document.getElementById('copyCodeBtn'));
+        document.getElementById('copyPart1Btn').addEventListener('click', () => {
+          if (TR.v3Data) copyText(TR.v3Data.part1, document.getElementById('copyPart1Btn'));
+        });
+        document.getElementById('copyPart2Btn').addEventListener('click', () => {
+          if (TR.v3Data) copyText(TR.v3Data.part2, document.getElementById('copyPart2Btn'));
+        });
+        document.getElementById('copyFullBtn').addEventListener('click', () => {
+          if (TR.v3Data) copyText(TR.v3Data.full, document.getElementById('copyFullBtn'));
+        });
+        document.getElementById('downloadBtn').addEventListener('click', downloadCode);
+        document.getElementById('copyV2Btn').addEventListener('click', () => {
+          if (TR.v2Code) copyText(TR.v2Code, document.getElementById('copyV2Btn'));
         });
         document.getElementById('rotateBtn').addEventListener('click', rotateKey);
       } catch (e) {
@@ -271,20 +341,54 @@
       document.getElementById('trackerContent').style.display = '';
       document.getElementById('trackerEmpty').style.display = 'none';
       document.getElementById('siteKeyInput').value = site.site_key;
-      document.getElementById('embedCode').textContent = 'جاري التحميل…';
-      document.getElementById('codeLabel').textContent = version === 'v3' ? 'v3 — Multi-Send' : 'v2 — Legacy (يُبعت مرة واحدة)';
-      document.getElementById('v3Features').style.display = version === 'v3' ? '' : 'none';
-      document.getElementById('v3Info').style.display = version === 'v3' ? '' : 'none';
 
+      document.getElementById('v3Content').style.display = version === 'v3' ? '' : 'none';
+      document.getElementById('v2Content').style.display = version === 'v2' ? '' : 'none';
+
+      if (version === 'v3') {
+        try {
+          const data = await Shell.api(`/api/sites/${site.id}/tracker-code-v3`);
+          TR.v3Data = data;
+          document.getElementById('part1Code').textContent = data.part1 || '';
+          document.getElementById('part2Code').textContent = data.part2 || '';
+          document.getElementById('codeStats').innerHTML =
+            `📏 <strong>${data.lines || 0}</strong> سطر · ` +
+            `💾 <strong>${Math.round((data.size_bytes || 0) / 1024)} KB</strong> · ` +
+            `🔑 Campaign: <strong>${data.campaign_key || ''}</strong>`;
+        } catch (err) {
+          document.getElementById('part1Code').textContent = 'فشل التحميل: ' + err.message;
+          document.getElementById('part2Code').textContent = '';
+        }
+      } else {
+        try {
+          const data = await Shell.api(`/api/sites/${site.id}/tracker-code`);
+          TR.v2Code = data.code || '';
+          document.getElementById('v2Code').textContent = TR.v2Code || 'فشل التحميل';
+        } catch (err) {
+          document.getElementById('v2Code').textContent = 'فشل التحميل: ' + err.message;
+        }
+      }
+    }
+
+    function downloadCode() {
+      if (!TR.v3Data || !TR.v3Data.full) {
+        Shell.toast('مفيش كود متاح', 'error');
+        return;
+      }
+      const filename = `ovg-tracker-v3-${(TR.currentSite?.site_key || 'unknown').substring(0, 8)}.txt`;
       try {
-        const endpoint = version === 'v3'
-          ? `/api/sites/${site.id}/tracker-code-v3`
-          : `/api/sites/${site.id}/tracker-code`;
-        const data = await Shell.api(endpoint);
-        TR.currentCode = data.code || '';
-        document.getElementById('embedCode').textContent = TR.currentCode || 'فشل التحميل';
-      } catch (err) {
-        document.getElementById('embedCode').textContent = 'فشل التحميل: ' + err.message;
+        const blob = new Blob([TR.v3Data.full], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        Shell.toast('تم تحميل الملف ✅', 'success');
+      } catch (e) {
+        Shell.toast('فشل التحميل: ' + e.message, 'error');
       }
     }
 
