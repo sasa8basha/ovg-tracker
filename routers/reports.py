@@ -11,8 +11,10 @@ from models import UserModel, SiteModel, VisitModel
 from auth import current_user
 from helpers import (
     _resolve_user_site, _apply_date_filter, _country_key,
-    _extract_source, _compute_pl, _compute_zone_score,
-    _compute_zone_lifecycle, _is_wasted_visit,
+)
+from metrics import ( # <--- استخدام المحرك الموحد
+    extract_source, compute_pl, compute_zone_score,
+    compute_zone_lifecycle, is_wasted_visit,
 )
 
 router = APIRouter()
@@ -93,7 +95,7 @@ def smart_report(
         if verdict == "valid":
             z["valid"] += 1
             valid_all += 1
-            if _is_wasted_visit(row.evidence):
+            if is_wasted_visit(row.evidence):
                 z["wasted"] += 1
                 wasted_all += 1
         elif verdict == "invalid":
@@ -103,7 +105,7 @@ def smart_report(
             z["suspicious"] += 1
             suspicious_all += 1
 
-    summary_pl = _compute_pl(total_all, valid_all, wasted_all, buy_cpm, sell_cpm)
+    summary_pl = compute_pl(total_all, valid_all, wasted_all, buy_cpm, sell_cpm)
     summary = {
         "total": total_all,
         "valid": valid_all,
@@ -124,12 +126,12 @@ def smart_report(
         total = z["total"]
         bot_rate = round(z["invalid"] / total * 100.0, 2) if total > 0 else 0.0
         wasted_rate = round(z["wasted"] / total * 100.0, 2) if total > 0 else 0.0
-        pl = _compute_pl(total, z["valid"], z["wasted"], buy_cpm, sell_cpm)
-        score = _compute_zone_score(pl["profit"], pl["roi"], bot_rate, wasted_rate, total)
-        lifecycle = _compute_zone_lifecycle(total, score["grade"], pl["roi"])
+        pl = compute_pl(total, z["valid"], z["wasted"], buy_cpm, sell_cpm)
+        score = compute_zone_score(pl["profit"], pl["roi"], bot_rate, wasted_rate, total)
+        lifecycle = compute_zone_lifecycle(total, score["grade"], pl["roi"])
         result_zones.append({
             "zone": zid,
-            "source": _extract_source(zid),
+            "source": extract_source(zid),
             "total": total,
             "valid": z["valid"],
             "invalid": z["invalid"],
