@@ -1,7 +1,9 @@
 """
-routers/collector_v3.py — Collector v3 (Phase 1.1 + Fix 1.3.1)
+routers/collector_v3.py — Collector v3 (Phase 1.1 + Fix 2.1)
 
-Fix: /collect/final now accepts text/plain (from sendBeacon) and JSON (from fetch).
+Fix:
+  - Pass heartbeat count + first_30s + milestones + ad_events to analyze_visit
+  - Extract zone_id from campaign.destination_url if not in URL
 """
 import json
 from datetime import datetime, timedelta
@@ -28,10 +30,7 @@ from utils import (
 from analysis import (
     get_ip_info, parse_ua, extract_zone_id, analyze_visit,
 )
-from collector.constants import (
-    SIG_HONEYPOT_CLICK, SIG_HONEYPOT_FORM,
-    SIG_CLOCK_DRIFT, SIG_SILENT_AFTER_INITIAL, SIG_HEARTBEAT_GAP,
-)
+from helpers import extract_zone_id_from_url
 
 router = APIRouter()
 
@@ -241,16 +240,11 @@ async def collect_final(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """
-    يقبل text/plain (من sendBeacon) أو application/json (من fetch).
-    بيقرأ الـ body يدوياً ويحوله JSON.
-    """
     if not COLLECTOR_V3_ENABLED:
         raise HTTPException(404, "Collector v3 disabled")
 
     client_ip = get_client_ip(request)
 
-    # Read raw body
     try:
         raw_bytes = await request.body()
         if not raw_bytes:
@@ -293,9 +287,20 @@ async def collect_final(
     except Exception:
         os_name, device, browser = "Unknown", "Unknown", "Unknown"
 
-    try:
-        zone_id = extract_zone_id(payload.url)
-    except Exception:
+    # ===== Zone ID extraction (v3 fix) =====
+    zone_id = extract_zone_id(payload.url or "")
+    if not zone_id or zone_id == "unknown":
+        # Try campaign
+        if session.campaign_id:
+            c = db.query(CampaignModel).get(session.campaign_id)
+            if c:
+                if c.destination_zone_id:
+                    zone_id = str(c.destination_zone_id).strip()[:100]
+                elif c.destination_url:
+                    z = extract_zone_id_from_url(c.destination_url)
+                    if z:
+                        zone_id = z
+    if not zone_id:
         zone_id = "unknown"
 
     try:
@@ -341,6 +346,24 @@ async def collect_final(
     except Exception as e:
         print(f"[COLLECT_FINAL] cross-visit failed: {e}")
 
+    # ===== Build data with v3 context =====
+    heartbeat_count = session.total_heartbeats or 0
+    time_ms = max(int(payload.t_ms or 0), session.total_time_ms or 0)
+
+    # heartbeats max gap
+    max_gap_ms = 0
+    if heartbeat_count >= 2:
+        hbs = db.query(VisitHeartbeatModel).filter(
+            VisitHeartbeatModel.session_id == session_id
+        ).order_by(VisitHeartbeatModel.seq.asc()).all()
+        prev = None
+        for hb in hbs:
+            if prev is not None:
+                gap = (hb.received_at - prev.received_at).total_seconds() * 1000
+                if gap > max_gap_ms:
+                    max_gap_ms = int(gap)
+            prev = hb
+
     data = {
         "nav": payload.nav or {},
         "fingerprint": payload.fingerprint or {},
@@ -352,12 +375,23 @@ async def collect_final(
         "_same_ip_last_minute": same_ip_last_minute,
         "_same_canvas_ip_count": same_canvas_ip_count,
         "_same_ip_canvas_count": same_ip_canvas_count,
+        # v3 context
+        "_heartbeat_count": heartbeat_count,
+        "_heartbeat_max_gap_ms": max_gap_ms,
+        "_session_duration_ms": time_ms,
+        "_first_30s": payload.first_30s or {},
+        "_milestones": payload.milestones or {},
+        "_ad_events": payload.ad_events or [],
+        "_clock_drift_ms": payload.clock_drift_ms or 0,
+        "_honeypot_triggered": bool(payload.honeypot_triggered),
     }
 
     try:
         result = analyze_visit(data, ip_info)
     except Exception as e:
         print(f"[COLLECT_FINAL] analyze_visit failed: {e}")
+        import traceback as _tb
+        _tb.print_exc()
         result = {
             "score": 50,
             "verdict": "suspicious",
@@ -369,46 +403,6 @@ async def collect_final(
             "categories": {"critical": 0, "high": 0, "medium": 0,
                            "low": 0, "human": 0},
         }
-
-    new_evidence = list(result.get("evidence", []))
-
-    if payload.honeypot_triggered:
-        new_evidence.append({
-            "code": SIG_HONEYPOT_CLICK, "severity": "critical",
-            "score": 100, "detail": "Honeypot triggered (from client)",
-        })
-
-    if abs(int(payload.clock_drift_ms or 0)) > 30000:
-        new_evidence.append({
-            "code": SIG_CLOCK_DRIFT, "severity": "medium",
-            "score": 30,
-            "detail": f"Clock drift: {int(payload.clock_drift_ms)}ms",
-        })
-
-    heartbeat_count = session.total_heartbeats or 0
-    time_ms = max(int(payload.t_ms or 0), session.total_time_ms or 0)
-
-    if heartbeat_count == 0 and time_ms < 5000:
-        new_evidence.append({
-            "code": SIG_SILENT_AFTER_INITIAL, "severity": "high",
-            "score": 60, "detail": "No heartbeat after handshake (drive-by bot?)",
-        })
-
-    if heartbeat_count >= 2:
-        hbs = db.query(VisitHeartbeatModel).filter(
-            VisitHeartbeatModel.session_id == session_id
-        ).order_by(VisitHeartbeatModel.seq.asc()).all()
-        for i in range(1, len(hbs)):
-            gap = (hbs[i].received_at - hbs[i-1].received_at).total_seconds()
-            if gap > 60:
-                new_evidence.append({
-                    "code": SIG_HEARTBEAT_GAP, "severity": "low",
-                    "score": 15,
-                    "detail": f"Heartbeat gap: {gap:.1f}s",
-                })
-                break
-
-    result["evidence"] = new_evidence
 
     fp = payload.fingerprint or {}
     behavior = payload.behavior or {}
@@ -489,4 +483,4 @@ async def collect_final(
         "verdict": visit.verdict,
         "score": visit.score,
         "duplicate": False,
-      }
+}
