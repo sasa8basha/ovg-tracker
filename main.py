@@ -25,13 +25,14 @@ from routers import (
     campaigns as campaigns_router,
     traffic_sources as traffic_sources_router,
     destinations as destinations_router,
+    collector_v3 as collector_v3_router,
 )
 
 Base.metadata.create_all(bind=engine)
 run_migrations()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="5.7")
+app = FastAPI(title="OVG Tracker", version="5.8")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if ALLOWED_ORIGINS == ["*"]:
@@ -57,6 +58,7 @@ app.include_router(sites_router.router, prefix="/api/sites", tags=["sites"])
 app.include_router(campaigns_router.router, prefix="/api/campaigns", tags=["campaigns"])
 app.include_router(traffic_sources_router.router, prefix="/api/traffic-sources", tags=["traffic-sources"])
 app.include_router(destinations_router.router, prefix="/api/destinations", tags=["destinations"])
+app.include_router(collector_v3_router.router, prefix="/api", tags=["collector-v3"])
 app.include_router(tracker_router.router, prefix="/api", tags=["tracker"])
 app.include_router(stats_router.router, prefix="/api", tags=["stats"])
 app.include_router(reports_router.router, prefix="/api", tags=["reports"])
