@@ -28,7 +28,30 @@ from routers import (
     collector_v3 as collector_v3_router,
 )
 
-Base.metadata.create_all(bind=engine)
+# =========================================================
+# SAFE CREATE ALL
+# =========================================================
+# create_all() ممكن يفشل لو الـ DB موجودة أصلاً وفيها index شبه الجديد
+# (زي ix_visits_data_quality اللي اتعمل من migration سابق)
+# الحل: نلفها بـ try/except، ولو فشلت نجرب ننشئ كل جدول على حدة
+def _safe_create_all():
+    try:
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+        print("✅ create_all: OK")
+        return
+    except Exception as e:
+        print(f"⚠️ create_all partial failure: {e}")
+        print("   → Falling back to per-table creation...")
+
+    # Fallback: ننشئ كل جدول على حدة، لو واحد فشل مش بنوقف الباقي
+    for tbl in Base.metadata.sorted_tables:
+        try:
+            tbl.create(bind=engine, checkfirst=True)
+        except Exception as ex:
+            print(f"   ⚠️ table '{tbl.name}' skipped: {ex}")
+
+
+_safe_create_all()
 run_migrations()
 bootstrap_admin()
 
