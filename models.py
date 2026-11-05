@@ -61,25 +61,19 @@ class CampaignModel(Base):
 
     name = Column(String(200), nullable=False)
     type = Column(String(20), nullable=False, default="landing", index=True)
-
     traffic_source_slug = Column(String(50), default="custom", index=True)
     traffic_source_campaign_id = Column(String(100), default="")
     buy_cpm = Column(Float, default=0.0, nullable=False)
-
     destination_slug = Column(String(50), default="custom", index=True)
     destination_url = Column(String(1000), default="")
     destination_zone_id = Column(String(100), default="")
     sell_cpm = Column(Float, default=0.0, nullable=False)
-
     site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), nullable=True, index=True)
     campaign_key = Column(String(32), unique=True, index=True, nullable=False)
-
     redirect_delay_ms = Column(Integer, default=500, nullable=False)
     bot_block_threshold = Column(Integer, default=100, nullable=False)
     daily_budget = Column(Float, nullable=True)
-
     status = Column(String(20), default="active", nullable=False, index=True)
-
     notes = Column(String(1000), default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -97,33 +91,25 @@ class SessionModel(Base):
     __tablename__ = "sessions"
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String(36), unique=True, index=True, nullable=False)
-
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", ondelete="SET NULL"), index=True, nullable=True)
     site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), index=True, nullable=True)
-
     ip = Column(String(45), index=True)
     country_code = Column(String(2), nullable=True, index=True)
     user_agent = Column(String(500), default="")
     url = Column(String(2000), default="")
-
     started_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
     last_heartbeat_at = Column(DateTime, nullable=True)
     ended_at = Column(DateTime, nullable=True)
-
     total_heartbeats = Column(Integer, default=0, nullable=False)
     total_time_ms = Column(Integer, default=0, nullable=False)
-
     visit_id = Column(Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True, index=True)
     verdict = Column(String(20), nullable=True, index=True)
     score = Column(Integer, nullable=True)
-
     data_quality = Column(String(20), default="pending", nullable=False, index=True)
-
     clock_drift_ms = Column(Integer, default=0)
     is_honeypot_triggered = Column(Boolean, default=False)
     consent_state = Column(String(20), default="unknown")
-
     visitor_fp_hash = Column(String(64), nullable=True, index=True)
     meta = Column(JSON, nullable=True)
 
@@ -140,17 +126,13 @@ class VisitHeartbeatModel(Base):
     session_id = Column(String(36), index=True, nullable=False)
     seq = Column(Integer, nullable=False)
     received_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
-
     t_ms = Column(Integer, default=0, nullable=False)
-
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
     mousemoves = Column(Integer, default=0)
     keydowns = Column(Integer, default=0)
-
     is_visible = Column(Boolean, default=True)
     is_focused = Column(Boolean, default=True)
-
     meta = Column(JSON, nullable=True)
 
     __table_args__ = (
@@ -194,25 +176,26 @@ class VisitModel(Base):
     ground_truth_at = Column(DateTime, nullable=True)
     ground_truth_by = Column(String(64), nullable=True)
 
+    # v3 fields
     data_quality = Column(String(20), nullable=True, index=True)
+    counting_type = Column(String(20), nullable=True, index=True)  # v3.1 — counting_type
     is_honeypot_triggered = Column(Boolean, default=False)
     clock_drift_ms = Column(Integer, default=0)
     consent_state = Column(String(20), default="unknown")
-
     first_30s = Column(JSON, nullable=True)
     milestones = Column(JSON, nullable=True)
     behavioral = Column(JSON, nullable=True)
     ad_events = Column(JSON, nullable=True)
     full_payload = Column(JSON, nullable=True)
 
-    # ⚠️ ملاحظة مهمة: ix_visits_session و ix_visits_data_quality
-    # مش موجودين هنا — بيتم إنشاؤهم من خلال migrate_v3_visit_columns()
-    # عشان نتجنب تعارض create_all مع الـ migration
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
         Index("ix_visits_gt_verdict", "ground_truth", "verdict"),
         Index("ix_visits_campaign_timestamp", "campaign_id", "timestamp"),
+        Index("ix_visits_session", "session_id"),
+        Index("ix_visits_data_quality", "data_quality"),
+        Index("ix_visits_counting_type", "counting_type"),
     )
 
 
@@ -259,7 +242,6 @@ class BanRiskSnapshot(Base):
 
 class ZoneActionModel(Base):
     __tablename__ = "zone_actions"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     zone_id = Column(String, index=True, nullable=False)
