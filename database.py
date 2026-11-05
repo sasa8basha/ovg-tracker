@@ -92,7 +92,6 @@ def migrate_country_code():
 # v3 — Campaign Foundation (Phase 0.5)
 # =========================================================
 def migrate_visit_campaign_column():
-    """إضافة campaign_id لجدول visits (nullable، backward compatible)."""
     try:
         insp = inspect(engine)
         if "visits" not in insp.get_table_names():
@@ -110,8 +109,46 @@ def migrate_visit_campaign_column():
         print(f"⚠️ migrate_visit_campaign_column skipped: {e}")
 
 
+# =========================================================
+# v3 — Collector columns (Phase 1.1)
+# =========================================================
+def migrate_v3_visit_columns():
+    """
+    إضافة أعمدة v3 لجدول الزيارات.
+    كلها nullable عشان backward compatible.
+    """
+    try:
+        insp = inspect(engine)
+        if "visits" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("visits")]
+
+        additions = [
+            ("session_id", "ALTER TABLE visits ADD COLUMN session_id VARCHAR(36)"),
+            ("data_quality", "ALTER TABLE visits ADD COLUMN data_quality VARCHAR(20)"),
+            ("is_honeypot_triggered", "ALTER TABLE visits ADD COLUMN is_honeypot_triggered BOOLEAN DEFAULT 0"),
+            ("clock_drift_ms", "ALTER TABLE visits ADD COLUMN clock_drift_ms INTEGER DEFAULT 0"),
+            ("consent_state", "ALTER TABLE visits ADD COLUMN consent_state VARCHAR(20) DEFAULT 'unknown'"),
+            ("first_30s", "ALTER TABLE visits ADD COLUMN first_30s JSON"),
+            ("milestones", "ALTER TABLE visits ADD COLUMN milestones JSON"),
+            ("behavioral", "ALTER TABLE visits ADD COLUMN behavioral JSON"),
+            ("ad_events", "ALTER TABLE visits ADD COLUMN ad_events JSON"),
+            ("full_payload", "ALTER TABLE visits ADD COLUMN full_payload JSON"),
+        ]
+
+        with engine.connect() as conn:
+            for col_name, sql in additions:
+                if col_name not in cols:
+                    _safe_alter(conn, sql, f"visits.{col_name}")
+
+            # Indexes
+            _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_session ON visits (session_id)", "ix_visits_session")
+            _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_data_quality ON visits (data_quality)", "ix_visits_data_quality")
+    except Exception as e:
+        print(f"⚠️ migrate_v3_visit_columns skipped: {e}")
+
+
 def seed_traffic_sources():
-    """يزرع المصادر الافتراضية لو مش موجودة."""
     try:
         insp = inspect(engine)
         if "traffic_sources" not in insp.get_table_names():
@@ -144,7 +181,6 @@ def seed_traffic_sources():
 
 
 def seed_destinations():
-    """يزرع الوجهات الافتراضية."""
     try:
         insp = inspect(engine)
         if "destinations" not in insp.get_table_names():
@@ -177,10 +213,6 @@ def seed_destinations():
 
 
 def backfill_campaigns_from_sites():
-    """
-    كل site موجود → campaign (legacy).
-    campaign_key = site.site_key عشان الـ tracker القديم يفضل شغال.
-    """
     try:
         insp = inspect(engine)
         if "campaigns" not in insp.get_table_names():
@@ -189,16 +221,14 @@ def backfill_campaigns_from_sites():
             return
 
         with engine.connect() as conn:
-            # عدد الـ sites والـ campaigns
             sites_count = conn.execute(text("SELECT COUNT(*) FROM sites")).scalar() or 0
             if sites_count == 0:
                 return
 
             campaigns_count = conn.execute(text("SELECT COUNT(*) FROM campaigns")).scalar() or 0
             if campaigns_count >= sites_count:
-                return  # متزامن بالفعل
+                return
 
-            # backfill
             rows = conn.execute(
                 text(
                     "SELECT s.id, s.user_id, s.name, s.domain, s.site_key "
@@ -209,13 +239,7 @@ def backfill_campaigns_from_sites():
             ).fetchall()
 
             for row in rows:
-                site_id = row[0]
-                user_id = row[1]
-                name = row[2]
-                domain = row[3] or ""
-                site_key = row[4]
-
-                # تحقق إن الـ key مش مستخدم
+                site_id, user_id, name, domain, site_key = row[0], row[1], row[2], row[3] or "", row[4]
                 existing = conn.execute(
                     text("SELECT id FROM campaigns WHERE campaign_key = :k"),
                     {"k": site_key},
@@ -249,7 +273,6 @@ def backfill_campaigns_from_sites():
 
 
 def backfill_visits_campaign_id():
-    """ربط الزيارات القديمة بالـ campaigns عن طريق site_id."""
     try:
         insp = inspect(engine)
         if "visits" not in insp.get_table_names() or "campaigns" not in insp.get_table_names():
@@ -259,7 +282,6 @@ def backfill_visits_campaign_id():
             return
 
         with engine.connect() as conn:
-            # كم زيارة عندها site_id بس مش campaign_id
             unlinked = conn.execute(
                 text(
                     "SELECT COUNT(*) FROM visits "
@@ -285,17 +307,50 @@ def backfill_visits_campaign_id():
         print(f"⚠️ backfill_visits_campaign_id skipped: {e}")
 
 
+def backfill_legacy_data_quality():
+    """
+    كل زيارة قديمة (قبل v3) بتتحول لـ data_quality='legacy'.
+    عشان نعرف نفرقها عن الزيارات الجديدة.
+    """
+    try:
+        insp = inspect(engine)
+        if "visits" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("visits")]
+        if "data_quality" not in cols:
+            return
+
+        with engine.connect() as conn:
+            n = conn.execute(
+                text("SELECT COUNT(*) FROM visits WHERE data_quality IS NULL")
+            ).scalar() or 0
+
+            if n == 0:
+                return
+
+            conn.execute(
+                text("UPDATE visits SET data_quality = 'legacy' WHERE data_quality IS NULL")
+            )
+            conn.commit()
+            print(f"✅ Backfill: {n} legacy visits tagged")
+    except Exception as e:
+        print(f"⚠️ backfill_legacy_data_quality skipped: {e}")
+
+
 def run_migrations():
     migrate_auth_columns()
     migrate_cpm_columns()
     migrate_ground_truth_columns()
     migrate_country_code()
-    # v3
+    # v3 Campaign (Phase 0.5)
     migrate_visit_campaign_column()
     seed_traffic_sources()
     seed_destinations()
     backfill_campaigns_from_sites()
     backfill_visits_campaign_id()
+    # v3 Collector (Phase 1.1)
+    migrate_v3_visit_columns()
+    backfill_legacy_data_quality()
 
 
 def get_db():
