@@ -144,6 +144,12 @@ class VisitHeartbeatModel(Base):
 class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
+    
+    # --- NEW FIELDS FOR P1 ---
+    click_id = Column(String(36), unique=True, index=True, nullable=True) # ID فريد للنقرة لمنع التكرار
+    filter_reason = Column(String(100), nullable=True, index=True)       # سبب الرفض
+    # -------------------------
+
     site_id = Column(Integer, ForeignKey("sites.id"), index=True, nullable=True)
     campaign_id = Column(Integer, index=True, nullable=True)
     session_id = Column(String(36), nullable=True, index=True)
@@ -176,9 +182,8 @@ class VisitModel(Base):
     ground_truth_at = Column(DateTime, nullable=True)
     ground_truth_by = Column(String(64), nullable=True)
 
-    # v3 fields
     data_quality = Column(String(20), nullable=True, index=True)
-    counting_type = Column(String(20), nullable=True, index=True)  # v3.1 — counting_type
+    counting_type = Column(String(20), nullable=True, index=True)
     is_honeypot_triggered = Column(Boolean, default=False)
     clock_drift_ms = Column(Integer, default=0)
     consent_state = Column(String(20), default="unknown")
@@ -255,4 +260,28 @@ class ZoneActionModel(Base):
         Index("ix_zone_actions_user_zone", "user_id", "zone_id"),
         Index("ix_zone_actions_user_time", "user_id", "timestamp"),
         Index("ix_zone_actions_user_active", "user_id", "action", "reverted_at"),
+    )
+
+# =========================================================
+# P1 — DECISION AUDIT (جديد)
+# =========================================================
+class DecisionAuditModel(Base):
+    __tablename__ = "decision_audit"
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    
+    # نوع القرار: reject_visit | block_ip | pause_campaign
+    decision_type = Column(String(50), nullable=False, index=True) 
+    target_id = Column(String(100), nullable=True, index=True) # visit_id أو campaign_id
+    
+    # السبب والنتيجة
+    reason = Column(String(200), nullable=False)
+    risk_score = Column(Integer, default=0)
+    inputs_json = Column(JSON, nullable=True) # الإدخالات اللي بنى عليها القرار
+    
+    actor = Column(String(100), default="system") # system | admin | rule_engine
+    
+    __table_args__ = (
+        Index("ix_audit_type_time", "decision_type", "timestamp"),
+        Index("ix_audit_target", "target_id"),
     )
