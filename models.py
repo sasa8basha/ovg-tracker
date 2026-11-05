@@ -32,9 +32,6 @@ class SiteModel(Base):
     user = relationship("UserModel", back_populates="sites")
 
 
-# =========================================================
-# v3 — Campaign Foundation (Phase 0.5)
-# =========================================================
 class TrafficSource(Base):
     __tablename__ = "traffic_sources"
     id = Column(Integer, primary_key=True)
@@ -64,7 +61,6 @@ class CampaignModel(Base):
 
     name = Column(String(200), nullable=False)
     type = Column(String(20), nullable=False, default="landing", index=True)
-    # landing | direct | hybrid
 
     traffic_source_slug = Column(String(50), default="custom", index=True)
     traffic_source_campaign_id = Column(String(100), default="")
@@ -83,7 +79,6 @@ class CampaignModel(Base):
     daily_budget = Column(Float, nullable=True)
 
     status = Column(String(20), default="active", nullable=False, index=True)
-    # active | paused | archived
 
     notes = Column(String(1000), default="")
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -98,17 +93,7 @@ class CampaignModel(Base):
     )
 
 
-# =========================================================
-# v3 — Session (Phase 1.1)
-# =========================================================
 class SessionModel(Base):
-    """
-    كل session = زيارة واحدة (من handshake لـ final/انتهاء).
-    بنستخدمها عشان:
-      - نربط الـ heartbeats ببعضها
-      - نعرف لو الزيارة اتقفلت فجأة
-      - نمنع تكرار الزيارات
-    """
     __tablename__ = "sessions"
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String(36), unique=True, index=True, nullable=False)
@@ -129,22 +114,18 @@ class SessionModel(Base):
     total_heartbeats = Column(Integer, default=0, nullable=False)
     total_time_ms = Column(Integer, default=0, nullable=False)
 
-    # بيتملى لما الـ final ييجي
     visit_id = Column(Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True, index=True)
     verdict = Column(String(20), nullable=True, index=True)
     score = Column(Integer, nullable=True)
 
     data_quality = Column(String(20), default="pending", nullable=False, index=True)
-    # pending | full | partial | failed | legacy | unknown
 
     clock_drift_ms = Column(Integer, default=0)
     is_honeypot_triggered = Column(Boolean, default=False)
     consent_state = Column(String(20), default="unknown")
-    # granted | denied | unknown
 
     visitor_fp_hash = Column(String(64), nullable=True, index=True)
     meta = Column(JSON, nullable=True)
-    # {nav_brief, fp_brief, ...}
 
     __table_args__ = (
         Index("ix_sessions_ip_started", "ip", "started_at"),
@@ -153,16 +134,7 @@ class SessionModel(Base):
     )
 
 
-# =========================================================
-# v3 — Heartbeats (Phase 1.1)
-# =========================================================
 class VisitHeartbeatModel(Base):
-    """
-    كل heartbeat = نقطة زمنية بتقول 'لسه هنا'.
-    بنستخدمها عشان:
-      - نعرف الزيارة قعدت قد إيه فعلاً (لو الـ final ماجاش)
-      - نشوف نمط التفاعل عبر الزمن
-    """
     __tablename__ = "visit_heartbeats"
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String(36), index=True, nullable=False)
@@ -170,7 +142,6 @@ class VisitHeartbeatModel(Base):
     received_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
 
     t_ms = Column(Integer, default=0, nullable=False)
-    # الوقت الداخلي من بداية الزيارة (client-side)
 
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
@@ -188,15 +159,12 @@ class VisitHeartbeatModel(Base):
     )
 
 
-# =========================================================
-# Visits (extended for v3)
-# =========================================================
 class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
     site_id = Column(Integer, ForeignKey("sites.id"), index=True, nullable=True)
     campaign_id = Column(Integer, index=True, nullable=True)
-    session_id = Column(String(36), nullable=True, index=True)  # v3
+    session_id = Column(String(36), nullable=True, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     ip = Column(String, index=True)
     user_agent = Column(String)
@@ -226,43 +194,28 @@ class VisitModel(Base):
     ground_truth_at = Column(DateTime, nullable=True)
     ground_truth_by = Column(String(64), nullable=True)
 
-    # ===== v3 fields =====
     data_quality = Column(String(20), nullable=True, index=True)
-    # full | partial | failed | legacy | unknown
-
     is_honeypot_triggered = Column(Boolean, default=False)
     clock_drift_ms = Column(Integer, default=0)
     consent_state = Column(String(20), default="unknown")
 
-    # حقول JSONB (في SQLite بيبقوا JSON عادي)
     first_30s = Column(JSON, nullable=True)
-    # {scroll_depth_30s, interaction_count_30s, mouse_distance_30s, ...}
-
     milestones = Column(JSON, nullable=True)
-    # {t_first_paint, t_first_ad_visible_50, ...}
-
     behavioral = Column(JSON, nullable=True)
-    # {scroll_depth_pct, mouse_velocity_median, ...} — 40+ حقل
-
     ad_events = Column(JSON, nullable=True)
-    # [{zone_id, viewport_pct, duration_ms, event, ...}]
-
     full_payload = Column(JSON, nullable=True)
-    # الـ payload الكامل (للdebug والـ replay)
 
+    # ⚠️ ملاحظة مهمة: ix_visits_session و ix_visits_data_quality
+    # مش موجودين هنا — بيتم إنشاؤهم من خلال migrate_v3_visit_columns()
+    # عشان نتجنب تعارض create_all مع الـ migration
     __table_args__ = (
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
         Index("ix_visits_gt_verdict", "ground_truth", "verdict"),
         Index("ix_visits_campaign_timestamp", "campaign_id", "timestamp"),
-        Index("ix_visits_session", "session_id"),
-        Index("ix_visits_data_quality", "data_quality"),
     )
 
 
-# =========================================================
-# Auth tokens
-# =========================================================
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
     id = Column(Integer, primary_key=True)
@@ -284,9 +237,6 @@ class EmailVerificationToken(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
-# =========================================================
-# v8 — Ban Risk Snapshots
-# =========================================================
 class BanRiskSnapshot(Base):
     __tablename__ = "ban_risk_snapshots"
     id = Column(Integer, primary_key=True, index=True)
@@ -307,9 +257,6 @@ class BanRiskSnapshot(Base):
     )
 
 
-# =========================================================
-# v8 — Zone Actions
-# =========================================================
 class ZoneActionModel(Base):
     __tablename__ = "zone_actions"
 
