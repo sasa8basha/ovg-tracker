@@ -2,6 +2,7 @@
 schemas.py — Pydantic models for OVG Tracker.
 """
 from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
 
 
 class AuthIn(BaseModel):
@@ -65,17 +66,14 @@ class GroundTruthIn(BaseModel):
 class CampaignCreateIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     type: str = Field(pattern=r"^(landing|direct|hybrid)$")
-
     traffic_source_slug: str = Field(default="custom", max_length=50)
     traffic_source_campaign_id: str = Field(default="", max_length=100)
     buy_cpm: float = Field(default=0.0, ge=0.0, le=100.0)
-
     destination_slug: str = Field(default="custom", max_length=50)
     destination_url: str = Field(default="", max_length=1000)
     destination_zone_id: str = Field(default="", max_length=100)
     sell_cpm: float = Field(default=0.0, ge=0.0, le=100.0)
-
-    site_id: int = Field(default=0)  # 0 = مفيش site مرتبط (للـ direct)
+    site_id: int = Field(default=0)
     redirect_delay_ms: int = Field(default=500, ge=100, le=2000)
     bot_block_threshold: int = Field(default=100, ge=0, le=100)
     daily_budget: float = Field(default=0.0, ge=0.0, le=100000.0)
@@ -94,7 +92,7 @@ class CampaignUpdateIn(BaseModel):
     redirect_delay_ms: int = Field(default=0, ge=0, le=2000)
     bot_block_threshold: int = Field(default=-1, ge=-1, le=100)
     daily_budget: float = Field(default=-1.0, ge=-1.0, le=100000.0)
-    status: str = Field(default="", max_length=20)  # active | paused | archived
+    status: str = Field(default="", max_length=20)
     notes: str = Field(default="", max_length=1000)
 
 
@@ -110,3 +108,84 @@ class DestinationIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     postback_supported: bool = Field(default=False)
     notes: str = Field(default="", max_length=500)
+
+
+# =========================================================
+# v3 — Collector Payloads (Phase 1.1)
+# =========================================================
+class HandshakePayload(BaseModel):
+    """النبضة الأولى — بتفتح session."""
+    v: int = Field(default=3)
+    session_id: str = Field(min_length=8, max_length=64)
+    site_key: str = Field(default="", max_length=100)
+    campaign_key: str = Field(default="", max_length=100)
+    url: str = Field(default="", max_length=2000)
+    t_ms: int = Field(default=0, ge=0)
+
+    # بيانات أولية (مختصرة للسرعة)
+    nav: Dict[str, Any] = Field(default_factory=dict)
+    fp: Dict[str, Any] = Field(default_factory=dict)
+
+    # consent (لو معروف)
+    consent_state: str = Field(default="unknown", max_length=20)
+
+
+class HeartbeatPayload(BaseModel):
+    """نبضة دورية — لسه هنا."""
+    v: int = Field(default=3)
+    session_id: str = Field(min_length=8, max_length=64)
+    seq: int = Field(ge=1, le=10000)
+    t_ms: int = Field(ge=0)
+
+    # عدادات تراكمية
+    clicks: int = Field(default=0, ge=0)
+    scrolls: int = Field(default=0, ge=0)
+    mousemoves: int = Field(default=0, ge=0)
+    keydowns: int = Field(default=0, ge=0)
+
+    is_visible: bool = Field(default=True)
+    is_focused: bool = Field(default=True)
+
+
+class AdEventPayload(BaseModel):
+    """حدث إعلاني واحد."""
+    event: str = Field(max_length=50)
+    # ad_script_loaded | ad_impression_start | ad_viewable_50pct_1s | ad_viewable_100pct_1s | ad_click
+    zone_id: str = Field(default="", max_length=100)
+    t_ms: int = Field(default=0, ge=0)
+    viewport_pct: float = Field(default=0.0, ge=0.0, le=100.0)
+    duration_ms: int = Field(default=0, ge=0)
+    is_trusted: Optional[bool] = None
+    meta: Dict[str, Any] = Field(default_factory=dict)
+
+
+class FinalPayload(BaseModel):
+    """البيانات الكاملة — بتقفل session."""
+    v: int = Field(default=3)
+    session_id: str = Field(min_length=8, max_length=64)
+    seq: int = Field(default=999, ge=0, le=10000)
+    t_ms: int = Field(default=0, ge=0)
+
+    # Basic data
+    site_key: str = Field(default="", max_length=100)
+    campaign_key: str = Field(default="", max_length=100)
+    url: str = Field(default="", max_length=2000)
+    webrtc_ip: str = Field(default="None", max_length=100)
+
+    # Payloads (نفس الـ TrackPayload القديم + جديد)
+    nav: Dict[str, Any] = Field(default_factory=dict)
+    fingerprint: Dict[str, Any] = Field(default_factory=dict)
+    behavior: Dict[str, Any] = Field(default_factory=dict)
+    screen: Dict[str, Any] = Field(default_factory=dict)
+
+    # v3 fields
+    milestones: Dict[str, Any] = Field(default_factory=dict)
+    first_30s: Dict[str, Any] = Field(default_factory=dict)
+    ad_events: List[Dict[str, Any]] = Field(default_factory=list)
+    honeypot_triggered: bool = Field(default=False)
+    clock_drift_ms: int = Field(default=0)
+    consent_state: str = Field(default="unknown", max_length=20)
+
+    # Data quality (يحددها الـ client)
+    data_quality: str = Field(default="full", max_length=20)
+    # full | partial | failed
