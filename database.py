@@ -10,151 +10,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def _safe_alter(conn, sql: str, label: str):
-    try:
-        conn.execute(text(sql))
-        conn.commit()
-        print(f"✅ Migration: {label}")
-    except Exception as e:
-        print(f"⚠️ Migration '{label}' skipped: {e}")
-
-
-def migrate_auth_columns():
-    try:
-        insp = inspect(engine)
-        if "users" not in insp.get_table_names():
-            return
-        cols = [c["name"] for c in insp.get_columns("users")]
-        with engine.connect() as conn:
-            if "email" not in cols:
-                _safe_alter(conn, "ALTER TABLE users ADD COLUMN email VARCHAR(255)", "users.email")
-                _safe_alter(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)", "ix_users_email")
-            if "email_verified" not in cols:
-                _safe_alter(conn, "ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 0", "users.email_verified")
-            if "token_version" not in cols:
-                _safe_alter(conn, "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 1", "users.token_version")
-    except Exception as e:
-        print(f"⚠️ migrate_auth_columns skipped: {e}")
-
-
-def migrate_cpm_columns():
-    try:
-        insp = inspect(engine)
-        if "users" not in insp.get_table_names():
-            return
-        cols = [c["name"] for c in insp.get_columns("users")]
-        with engine.connect() as conn:
-            if "cpm_buy" not in cols:
-                _safe_alter(conn, "ALTER TABLE users ADD COLUMN cpm_buy FLOAT NOT NULL DEFAULT 1.0", "users.cpm_buy")
-            if "cpm_sell" not in cols:
-                _safe_alter(conn, "ALTER TABLE users ADD COLUMN cpm_sell FLOAT NOT NULL DEFAULT 1.5", "users.cpm_sell")
-    except Exception as e:
-        print(f"⚠️ migrate_cpm_columns skipped: {e}")
-
-
-def migrate_ground_truth_columns():
-    try:
-        insp = inspect(engine)
-        if "visits" not in insp.get_table_names():
-            return
-        cols = [c["name"] for c in insp.get_columns("visits")]
-        with engine.connect() as conn:
-            if "ground_truth" not in cols:
-                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN ground_truth VARCHAR(10)", "visits.ground_truth")
-                _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_ground_truth ON visits (ground_truth)", "ix_visits_ground_truth")
-            if "ground_truth_at" not in cols:
-                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN ground_truth_at TIMESTAMP", "visits.ground_truth_at")
-            if "ground_truth_by" not in cols:
-                _safe_alter(conn, "ALTER TABLE visits ADD COLUMN ground_truth_by VARCHAR(64)", "visits.ground_truth_by")
-            _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_gt_verdict ON visits (ground_truth, verdict)", "ix_visits_gt_verdict")
-    except Exception as e:
-        print(f"⚠️ migrate_ground_truth_columns skipped: {e}")
-
-
-def migrate_country_code():
-    try:
-        insp = inspect(engine)
-        if "visits" not in insp.get_table_names():
-            return
-        cols = [c["name"] for c in insp.get_columns("visits")]
-        if "country_code" in cols:
-            return
-        with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE visits ADD COLUMN country_code VARCHAR(2)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_visits_country_code ON visits (country_code)"))
-            conn.commit()
-        print("✅ Migration: added visits.country_code column")
-    except Exception as e:
-        print(f"⚠️ Migration skipped: {e}")
-
-
-def migrate_visit_campaign_column():
-    try:
-        insp = inspect(engine)
-        if "visits" not in insp.get_table_names():
-            return
-        cols = [c["name"] for c in insp.get_columns("visits")]
-        if "campaign_id" in cols:
-            return
-        with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE visits ADD COLUMN campaign_id INTEGER"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_visits_campaign_id ON visits (campaign_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_visits_campaign_timestamp ON visits (campaign_id, timestamp)"))
-            conn.commit()
-        print("✅ Migration: added visits.campaign_id column")
-    except Exception as e:
-        print(f"⚠️ migrate_visit_campaign_column skipped: {e}")
-
-
-def migrate_v3_visit_columns():
-    try:
-        insp = inspect(engine)
-        if "visits" not in insp.get_table_names():
-            return
-        cols = [c["name"] for c in insp.get_columns("visits")]
-
-        additions = [
-            ("session_id", "ALTER TABLE visits ADD COLUMN session_id VARCHAR(36)"),
-            ("data_quality", "ALTER TABLE visits ADD COLUMN data_quality VARCHAR(20)"),
-            ("is_honeypot_triggered", "ALTER TABLE visits ADD COLUMN is_honeypot_triggered BOOLEAN DEFAULT 0"),
-            ("clock_drift_ms", "ALTER TABLE visits ADD COLUMN clock_drift_ms INTEGER DEFAULT 0"),
-            ("consent_state", "ALTER TABLE visits ADD COLUMN consent_state VARCHAR(20) DEFAULT 'unknown'"),
-            ("first_30s", "ALTER TABLE visits ADD COLUMN first_30s JSON"),
-            ("milestones", "ALTER TABLE visits ADD COLUMN milestones JSON"),
-            ("behavioral", "ALTER TABLE visits ADD COLUMN behavioral JSON"),
-            ("ad_events", "ALTER TABLE visits ADD COLUMN ad_events JSON"),
-            ("full_payload", "ALTER TABLE visits ADD COLUMN full_payload JSON"),
-        ]
-
-        with engine.connect() as conn:
-            for col_name, sql in additions:
-                if col_name not in cols:
-                    _safe_alter(conn, sql, f"visits.{col_name}")
-
-            _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_session ON visits (session_id)", "ix_visits_session")
-            _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_data_quality ON visits (data_quality)", "ix_visits_data_quality")
-    except Exception as e:
-        print(f"⚠️ migrate_v3_visit_columns skipped: {e}")
-
-
-def migrate_counting_type():
-    """v3.1 — counting_type field to fix hybrid cost double-counting."""
-    try:
-        insp = inspect(engine)
-        if "visits" not in insp.get_table_names():
-            return
-        cols = [c["name"] for c in insp.get_columns("visits")]
-        if "counting_type" in cols:
-            return
-        with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE visits ADD COLUMN counting_type VARCHAR(20)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_visits_counting_type ON visits (counting_type)"))
-            conn.commit()
-        print("✅ Migration: added visits.counting_type column")
-    except Exception as e:
-        print(f"⚠️ migrate_counting_type skipped: {e}")
-
-
 def seed_traffic_sources():
     try:
         insp = inspect(engine)
@@ -341,7 +196,6 @@ def backfill_legacy_data_quality():
 
 
 def backfill_counting_type():
-    """v3.1 — backfill counting_type for existing visits (default: standalone)."""
     try:
         insp = inspect(engine)
         if "visits" not in insp.get_table_names():
@@ -367,18 +221,15 @@ def backfill_counting_type():
         print(f"⚠️ backfill_counting_type skipped: {e}")
 
 
-def run_migrations():
-    migrate_auth_columns()
-    migrate_cpm_columns()
-    migrate_ground_truth_columns()
-    migrate_country_code()
-    migrate_visit_campaign_column()
+def run_data_seeding_and_backfills():
+    """
+    بتشغل تعبئة البيانات الأولية والـ backfills.
+    دوال التعديل (ALTER TABLE) اتشالت خلاص واتنقلت لـ Alembic.
+    """
     seed_traffic_sources()
     seed_destinations()
     backfill_campaigns_from_sites()
     backfill_visits_campaign_id()
-    migrate_v3_visit_columns()
-    migrate_counting_type()
     backfill_legacy_data_quality()
     backfill_counting_type()
 
