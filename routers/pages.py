@@ -1,7 +1,7 @@
 """
 routers/pages.py — HTML pages + debug/diagnostic endpoints.
 
-v3 (Phase 0.5): إضافة /campaigns و /campaigns/{id}
+v3 (Phase 1.4): إضافة /sessions و /sessions/{session_id}
 """
 import os
 import random
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from config import DASHBOARD_KEY, SESSION_COOKIE, SESSION_TTL, ENV
 from database import get_db
-from models import UserModel, SiteModel, VisitModel, CampaignModel
+from models import UserModel, SiteModel, VisitModel, CampaignModel, SessionModel
 from auth import _optional_user, current_user, make_token, consume_email_verification_token
 from helpers import _resolve_user_site
 from utils import stats_cache, zone_evidence_cache
@@ -75,9 +75,6 @@ def verify_email_page(token: str = "", db: Session = Depends(get_db)):
     return RedirectResponse("/dashboard?verify=invalid", status_code=302)
 
 
-# =========================================================
-# v3 — Campaigns pages (Phase 0.5)
-# =========================================================
 @router.get("/campaigns", response_class=HTMLResponse)
 def campaigns_page(request: Request, db: Session = Depends(get_db)):
     if not _optional_user(request, db):
@@ -92,9 +89,20 @@ def campaign_detail_page(request: Request, campaign_id: int, db: Session = Depen
     return HTMLResponse(read_template("campaign_detail.html"))
 
 
-# =========================================================
-# Existing pages
-# =========================================================
+@router.get("/sessions", response_class=HTMLResponse)
+def sessions_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("sessions.html"))
+
+
+@router.get("/sessions/{session_id}", response_class=HTMLResponse)
+def session_detail_page(request: Request, session_id: str, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("session_detail.html"))
+
+
 @router.get("/visits", response_class=HTMLResponse)
 def all_visits_page(request: Request, db: Session = Depends(get_db)):
     if not _optional_user(request, db):
@@ -165,9 +173,6 @@ def live_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(read_template("live.html"))
 
 
-# =========================================================
-# Diagnostics
-# =========================================================
 @router.get("/api/_debug/stats")
 def debug_stats(user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
     total_visits = db.query(VisitModel).count()
@@ -178,12 +183,14 @@ def debug_stats(user: UserModel = Depends(current_user), db: Session = Depends(g
 
     sites = db.query(SiteModel).filter(SiteModel.user_id == user.id).all()
     campaigns = db.query(CampaignModel).filter(CampaignModel.user_id == user.id).all()
+    sessions_count = db.query(SessionModel).filter(SessionModel.user_id == user.id).count()
     recent = db.query(VisitModel).order_by(VisitModel.id.desc()).limit(15).all()
 
     return {
         "total_visits_db": total_visits,
         "user_visits_db": user_visits,
         "orphan_visits_db": orphan_visits,
+        "user_sessions_count": sessions_count,
         "user_sites": [
             {"id": s.id, "name": s.name, "key_prefix": (s.site_key or "")[:8]}
             for s in sites
@@ -195,8 +202,10 @@ def debug_stats(user: UserModel = Depends(current_user), db: Session = Depends(g
         ],
         "recent_visits": [
             {"id": v.id, "site_id": v.site_id, "campaign_id": v.campaign_id,
+             "session_id": v.session_id,
              "ts": v.timestamp.isoformat() if v.timestamp else None,
              "verdict": v.verdict, "score": v.score,
+             "data_quality": v.data_quality,
              "ground_truth": v.ground_truth}
             for v in recent
         ],
@@ -232,6 +241,7 @@ def generate_mock(site: str = Query(None), user: UserModel = Depends(current_use
             clicks=random.randint(0, 5), scrolls=random.randint(0, 10),
             latitude=clat + random.uniform(-2, 2),
             longitude=clon + random.uniform(-2, 2),
+            data_quality="full",
         ))
     db.commit()
     stats_cache.invalidate(f"stats:site:{s.id}")
@@ -242,4 +252,4 @@ def generate_mock(site: str = Query(None), user: UserModel = Depends(current_use
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "5.7"}
+    return {"status": "ok", "version": "5.9"}
