@@ -11,9 +11,11 @@ Supports both plain names (SECRET, DATABASE_URL) and legacy OVG_* prefixes.
 """
 
 import re
+import json
+from typing import Annotated
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict, NoDecode
 
 
 # =========================================================
@@ -68,7 +70,8 @@ class Settings(BaseSettings):
     )
 
     # ---------- CORS ----------
-    ALLOWED_ORIGINS: list[str] = Field(
+    # NoDecode prevents pydantic from forcing JSON parsing on env vars
+    ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
         validation_alias=AliasChoices("ALLOWED_ORIGINS", "OVG_ORIGINS"),
     )
@@ -166,6 +169,15 @@ class Settings(BaseSettings):
     # ---------- Redis ----------
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
+    # ---------- Click Params ----------
+    CLICK_PARAM_WHITELIST: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: [
+            "sub1", "sub2", "sub3", "sub4", "sub5",
+            "utm_source", "utm_medium", "utm_campaign",
+            "utm_content", "utm_term",
+        ]
+    )
+
     # =========================================================
     # VALIDATORS
     # =========================================================
@@ -192,10 +204,20 @@ class Settings(BaseSettings):
             )
         return v
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @field_validator("ALLOWED_ORIGINS", "CLICK_PARAM_WHITELIST", mode="before")
     @classmethod
-    def _split_csv(cls, v):
+    def _split_csv_or_json(cls, v):
         if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            # Handle JSON array format ["url1", "url2"]
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            # Handle comma-separated format url1,url2
             return [x.strip() for x in v.split(",") if x.strip()]
         return v or []
 
@@ -215,7 +237,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _post_checks(self):
-        # Warn if DEBUG on in production
         if self.ENV == "prod" and self.DEBUG:
             import warnings
             warnings.warn("DEBUG=True in production — disable it.", RuntimeWarning)
@@ -251,7 +272,6 @@ DATA_QUALITY_UNKNOWN = "unknown"
 
 # =========================================================
 # BACKWARD-COMPAT EXPORTS
-# Existing `from config import X` continues to work.
 # =========================================================
 DATABASE_URL = settings.DATABASE_URL
 ENV = settings.ENV
@@ -302,3 +322,4 @@ INTERSTITIAL_MAX_WAIT_MS = settings.INTERSTITIAL_MAX_WAIT_MS
 
 BOT_RISK_THRESHOLD = settings.BOT_RISK_THRESHOLD
 REDIS_URL = settings.REDIS_URL
+CLICK_PARAM_WHITELIST = settings.CLICK_PARAM_WHITELIST
