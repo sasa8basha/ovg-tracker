@@ -1,23 +1,12 @@
 """
-tracker_v3_template.py — Collector v3 JS Template (Phase 1.2)
+tracker_v3_template.py — Collector v3 JS Template (Phase 1.2 + Fix 1.3.1)
 
-Heartbeat-based multi-send collector.
-
-Placeholders:
-  __OVG_SITE_KEY__      → site_key (legacy)
-  __OVG_CAMPAIGN_KEY__  → campaign_key (v3 — الـ preferred)
-  __OVG_ENDPOINT_BASE__ → base URL (e.g. https://ovg-tracker.de1.netrun.io)
+Fix: sendBeacon uses text/plain to avoid CORS preflight on page unload.
 """
 
 TRACKER_V3_JS = r"""(function () {
   'use strict';
 
-  /* ============================================================
-   * OVG Tracker v3 — Collector
-   * Multi-send: handshake + heartbeats + final beacon
-   * ============================================================ */
-
-  // ============ CONFIG ============
   var SITE_KEY      = '__OVG_SITE_KEY__';
   var CAMPAIGN_KEY  = '__OVG_CAMPAIGN_KEY__';
   var ENDPOINT      = '__OVG_ENDPOINT_BASE__';
@@ -29,9 +18,8 @@ TRACKER_V3_JS = r"""(function () {
   var FIRST_30S_WINDOW_MS   = 30000;
   var IDLE_THRESHOLD_MS     = 30000;
   var MAX_QUEUE_SIZE        = 30;
-  var FINAL_TIMEOUT_MS      = 30 * 60 * 1000; // 30 دقيقة
+  var FINAL_TIMEOUT_MS      = 30 * 60 * 1000;
 
-  // ============ STATE ============
   var startTime = Date.now();
   var sessionId = null;
   var serverTimeOffset = 0;
@@ -49,14 +37,12 @@ TRACKER_V3_JS = r"""(function () {
     }
   } catch (e) {}
 
-  // ============ COUNTERS ============
   var counters = {
     mousemove: 0, clicks: 0, scrolls: 0, touchstart: 0,
     keydown: 0, backspace: 0, wheel: 0, copy: 0, selection: 0,
     dblclick: 0, rightclick: 0, focus: 0, blur: 0
   };
 
-  // ============ MOUSE ============
   var mousePoints = [];
   var firstMoveTime = null;
   var mouseDirectionChanges = 0;
@@ -66,7 +52,6 @@ TRACKER_V3_JS = r"""(function () {
   var mouseTotalDistance = 0;
   var lastMouseX = 0, lastMouseY = 0;
 
-  // ============ SCROLL ============
   var firstScrollTime = null;
   var scrollMaxDepthPct = 0;
   var scrollDirectionChanges = 0;
@@ -77,34 +62,28 @@ TRACKER_V3_JS = r"""(function () {
   var wheelDeltaTotal = 0;
   var scrollVelocitySamples = [];
 
-  // ============ KEYBOARD ============
   var firstKeyTime = null;
   var lastKeyTime = 0;
   var typingBursts = 0;
   var formInputs = 0;
 
-  // ============ CLICKS ============
   var clickPoints = [];
   var firstClickTime = null;
   var clicksBeforeMove = 0;
   var clicksOnLinks = 0;
   var clicksOnButtons = 0;
 
-  // ============ FOCUS ============
   var firstBlurTime = null;
   var totalUnfocusedTime = 0;
   var unfocusedSince = null;
   var tabSwitches = 0;
 
-  // ============ IDLE ============
   var lastActivityTime = Date.now();
   var idlePeriods = [];
   var currentIdleStart = null;
 
-  // ============ FIRST INTERACTION ============
   var firstInteractionTime = null;
 
-  // ============ MILESTONES ============
   var milestones = {
     t_first_paint: null,
     t_first_content_viewable: null,
@@ -118,27 +97,19 @@ TRACKER_V3_JS = r"""(function () {
     t_departure: null
   };
 
-  // ============ FIRST 30s SNAPSHOT ============
   var first30sSnapshot = null;
   var first30sCaptured = false;
 
-  // ============ AD EVENTS ============
   var adEvents = [];
   var trackedAdElements = [];
   var adObserver = null;
-  var adVisibilityStart = {}; // elId -> {t, pct}
+  var adVisibilityStart = {};
   var adFired50_1s = {};
 
-  // ============ HONEYPOT ============
   var honeypotTriggered = false;
 
-  // ============ SEND QUEUE ============
-  var sendQueue = [];
   var QUEUE_KEY = 'ovg_q_v3';
 
-  /* ============================================================
-   * UTILITIES
-   * ============================================================ */
   function now() { return Date.now() - startTime; }
 
   function variance(arr) {
@@ -162,7 +133,6 @@ TRACKER_V3_JS = r"""(function () {
     try {
       if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     } catch (e) {}
-    // Fallback
     var d = Date.now().toString(16);
     var r = '';
     for (var i = 0; i < 24; i++) {
@@ -178,7 +148,7 @@ TRACKER_V3_JS = r"""(function () {
 
     if (useBeacon && navigator.sendBeacon) {
       try {
-        var blob = new Blob([bodyStr], { type: 'application/json' });
+        var blob = new Blob([bodyStr], { type: 'text/plain;charset=UTF-8' });
         var ok = navigator.sendBeacon(url, blob);
         if (ok) return Promise.resolve({ ok: true, via: 'beacon' });
       } catch (e) {}
@@ -229,7 +199,6 @@ TRACKER_V3_JS = r"""(function () {
   function markActivity() {
     lastActivityTime = Date.now();
     if (currentIdleStart !== null) {
-      // خلص idle period
       var dur = Date.now() - currentIdleStart;
       if (dur >= IDLE_THRESHOLD_MS) {
         idlePeriods.push({ start: currentIdleStart - startTime, end: Date.now() - startTime, dur: dur });
@@ -246,16 +215,12 @@ TRACKER_V3_JS = r"""(function () {
     }
   }
 
-  /* ============================================================
-   * HONEYPOT INJECTION
-   * ============================================================ */
   function injectHoneypots() {
     try {
       var container = document.createElement('div');
       container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;opacity:0.01;pointer-events:auto;';
       container.setAttribute('aria-hidden', 'true');
 
-      // 1) لينك مخفي
       var a = document.createElement('a');
       a.href = '#hp-' + Math.random().toString(36).substring(7);
       a.textContent = 'info';
@@ -266,7 +231,6 @@ TRACKER_V3_JS = r"""(function () {
       });
       container.appendChild(a);
 
-      // 2) input مخفي
       var form = document.createElement('form');
       form.style.cssText = 'display:block;';
       var input = document.createElement('input');
@@ -281,7 +245,6 @@ TRACKER_V3_JS = r"""(function () {
       form.appendChild(input);
       container.appendChild(form);
 
-      // 3) زرار مخفي
       var btn = document.createElement('button');
       btn.textContent = 'Submit';
       btn.tabIndex = -1;
@@ -302,9 +265,6 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
   }
 
-  /* ============================================================
-   * AD TRACKING
-   * ============================================================ */
   var AD_SELECTORS = [
     'iframe[src*="adsterra"]',
     'iframe[src*="monetag"]',
@@ -327,7 +287,6 @@ TRACKER_V3_JS = r"""(function () {
     }
     if (el.hasAttribute && el.hasAttribute('data-ovg-ad')) return true;
 
-    // حجم كبير + iframe = محتمل إعلان
     if (tag === 'iframe') {
       var w = el.offsetWidth || parseInt(el.getAttribute('width') || 0);
       var h = el.offsetHeight || parseInt(el.getAttribute('height') || 0);
@@ -344,7 +303,6 @@ TRACKER_V3_JS = r"""(function () {
 
     milestones.t_first_ad_loaded = milestones.t_first_ad_loaded || now();
 
-    // IntersectionObserver
     if (!adObserver) return;
 
     try {
@@ -382,7 +340,6 @@ TRACKER_V3_JS = r"""(function () {
               ad_id: adId
             });
 
-            // بعد 1 ثانية متصلة → billable
             setTimeout(function () {
               if (adFired50_1s[adId]) return;
               var still = adVisibilityStart[adId];
@@ -415,7 +372,6 @@ TRACKER_V3_JS = r"""(function () {
       });
     }, { threshold: [0, 0.25, 0.5, 0.75, 1.0] });
 
-    // امسح العناصر الموجودة
     for (var i = 0; i < AD_SELECTORS.length; i++) {
       try {
         var els = document.querySelectorAll(AD_SELECTORS[i]);
@@ -425,7 +381,6 @@ TRACKER_V3_JS = r"""(function () {
       } catch (e) {}
     }
 
-    // راقب أي إضافة جديدة
     if (typeof MutationObserver !== 'undefined') {
       var mo = new MutationObserver(function (muts) {
         muts.forEach(function (m) {
@@ -446,9 +401,6 @@ TRACKER_V3_JS = r"""(function () {
     }
   }
 
-  /* ============================================================
-   * MILESTONES (paint + LCP)
-   * ============================================================ */
   function capturePaint() {
     try {
       var entries = performance.getEntriesByType('paint');
@@ -472,9 +424,6 @@ TRACKER_V3_JS = r"""(function () {
     }
   }
 
-  /* ============================================================
-   * FIRST 30s SNAPSHOT
-   * ============================================================ */
   function captureFirst30s() {
     if (first30sCaptured) return;
     first30sCaptured = true;
@@ -496,11 +445,7 @@ TRACKER_V3_JS = r"""(function () {
     };
   }
 
-  /* ============================================================
-   * EVENT LISTENERS
-   * ============================================================ */
   function setupListeners() {
-    // MOUSE
     document.addEventListener('mousemove', function (e) {
       counters.mousemove++;
       if (firstMoveTime === null) firstMoveTime = Date.now();
@@ -534,7 +479,6 @@ TRACKER_V3_JS = r"""(function () {
       if (mousePoints.length > 200) mousePoints.shift();
     }, { passive: true });
 
-    // CLICKS
     document.addEventListener('click', function (e) {
       counters.clicks++;
       if (firstClickTime === null) firstClickTime = Date.now();
@@ -560,7 +504,6 @@ TRACKER_V3_JS = r"""(function () {
     document.addEventListener('dblclick', function () { counters.dblclick++; }, { passive: true });
     document.addEventListener('contextmenu', function () { counters.rightclick++; }, { passive: true });
 
-    // SCROLL
     var scrollHandler = function () {
       counters.scrolls++;
       if (firstScrollTime === null) firstScrollTime = Date.now();
@@ -599,13 +542,11 @@ TRACKER_V3_JS = r"""(function () {
     };
     document.addEventListener('scroll', scrollHandler, { passive: true });
 
-    // WHEEL
     document.addEventListener('wheel', function (e) {
       counters.wheel++;
       wheelDeltaTotal += Math.abs(e.deltaY || 0);
     }, { passive: true });
 
-    // TOUCH
     document.addEventListener('touchstart', function () {
       counters.touchstart++;
       if (firstInteractionTime === null) {
@@ -615,7 +556,6 @@ TRACKER_V3_JS = r"""(function () {
       markActivity();
     }, { passive: true });
 
-    // KEYBOARD
     document.addEventListener('keydown', function (e) {
       counters.keydown++;
       if (firstKeyTime === null) firstKeyTime = Date.now();
@@ -630,18 +570,15 @@ TRACKER_V3_JS = r"""(function () {
 
       var t = Date.now();
       if (lastKeyTime && (t - lastKeyTime) < 1000) {
-        // في وسط typing burst
       } else if (lastKeyTime) {
         typingBursts++;
       }
       lastKeyTime = t;
     }, { passive: true });
 
-    // COPY / SELECTION
     document.addEventListener('copy', function () { counters.copy++; }, { passive: true });
     document.addEventListener('selectionchange', function () { counters.selection++; }, { passive: true });
 
-    // FORM INPUTS
     document.addEventListener('input', function (e) {
       var t = e.target;
       if (!t) return;
@@ -651,7 +588,6 @@ TRACKER_V3_JS = r"""(function () {
       }
     }, { passive: true });
 
-    // FOCUS / BLUR
     window.addEventListener('focus', function () {
       counters.focus++;
       if (unfocusedSince !== null) {
@@ -666,7 +602,6 @@ TRACKER_V3_JS = r"""(function () {
       tabSwitches++;
     });
 
-    // VISIBILITY
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') {
         finalize('hidden');
@@ -675,13 +610,9 @@ TRACKER_V3_JS = r"""(function () {
     window.addEventListener('pagehide', function () { finalize('pagehide'); });
     window.addEventListener('beforeunload', function () { finalize('unload'); });
 
-    // IDLE CHECK
     setInterval(checkIdle, 5000);
   }
 
-  /* ============================================================
-   * BUILD BEHAVIORAL SNAPSHOT
-   * ============================================================ */
   function buildBehavioral() {
     var totalVisible = now();
 
@@ -708,7 +639,6 @@ TRACKER_V3_JS = r"""(function () {
     if (unfocusedSince !== null) unfocusedTotal += Date.now() - unfocusedSince;
 
     return {
-      // Mouse
       mouse_distance_total: Math.round(mouseTotalDistance),
       mouse_velocity_median: mouseVelocities.length ? Math.round(median(mouseVelocities)) : 0,
       mouse_velocity_variance: mouseVelocities.length ? Math.round(variance(mouseVelocities) * 100) / 100 : 0,
@@ -716,8 +646,6 @@ TRACKER_V3_JS = r"""(function () {
       mouse_pauses: mousePauses,
       first_move_delay_ms: firstMoveTime ? firstMoveTime - startTime : -1,
       mouse_points: mousePoints.slice(-50),
-
-      // Scroll
       scroll_depth_pct: scrollMaxDepthPct,
       scroll_velocity_median: scrollVelMedian,
       scroll_pattern: scrollPattern,
@@ -726,14 +654,10 @@ TRACKER_V3_JS = r"""(function () {
       first_scroll_delay_ms: firstScrollTime ? firstScrollTime - startTime : -1,
       wheel_events: counters.wheel,
       wheel_delta_total: Math.round(wheelDeltaTotal),
-
-      // Keyboard
       keydown_count: counters.keydown,
       backspace_count: counters.backspace,
       typing_bursts: typingBursts,
       form_inputs: formInputs,
-
-      // Interaction
       clicks: counters.clicks,
       dblclicks: counters.dblclick,
       rightclicks: counters.rightclick,
@@ -744,24 +668,16 @@ TRACKER_V3_JS = r"""(function () {
       touch_events: counters.touchstart,
       copy_events: counters.copy,
       selection_events: counters.selection,
-
-      // Focus
       tab_switches: tabSwitches,
       blur_count: counters.blur,
       focus_count: counters.focus,
       total_unfocused_ms: Math.round(unfocusedTotal),
       first_blur_delay_ms: firstBlurTime ? firstBlurTime - startTime : -1,
-
-      // Time
       total_time_ms: Math.round(now()),
       visible_time_ms: Math.round(totalVisible),
       focused_time_ms: Math.round(totalVisible - unfocusedTotal),
-
-      // Idle
       idle_periods_count: idlePeriods.length,
       longest_idle_ms: idlePeriods.length ? Math.max.apply(null, idlePeriods.map(function(p){return p.dur;})) : 0,
-
-      // Events summary (للـ backward compat)
       events: {
         mousemove: counters.mousemove,
         touchstart: counters.touchstart,
@@ -772,9 +688,6 @@ TRACKER_V3_JS = r"""(function () {
     };
   }
 
-  /* ============================================================
-   * COLLECT NAV + FP
-   * ============================================================ */
   function getCanvasHash() {
     try {
       var c = document.createElement('canvas');
@@ -828,8 +741,7 @@ TRACKER_V3_JS = r"""(function () {
       var detected = false;
       var err = new Error();
       Object.defineProperty(err, 'stack', { get: function () { detected = true; return ''; } });
-      // eslint-disable-next-line no-console
-      if (typeof console !== 'undefined') console.debug(err);
+      if (typeof console !== 'undefined' && console.debug) console.debug(err);
       return detected;
     } catch (e) { return false; }
   }
@@ -914,9 +826,6 @@ TRACKER_V3_JS = r"""(function () {
     };
   }
 
-  /* ============================================================
-   * SEND: HANDSHAKE
-   * ============================================================ */
   function doHandshake() {
     if (handshakeDone) return;
     handshakeDone = true;
@@ -940,7 +849,6 @@ TRACKER_V3_JS = r"""(function () {
       startHeartbeatTimer();
       startBatchTimer();
     }).catch(function () {
-      // لو فشل، نحاول تاني بعد 3 ثواني
       setTimeout(function () {
         handshakeDone = false;
         doHandshake();
@@ -948,9 +856,6 @@ TRACKER_V3_JS = r"""(function () {
     });
   }
 
-  /* ============================================================
-   * SEND: HEARTBEAT
-   * ============================================================ */
   function sendHeartbeat() {
     if (finalSent) return;
     seq++;
@@ -986,16 +891,12 @@ TRACKER_V3_JS = r"""(function () {
     }, wait);
   }
 
-  /* ============================================================
-   * SEND: BATCH (interaction digest)
-   * ============================================================ */
   function sendBatch() {
     if (finalSent) return;
-    // batch = lightweight — مش محتاجينه دايماً، بس بيدي frequency info
     var body = {
       v: 3,
       session_id: sessionId,
-      seq: seq + 10000, // رقم مميز
+      seq: seq + 10000,
       t_ms: Math.round(now()),
       clicks: counters.clicks,
       scrolls: counters.scrolls,
@@ -1012,9 +913,6 @@ TRACKER_V3_JS = r"""(function () {
     batchTimer = setInterval(sendBatch, BATCH_INTERVAL_MS);
   }
 
-  /* ============================================================
-   * FINAL
-   * ============================================================ */
   function finalize(reason) {
     if (finalSent) return;
     finalSent = true;
@@ -1025,7 +923,6 @@ TRACKER_V3_JS = r"""(function () {
 
     milestones.t_departure = now();
 
-    // Snapshot أول 30 ثانية (لو لسه)
     captureFirst30s();
 
     var behavior = buildBehavioral();
@@ -1038,7 +935,7 @@ TRACKER_V3_JS = r"""(function () {
       site_key: SITE_KEY || '',
       campaign_key: CAMPAIGN_KEY || SITE_KEY || '',
       url: location.href,
-      webrtc_ip: 'None', // مش بنجمع WebRTC في v3 (بيبطأ)
+      webrtc_ip: 'None',
       nav: buildNav(),
       fingerprint: buildFingerprint(),
       behavior: behavior,
@@ -1052,22 +949,34 @@ TRACKER_V3_JS = r"""(function () {
       data_quality: reason === 'timeout' ? 'partial' : 'full'
     };
 
+    var bodyStr;
+    try { bodyStr = JSON.stringify(body); } catch (e) { bodyStr = '{}'; }
+
     var ok = false;
     try {
-      ok = navigator.sendBeacon(ENDPOINT + '/api/collect/final',
-        new Blob([JSON.stringify(body)], { type: 'application/json' }));
-    } catch (e) {}
+      ok = navigator.sendBeacon(
+        ENDPOINT + '/api/collect/final',
+        new Blob([bodyStr], { type: 'text/plain;charset=UTF-8' })
+      );
+    } catch (e) { ok = false; }
 
     if (!ok) {
-      safeSend(ENDPOINT + '/api/collect/final', body, true).catch(function () {
+      try {
+        fetch(ENDPOINT + '/api/collect/final', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: bodyStr,
+          keepalive: true,
+          credentials: 'omit'
+        }).catch(function () {
+          enqueue(ENDPOINT + '/api/collect/final', body);
+        });
+      } catch (e) {
         enqueue(ENDPOINT + '/api/collect/final', body);
-      });
+      }
     }
   }
 
-  /* ============================================================
-   * TRACK (mini — للـ honeypot)
-   * ============================================================ */
   function track(code, detail) {
     try {
       safeSend(ENDPOINT + '/api/collect/heartbeat', {
@@ -1085,17 +994,13 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
   }
 
-  /* ============================================================
-   * BOOT
-   * ============================================================ */
   function boot() {
     try {
       sessionId = uuid();
-      flushQueue(); // حاول تبعت أي حاجة قديمة
+      flushQueue();
       capturePaint();
       setupListeners();
 
-      // Honeypots + Ads بعد DOM ready
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () {
           injectHoneypots();
@@ -1106,15 +1011,12 @@ TRACKER_V3_JS = r"""(function () {
         setupAdObserver();
       }
 
-      // First-30s snapshot
       setTimeout(captureFirst30s, FIRST_30S_WINDOW_MS);
 
-      // Final timeout (30 دقيقة max)
       finalTimeoutTimer = setTimeout(function () {
         finalize('timeout');
       }, FINAL_TIMEOUT_MS);
 
-      // Handshake بعد 500ms (عشان LCP)
       var doHandshakeDelayed = function () { setTimeout(doHandshake, HANDSHAKE_DELAY_MS); };
       if ('requestIdleCallback' in window) {
         requestIdleCallback(doHandshakeDelayed, { timeout: 2000 });
