@@ -7,13 +7,14 @@ Contains:
   - Zone scoring & lifecycle
   - Shared DB resolution helper
   - Campaign resolution (v3 — Phase 0.5)
+  - Zone ID extraction from URLs (improved in v3 Phase 2.1)
 """
 import re
 from datetime import datetime, timedelta
+from urllib.parse import urlparse, parse_qs
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-# v3 — إضافة VisitModel + CampaignModel (كانوا ناقصين، سبب NameError في /api/visits)
 from models import SiteModel, UserModel, VisitModel, CampaignModel
 
 
@@ -74,9 +75,6 @@ def _resolve_user_site(site_key: str, user: UserModel, db: Session) -> SiteModel
 
 
 def _resolve_user_campaign(campaign_key_or_id, user: UserModel, db: Session) -> CampaignModel:
-    """
-    يقبل campaign_key (str) أو campaign_id (int أو str رقمي).
-    """
     if not campaign_key_or_id:
         raise HTTPException(400, "campaign مطلوب")
 
@@ -98,7 +96,69 @@ def _resolve_user_campaign(campaign_key_or_id, user: UserModel, db: Session) -> 
 
 
 # =========================================================
-# CPM P&L HELPERS (Phase 3A)
+# ZONE ID EXTRACTION (v3 Phase 2.1 — improved)
+# =========================================================
+def extract_zone_id_from_url(url: str) -> str:
+    """
+    استخراج zone_id من URL بعدة طرق.
+    يقبل:
+      - ?zoneId=10245, ?zone_id=10245, ?zone=10245, ?z=10245
+      - /zone/10245 or /z/10245 or /zoneid/10245
+      - /10245/ (path يبدأ برقم كبير — adsterra direct)
+    """
+    if not url or url == "unknown":
+        return ""
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return ""
+
+    # 1) Query params
+    try:
+        for k, v in parse_qs(parsed.query or "").items():
+            kl = (k or "").lower().strip()
+            if kl in ("zoneid", "zone_id", "zone", "z"):
+                if v and v[0]:
+                    val = str(v[0]).strip()
+                    if val and len(val) <= 100:
+                        return val
+    except Exception:
+        pass
+
+    # 2) Path patterns: /zone/12345 or /z/12345
+    try:
+        parts = [p for p in (parsed.path or "").split("/") if p]
+        for i, p in enumerate(parts):
+            pl = (p or "").lower().strip()
+            if pl in ("zone", "z", "zoneid") and i + 1 < len(parts):
+                nxt = parts[i + 1]
+                if nxt and len(nxt) <= 100:
+                    return nxt
+    except Exception:
+        pass
+
+    # 3) Adsterra direct link pattern: first path segment is a number
+    try:
+        parts = [p for p in (parsed.path or "").split("/") if p]
+        if parts:
+            first = parts[0]
+            if first.isdigit() and 4 <= len(first) <= 10:
+                return first
+    except Exception:
+        pass
+
+    return ""
+
+
+def extract_zone_id(url: str) -> str:
+    """Legacy wrapper — يرجع 'unknown' لو مفيش نتيجة."""
+    result = extract_zone_id_from_url(url)
+    return result if result else "unknown"
+
+
+# =========================================================
+# CPM P&L HELPERS
 # =========================================================
 _WASTED_CODES = frozenset(["CPM_BRAVE", "CPM_ADBLOCK_BROWSER"])
 
@@ -117,6 +177,12 @@ def _extract_source(zone_id: str) -> str:
 
 def _compute_pl(total: int, valid: int, wasted: int,
                 buy_cpm: float, sell_cpm: float) -> dict:
+    """
+    P&L الحقيقي:
+      - cost = كل الزيارات (بوت + valid + suspicious) × buy_cpm
+      - revenue = valid × sell_cpm (بوت blocked = مفيش impression = مفيش revenue)
+      - profit = revenue - cost
+    """
     effective = max(0, valid - wasted)
     cost = round(total * buy_cpm / 1000.0, 4)
     revenue = round(effective * sell_cpm / 1000.0, 4)
