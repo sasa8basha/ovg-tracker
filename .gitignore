@@ -1,3 +1,42 @@
-# Phase 0 — بيانات المراجعة (حساسة، متترفعش على git)
-data/*.json
-!data/.gitkeep
+# ---- Secrets ----
+.env
+.env.*
+!.env.example
+ovg.txt
+*.pem
+*.key
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---- Database ----
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- IDE / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Testing / Coverage ----
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ---- Alembic ----
+# (keep alembic/ directory versioned)
