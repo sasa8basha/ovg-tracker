@@ -1,17 +1,9 @@
 """
-routers/interstitial.py — Interstitial + Precheck (Phase 1.3)
+routers/interstitial.py — Interstitial + Precheck (Phase 1.3 + Fix 2.1)
 
-Routes:
-  GET  /go/{campaign_key}          → interstitial HTML
-  POST /api/interstitial/precheck  → fast decision + save session/visit
-  POST /api/interstitial/log       → final log (decision made)
-
-الفكرة:
-  1. الزائر يدخل /go/{key}
-  2. الصفحة تجمع بصمة سريعة (<100ms)
-  3. POST precheck → تحليل سريع + حفظ session + visit
-  4. Response: redirect URL أو block
-  5. JS يعمل redirect أو يفضل ثابت
+Fix:
+  - Verdict: passed precheck = 'valid' (not 'suspicious')
+  - Zone ID: use campaign.destination_zone_id or extract from destination_url
 """
 from datetime import datetime
 
@@ -26,15 +18,12 @@ from schemas import InterstitialPrecheckPayload, InterstitialLogPayload
 from utils import get_client_ip, handshake_limiter, safe_origin
 from collector.precheck import quick_precheck
 from collector.interstitial_template import INTERSTITIAL_HTML
-from collector.constants import CODE_TO_SOURCE
-from analysis import get_ip_info, parse_ua
+from analysis import parse_ua, extract_zone_id
+from helpers import extract_zone_id_from_url
 
 router = APIRouter()
 
 
-# =========================================================
-# 1) Serve interstitial page
-# =========================================================
 @router.get("/go/{campaign_key}", response_class=HTMLResponse)
 async def serve_interstitial(campaign_key: str, request: Request,
                              db: Session = Depends(get_db)):
@@ -48,7 +37,6 @@ async def serve_interstitial(campaign_key: str, request: Request,
     if not c:
         raise HTTPException(404, "Not Found")
 
-    # لو الحملة مش نشطة → serve بلانك (مفيش redirect)
     if c.status != "active":
         blank = """<!DOCTYPE html><html><head><meta charset="UTF-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -58,11 +46,9 @@ async def serve_interstitial(campaign_key: str, request: Request,
         </style></head><body>This page is temporarily unavailable.</body></html>"""
         return HTMLResponse(content=blank, status_code=200)
 
-    # لو direct/hybrid بس — landing pages عندها tracker code عادي
     if c.type == "landing":
         raise HTTPException(404, "Not Found")
 
-    # لو مفيش destination_url → مش valid direct
     if not c.destination_url or len(c.destination_url) < 10:
         raise HTTPException(404, "Not Found")
 
@@ -86,9 +72,6 @@ async def serve_interstitial(campaign_key: str, request: Request,
     )
 
 
-# =========================================================
-# 2) Precheck — fast decision
-# =========================================================
 @router.post("/api/interstitial/precheck")
 async def precheck(
     payload: InterstitialPrecheckPayload,
@@ -102,7 +85,6 @@ async def precheck(
     try:
         handshake_limiter.check(f"isc:{client_ip}")
     except HTTPException:
-        # rate limit hit — redirect عشان ما نخسرش الزيارة
         return {
             "action": "redirect",
             "url": None,
@@ -110,12 +92,10 @@ async def precheck(
             "reasons": ["RATE_LIMITED"],
         }
 
-    # Validate session id
     session_id = (payload.session_id or "").strip()
     if not session_id or len(session_id) < 8 or len(session_id) > 64:
         raise HTTPException(400, "session_id غير صالح")
 
-    # Lookup campaign
     c = db.query(CampaignModel).filter(
         CampaignModel.campaign_key == payload.campaign_key,
     ).first()
@@ -130,14 +110,12 @@ async def precheck(
             "reasons": ["CAMPAIGN_PAUSED"],
         }
 
-    # Run fast precheck
     result = quick_precheck(
         nav=payload.nav or {},
         fp=payload.fp or {},
         threshold=int(c.bot_block_threshold or 100),
     )
 
-    # Save session + visit (don't block response on failure)
     try:
         _save_precheck(db, c, session_id, client_ip, payload, result)
     except Exception as e:
@@ -147,7 +125,6 @@ async def precheck(
         except Exception:
             pass
 
-    # Build response
     if result["action"] == "block":
         return {
             "action": "block",
@@ -155,25 +132,20 @@ async def precheck(
             "score": result["score"],
             "reasons": result["reasons"],
         }
-    else:
-        return {
-            "action": "redirect",
-            "url": c.destination_url,
-            "score": result["score"],
-            "reasons": result["reasons"],
-        }
+    return {
+        "action": "redirect",
+        "url": c.destination_url,
+        "score": result["score"],
+        "reasons": result["reasons"],
+    }
 
 
-# =========================================================
-# 3) Log — decision was made, log it
-# =========================================================
 @router.post("/api/interstitial/log")
 async def log_interstitial(
     payload: InterstitialLogPayload,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Logs the decision for audit. Fire-and-forget — no strict validation."""
     try:
         s = db.query(SessionModel).filter(
             SessionModel.session_id == payload.session_id
@@ -181,7 +153,6 @@ async def log_interstitial(
         if not s:
             return {"ok": True}
 
-        # Update session with decision (if not already set)
         if not s.meta:
             s.meta = {}
         try:
@@ -205,16 +176,11 @@ async def log_interstitial(
     return {"ok": True}
 
 
-# =========================================================
-# HELPERS
-# =========================================================
 def _save_precheck(db, campaign, session_id, client_ip, payload, result):
-    """Save session + minimal visit."""
-    # Check if session already exists (idempotent)
+    """Save session + visit. Zone id from campaign (reliable)."""
     existing = db.query(SessionModel).filter(
         SessionModel.session_id == session_id,
     ).first()
-
     if existing:
         return
 
@@ -224,24 +190,29 @@ def _save_precheck(db, campaign, session_id, client_ip, payload, result):
     except Exception:
         os_name, device, browser = "Unknown", "Unknown", "Unknown"
 
-    # Sync geo — best effort (may return Unknown quickly)
-    country = "Unknown"
-    country_code = None
-    isp = "Unknown"
-    asn = ""
-    is_vpn = False
-    connection_type = "unknown"
-    lat = lon = 0.0
+    # zone_id from campaign.destination_zone_id (most reliable)
+    zone_id = ""
+    if campaign.destination_zone_id:
+        zone_id = str(campaign.destination_zone_id).strip()[:100]
+    if not zone_id and campaign.destination_url:
+        zone_id = extract_zone_id_from_url(campaign.destination_url)
+    if not zone_id:
+        zone_id = extract_zone_id(payload.url or "")
 
-    # (best-effort — لا ننتظر الـ geo لو بطئ)
-    try:
-        # We DON'T await this to keep precheck fast (< 100ms).
-        # Skip geo for now — can be filled by later analysis.
-        pass
-    except Exception:
-        pass
+    # Verdict: blocked → invalid, passed → valid
+    is_blocked = (result["action"] == "block")
+    verdict = "invalid" if is_blocked else "valid"
+    score = 100 if is_blocked else 0
 
-    # Save session
+    evidence = []
+    for reason in result["reasons"]:
+        evidence.append({
+            "code": reason,
+            "severity": "critical" if is_blocked else "medium",
+            "score": 100 if is_blocked else 0,
+            "detail": "Interstitial precheck",
+        })
+
     session = SessionModel(
         session_id=session_id,
         campaign_id=campaign.id,
@@ -262,21 +233,6 @@ def _save_precheck(db, campaign, session_id, client_ip, payload, result):
     )
     db.add(session)
 
-    # Save visit (minimal, immediate)
-    verdict = "invalid" if result["action"] == "block" else "suspicious"
-    # "suspicious" مش "valid" — عشان البيانات ناقصة (interstitial)
-    # التحليل الكامل ممكن يغيرها لو جالها final
-    score = result["score"] if result["action"] == "block" else 25
-
-    evidence = []
-    for reason in result["reasons"]:
-        evidence.append({
-            "code": reason,
-            "severity": "critical" if result["action"] == "block" else "medium",
-            "score": 100 if result["action"] == "block" else 0,
-            "detail": "Interstitial precheck",
-        })
-
     visit = VisitModel(
         site_id=campaign.site_id,
         campaign_id=campaign.id,
@@ -284,28 +240,23 @@ def _save_precheck(db, campaign, session_id, client_ip, payload, result):
         timestamp=datetime.utcnow(),
         ip=client_ip,
         user_agent=ua,
-        zone_id=campaign.destination_zone_id or "unknown",
+        zone_id=zone_id or "unknown",
         score=score,
         verdict=verdict,
         evidence=evidence,
         os=os_name,
         device=device,
         browser=browser,
-        country=country,
-        country_code=country_code,
-        isp=isp,
-        asn=asn,
-        is_vpn=is_vpn,
-        connection_type=connection_type,
-        latitude=lat,
-        longitude=lon,
+        country="Unknown",
+        country_code=None,
+        isp="Unknown",
+        asn="",
+        is_vpn=False,
+        connection_type="unknown",
+        latitude=0.0,
+        longitude=0.0,
         data_quality="partial",
-        is_honeypot_triggered=("HONEYPOT_CLICK" in result["reasons"]
-                               or "HONEYPOT_FORM_FILL" in result["reasons"]),
-        first_30s=None,
-        milestones=None,
-        behavioral=None,
-        ad_events=None,
+        is_honeypot_triggered=False,
         full_payload={
             "type": "interstitial",
             "precheck_score": result["score"],
@@ -321,7 +272,6 @@ def _save_precheck(db, campaign, session_id, client_ip, payload, result):
     db.commit()
     db.refresh(visit)
 
-    # Link visit to session
     session.visit_id = visit.id
     session.verdict = visit.verdict
     session.score = visit.score
