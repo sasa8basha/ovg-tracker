@@ -9,6 +9,8 @@
  *   - Toasts with undo
  *   - Modals
  *   - Theme toggle
+ *
+ * v3 (Phase 0.5): إضافة قسم "الحملات" (campaigns) في الـ NAV + أيقونة campaigns.
  */
 (function () {
   'use strict';
@@ -89,6 +91,7 @@
     pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
     ban: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
     scale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
+    campaigns: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
   };
 
   // ============ NAV ============
@@ -101,7 +104,8 @@
         { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/visits', needsSite: true },
         { id: 'labeling',  label: 'المراجعة',     icon: 'labeling',  href: '/labeling', badge: 'labeling' },
       ]},
-      { group: 'المال', items: [
+      { group: 'الحملات', items: [
+        { id: 'campaigns', label: 'كل الحملات',     icon: 'campaigns', href: '/campaigns' },
         { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/smart-reports', needsSite: true },
         { id: 'analytics', label: 'Zone Analytics',  icon: 'analytics', href: '/zone-analytics', needsSite: true },
       ]},
@@ -119,7 +123,8 @@
         { id: 'visits',    label: 'Visits',    icon: 'visits',    href: '/visits', needsSite: true },
         { id: 'labeling',  label: 'Labeling',  icon: 'labeling',  href: '/labeling', badge: 'labeling' },
       ]},
-      { group: 'Money', items: [
+      { group: 'Campaigns', items: [
+        { id: 'campaigns', label: 'All Campaigns',  icon: 'campaigns', href: '/campaigns' },
         { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/smart-reports', needsSite: true },
         { id: 'analytics', label: 'Zone Analytics', icon: 'analytics', href: '/zone-analytics', needsSite: true },
       ]},
