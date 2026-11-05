@@ -1,14 +1,11 @@
 """
-tracker_v3_template.py — Collector v3 (Phase 2.2 — Accuracy Boost)
+tracker_v3_template.py — Collector v3 (Phase 2.4 — Accuracy Boost)
 
-New in v3.1:
-  - speechSynthesis.getVoices() count (headless returns 0)
-  - navigator.permissions snapshot (headless differs)
-  - WebGL precision (headless reports 0/-1)
-  - userAgentData.brands (headless mismatch)
-  - isTrusted click tracking (bot clicks via .click() fail this)
-  - connection.rtt / downlink (headless defaults)
-  - Notification.permission (headless defaults)
+New in v3.3:
+  - key_intervals (typing rhythm)
+  - scroll_velocity_samples (scroll physics)
+  - speech_voices, webgl_precision, ua_brands, connection, isTrusted clicks
+  - All v3.1 fields preserved
 """
 
 TRACKER_V3_JS = r"""(function () {
@@ -50,7 +47,6 @@ TRACKER_V3_JS = r"""(function () {
     dblclick: 0, rightclick: 0, focus: 0, blur: 0
   };
 
-  // v3.1 — click trust
   var trustedClicks = 0;
   var untrustedClicks = 0;
 
@@ -77,6 +73,7 @@ TRACKER_V3_JS = r"""(function () {
   var lastKeyTime = 0;
   var typingBursts = 0;
   var formInputs = 0;
+  var keyIntervals = [];
 
   var clickPoints = [];
   var firstClickTime = null;
@@ -576,7 +573,6 @@ TRACKER_V3_JS = r"""(function () {
       if (mousePoints.length > 200) mousePoints.shift();
     }, { passive: true });
 
-    // CLICKS with trust detection
     document.addEventListener('click', function (e) {
       if (e.isTrusted === true) {
         trustedClicks++;
@@ -673,6 +669,17 @@ TRACKER_V3_JS = r"""(function () {
       if (e.key === 'Backspace' || e.keyCode === 8) counters.backspace++;
 
       var t = Date.now();
+
+      // v3.3 — collect keystroke intervals
+      if (window._ovgLastKeyTime) {
+        var interval = t - window._ovgLastKeyTime;
+        if (interval > 0 && interval < 5000) {
+          keyIntervals.push(interval);
+          if (keyIntervals.length > 100) keyIntervals.shift();
+        }
+      }
+      window._ovgLastKeyTime = t;
+
       if (lastKeyTime && (t - lastKeyTime) < 1000) {
       } else if (lastKeyTime) {
         typingBursts++;
@@ -752,6 +759,7 @@ TRACKER_V3_JS = r"""(function () {
       mouse_points: mousePoints.slice(-50),
       scroll_depth_pct: scrollMaxDepthPct,
       scroll_velocity_median: scrollVelMedian,
+      scroll_velocity_samples: scrollVelocitySamples.slice(-30),
       scroll_pattern: scrollPattern,
       scroll_direction_changes: scrollDirectionChanges,
       scroll_pauses: scrollPauses,
@@ -759,6 +767,7 @@ TRACKER_V3_JS = r"""(function () {
       wheel_events: counters.wheel,
       wheel_delta_total: Math.round(wheelDeltaTotal),
       keydown_count: counters.keydown,
+      key_intervals: keyIntervals.slice(-20),
       backspace_count: counters.backspace,
       typing_bursts: typingBursts,
       form_inputs: formInputs,
@@ -915,7 +924,6 @@ TRACKER_V3_JS = r"""(function () {
       intl_locale: intlLocale,
       mime_types_count: mimeCount,
       pdf_viewer: pdfViewer,
-      // v3.1
       speech_voices: getSpeechVoices(),
       notification_permission: getNotificationPermission(),
       webgl_precision: getWebGLPrecision(),
