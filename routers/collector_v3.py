@@ -1,5 +1,5 @@
 """
-routers/collector_v3.py — Collector v3 (P2 — Idempotency & Speed)
+routers/collector_v3.py — Collector v3 (P3 — Explainable Filtering)
 """
 import json
 from datetime import datetime, timedelta
@@ -24,7 +24,7 @@ from utils import (
     stats_cache, zone_evidence_cache,
 )
 from analysis import get_ip_info, parse_ua, extract_zone_id
-from collector.orchestrator import analyze_full
+from collector.filter_engine import evaluate_visit # <--- المحرك الجديد
 from helpers import extract_zone_id_from_url
 
 router = APIRouter()
@@ -237,7 +237,7 @@ async def collect_heartbeat(
 
 
 # =========================================================
-# FINAL (Background Processing — P2)
+# FINAL (Background Processing + Filter Engine)
 # =========================================================
 def _process_final_background(
     session_id: str,
@@ -277,12 +277,9 @@ def _process_final_background(
         if not zone_id:
             zone_id = "unknown"
 
-        # NOTE: For async background, we skip get_ip_info to avoid blocking.
-        # In a real production setup, you would cache this from handshake.
         ip_info = {"country": "Unknown", "country_code": session.country_code,
                    "isp": "Unknown", "asn": "", "security": {}, "lat": 0.0, "lon": 0.0}
 
-        # Cross-visit (Simplified for background)
         recent_fp_count = 0
         same_ip_last_minute = 0
 
@@ -326,10 +323,16 @@ def _process_final_background(
         }
 
         try:
-            result = analyze_full(data, ip_info)
+            # P3: Using the new Explainable Filter Engine
+            result = evaluate_visit(data, ip_info)
         except Exception as e:
-            print(f"[BG] Analyze failed: {e}")
-            result = {"score": 50, "verdict": "suspicious", "evidence": []}
+            print(f"[BG] Filter Engine failed: {e}")
+            result = {
+                "score": 50, 
+                "verdict": "suspicious", 
+                "evidence": [],
+                "filter_reason": "ENGINE_ERROR"
+            }
 
         fp = payload.fingerprint or {}
         behavior = payload.behavior or {}
@@ -337,20 +340,32 @@ def _process_final_background(
         cc = str(ip_info.get("country_code") or "").upper().strip()
 
         visit = VisitModel(
-            site_id=session.site_id, campaign_id=session.campaign_id,
-            session_id=session_id, timestamp=datetime.utcnow(),
-            ip=client_ip, user_agent=ua, zone_id=zone_id,
-            click_id=payload.click_id or None,  # <--- IDEMPOTENCY
-            score=result.get("score", 0), verdict=result.get("verdict", "suspicious"),
-            evidence=result.get("evidence", []), os=os_name, device=device, browser=browser,
-            country=ip_info.get("country", "Unknown"), country_code=cc[:2] if cc else None,
-            isp=ip_info.get("isp", "Unknown"), timezone=str(fp.get("timezone", "Unknown"))[:50],
+            site_id=session.site_id, 
+            campaign_id=session.campaign_id,
+            session_id=session_id, 
+            timestamp=datetime.utcnow(),
+            ip=client_ip, 
+            user_agent=ua, 
+            zone_id=zone_id,
+            click_id=payload.click_id or None,
+            filter_reason=result.get("filter_reason"), # <--- P3 Output
+            score=result.get("score", 0), 
+            verdict=result.get("verdict", "suspicious"),
+            evidence=result.get("evidence", []), 
+            os=os_name, 
+            device=device, 
+            browser=browser,
+            country=ip_info.get("country", "Unknown"), 
+            country_code=cc[:2] if cc else None,
+            isp=ip_info.get("isp", "Unknown"), 
+            timezone=str(fp.get("timezone", "Unknown"))[:50],
             canvas_hash=(str(fp.get("canvas_hash", ""))[:15] + "...") if fp.get("canvas_hash") else "Unknown",
-            data_quality=dq, time_on_page=time_ms,
-            clicks=int(events.get("clicks", 0) or 0), scrolls=int(events.get("scrolls", 0) or 0),
+            data_quality=dq, 
+            time_on_page=time_ms,
+            clicks=int(events.get("clicks", 0) or 0), 
+            scrolls=int(events.get("scrolls", 0) or 0),
         )
         
-        # في حالة إن الـ click_id اتكرر، الداتابيز هترفض الإدخال (لو عليه unique index)
         try:
             db.add(visit)
             db.commit()
@@ -363,13 +378,12 @@ def _process_final_background(
             session.data_quality = dq
             db.commit()
             
-            # Invalidate caches
             if session.site_id: stats_cache.invalidate(f"stats:site:{session.site_id}")
             if session.user_id: stats_cache.invalidate(f"stats:user:{session.user_id}:all")
             
         except Exception as e:
             db.rollback()
-            print(f"[BG] Failed to save visit (duplicate click_id?): {e}")
+            print(f"[BG] Failed to save visit: {e}")
 
     except Exception as e:
         print(f"[BG] Fatal error: {e}")
@@ -380,7 +394,7 @@ def _process_final_background(
 @router.post("/collect/final")
 async def collect_final(
     request: Request,
-    background_tasks: BackgroundTasks,  # <--- NEW
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     if not COLLECTOR_V3_ENABLED:
@@ -391,7 +405,6 @@ async def collect_final(
     try:
         raw_bytes = await request.body()
         payload_dict = json.loads(raw_bytes.decode("utf-8", errors="replace"))
-        # Validate basic fields quickly
         payload = FinalPayload(**payload_dict) 
     except Exception as e:
         raise HTTPException(400, f"Invalid payload: {e}")
@@ -405,7 +418,6 @@ async def collect_final(
     if not session:
         raise HTTPException(400, "session غير موجودة — handshake أولاً")
 
-    # IDEMPOTENCY CHECK: Fast response if already processed
     if session.visit_id:
         v = db.query(VisitModel).get(session.visit_id)
         if v:
@@ -417,18 +429,15 @@ async def collect_final(
                 "duplicate": True,
             }
 
-    # Extract headers for background task
     try:
         headers_dict = {str(k).lower(): str(v) for k, v in request.headers.items()}
     except Exception:
         headers_dict = {}
     http_version = str(request.scope.get("http_version", "1.1"))
 
-    # OFFLOAD to Background
     background_tasks.add_task(
         _process_final_background,
         session_id, payload_dict, client_ip, headers_dict, http_version
     )
 
-    # Return immediately
     return {"ok": True, "status": "processing", "duplicate": False}
