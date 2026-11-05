@@ -1,5 +1,12 @@
 """
 routers/tracker.py — Tracking routes + tracker JS templates.
+
+Contains:
+  - Legacy v2 JS template (TRACKER_CODE_TEMPLATE)
+  - v3 JS template (imported from collector.tracker_v3_template)
+  - /sites/{id}/tracker-code      (v2 — legacy)
+  - /sites/{id}/tracker-code-v3   (v3 — split + download)
+  - /track                      (v2 — backward compat)
 """
 import json
 from datetime import datetime, timedelta
@@ -339,14 +346,50 @@ def get_tracker_code(site_id: int, request: Request,
 
 
 # =========================================================
-# v3 tracker code endpoint (Phase 1.2)
+# v3 tracker code endpoint (split into 2 parts)
 # =========================================================
+def _split_tracker_js(js: str):
+    """
+    يقسم الـ JS لجزئين عند حد دالة (function) قريب من المنتصف.
+    يضمن إن كل جزء متكامل (مش وسط دالة).
+    """
+    total = len(js)
+    if total < 5000:
+        return (js, "")
+
+    mid = total // 2
+    search_start = max(0, mid - 4000)
+    search_end = min(total, mid + 4000)
+
+    candidates = []
+    idx = search_start
+    while idx < search_end:
+        found = js.find("\n  function ", idx)
+        if found == -1 or found >= search_end:
+            break
+        candidates.append(found)
+        idx = found + 1
+
+    if candidates:
+        best = min(candidates, key=lambda x: abs(x - mid))
+        return (js[:best].rstrip() + "\n", js[best:].lstrip())
+
+    idx = js.find('\n', mid)
+    if idx == -1:
+        idx = mid
+    return (js[:idx].rstrip() + "\n", js[idx:].lstrip())
+
+
 @router.get("/sites/{site_id}/tracker-code-v3")
 def get_tracker_code_v3(site_id: int, request: Request,
                         user: UserModel = Depends(current_user),
                         db: Session = Depends(get_db)):
     """
-    الـ v3 JS template. بيرجع <script> كامل للـ landing pages.
+    الـ v3 JS template — مقسوم جزئين عشان يبقى سهل النسخ.
+    بيرجع:
+      - part1, part2 (مقسومين عند حد دالة)
+      - full (الكود كامل)
+      - size_bytes, lines, campaign_key
     """
     site = db.query(SiteModel).filter(
         SiteModel.id == site_id, SiteModel.user_id == user.id
@@ -358,7 +401,6 @@ def get_tracker_code_v3(site_id: int, request: Request,
         site.site_key = new_site_key()
         db.commit()
 
-    # جيب الـ campaign_key من الحملة المرتبطة
     campaign = db.query(CampaignModel).filter(
         CampaignModel.site_id == site.id,
         CampaignModel.user_id == user.id,
@@ -367,15 +409,25 @@ def get_tracker_code_v3(site_id: int, request: Request,
     campaign_key = campaign.campaign_key if campaign else site.site_key
 
     origin = safe_origin(request)
-    js = TRACKER_V3_JS \
+    js_inner = TRACKER_V3_JS \
         .replace("__OVG_SITE_KEY__", site.site_key) \
         .replace("__OVG_CAMPAIGN_KEY__", campaign_key) \
         .replace("__OVG_ENDPOINT_BASE__", origin)
 
-    code = "<script>\n" + js + "\n</script>"
+    full_code = "<script>\n" + js_inner + "\n</script>"
+
+    part1, part2 = _split_tracker_js(full_code)
 
     return Response(
-        content='{"code":' + json.dumps(code) + ', "version": "v3", "campaign_key":' + json.dumps(campaign_key) + '}',
+        content=json.dumps({
+            "part1": part1,
+            "part2": part2,
+            "full": full_code,
+            "version": "v3",
+            "campaign_key": campaign_key,
+            "size_bytes": len(full_code.encode("utf-8")),
+            "lines": full_code.count("\n") + 1,
+        }),
         media_type="application/json",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
@@ -526,7 +578,7 @@ async def track_visit(payload: TrackPayload, request: Request,
             time_on_page=behavior.get("time_on_page_ms", 0),
             clicks=events.get("clicks", 0), scrolls=events.get("scrolls", 0),
             latitude=ip_info.get("lat", 0.0), longitude=ip_info.get("lon", 0.0),
-            data_quality="legacy",  # v2 tracker = legacy data
+            data_quality="legacy",
         )
 
         try:
