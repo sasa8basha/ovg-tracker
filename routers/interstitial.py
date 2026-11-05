@@ -1,9 +1,7 @@
 """
-routers/interstitial.py — Interstitial + Precheck (Phase 1.3 + Fix 2.1)
+routers/interstitial.py — Interstitial + Precheck (Phase 2.3)
 
-Fix:
-  - Verdict: passed precheck = 'valid' (not 'suspicious')
-  - Zone ID: use campaign.destination_zone_id or extract from destination_url
+Added: header analysis + fingerprint cache in precheck.
 """
 from datetime import datetime
 
@@ -18,10 +16,26 @@ from schemas import InterstitialPrecheckPayload, InterstitialLogPayload
 from utils import get_client_ip, handshake_limiter, safe_origin
 from collector.precheck import quick_precheck
 from collector.interstitial_template import INTERSTITIAL_HTML
+from collector.header_analyzer import analyze_headers
+from collector.fingerprint_cache import get_strikes as fp_get_strikes
 from analysis import parse_ua, extract_zone_id
 from helpers import extract_zone_id_from_url
+import hashlib
 
 router = APIRouter()
+
+
+def _compute_fp_hash(nav, fp):
+    parts = [
+        str((fp or {}).get("canvas_hash") or ""),
+        str((fp or {}).get("timezone") or ""),
+        str((nav or {}).get("language") or ""),
+        str((fp or {}).get("hardwareConcurrency") or ""),
+        str((fp or {}).get("deviceMemory") or ""),
+        str(((fp or {}).get("webgl") or {}).get("renderer") or ""),
+    ]
+    s = "|".join(parts)
+    return hashlib.sha256(s.encode()).hexdigest()[:32]
 
 
 @router.get("/go/{campaign_key}", response_class=HTMLResponse)
@@ -110,14 +124,62 @@ async def precheck(
             "reasons": ["CAMPAIGN_PAUSED"],
         }
 
+    # Base precheck
     result = quick_precheck(
         nav=payload.nav or {},
         fp=payload.fp or {},
         threshold=int(c.bot_block_threshold or 100),
     )
 
+    extra_score = 0
+    extra_reasons = []
+
+    # Header analysis
     try:
-        _save_precheck(db, c, session_id, client_ip, payload, result)
+        headers_dict = {str(k).lower(): str(v) for k, v in request.headers.items()}
+    except Exception:
+        headers_dict = {}
+    http_version = "1.1"
+    try:
+        http_version = str(request.scope.get("http_version", "1.1"))
+    except Exception:
+        pass
+
+    ua = str((payload.nav or {}).get("ua") or "")
+    try:
+        header_sigs = analyze_headers(headers_dict, ua, http_version)
+        for sig in header_sigs:
+            extra_score += int(sig.get("score", 0) or 0)
+            extra_reasons.append(sig.get("code"))
+    except Exception as e:
+        print(f"[INTERSTITIAL] header analysis failed: {e}")
+
+    # Fingerprint cache strikes
+    fp_hash = _compute_fp_hash(payload.nav or {}, payload.fp or {})
+    try:
+        stats = fp_get_strikes(fp_hash)
+        strikes = int(stats.get("strikes") or 0)
+        if strikes >= 5:
+            extra_score += 85
+            extra_reasons.append("FINGERPRINT_KNOWN_BAD")
+        elif strikes >= 3:
+            extra_score += 55
+            extra_reasons.append("FINGERPRINT_SUSPICIOUS")
+    except Exception as e:
+        print(f"[INTERSTITIAL] cache lookup failed: {e}")
+
+    total_score = min(150, result["score"] + extra_score)
+    should_block = total_score >= int(c.bot_block_threshold or 100) or result["action"] == "block"
+
+    final_result = {
+        "action": "block" if should_block else "redirect",
+        "score": total_score,
+        "reasons": (result["reasons"] + extra_reasons)[:15],
+        "threshold": int(c.bot_block_threshold or 100),
+    }
+
+    try:
+        _save_precheck(db, c, session_id, client_ip, payload, final_result)
     except Exception as e:
         print(f"[INTERSTITIAL] save failed: {e}")
         try:
@@ -125,18 +187,18 @@ async def precheck(
         except Exception:
             pass
 
-    if result["action"] == "block":
+    if final_result["action"] == "block":
         return {
             "action": "block",
             "url": None,
-            "score": result["score"],
-            "reasons": result["reasons"],
+            "score": final_result["score"],
+            "reasons": final_result["reasons"],
         }
     return {
         "action": "redirect",
         "url": c.destination_url,
-        "score": result["score"],
-        "reasons": result["reasons"],
+        "score": final_result["score"],
+        "reasons": final_result["reasons"],
     }
 
 
@@ -177,7 +239,6 @@ async def log_interstitial(
 
 
 def _save_precheck(db, campaign, session_id, client_ip, payload, result):
-    """Save session + visit. Zone id from campaign (reliable)."""
     existing = db.query(SessionModel).filter(
         SessionModel.session_id == session_id,
     ).first()
@@ -190,7 +251,6 @@ def _save_precheck(db, campaign, session_id, client_ip, payload, result):
     except Exception:
         os_name, device, browser = "Unknown", "Unknown", "Unknown"
 
-    # zone_id from campaign.destination_zone_id (most reliable)
     zone_id = ""
     if campaign.destination_zone_id:
         zone_id = str(campaign.destination_zone_id).strip()[:100]
@@ -199,7 +259,6 @@ def _save_precheck(db, campaign, session_id, client_ip, payload, result):
     if not zone_id:
         zone_id = extract_zone_id(payload.url or "")
 
-    # Verdict: blocked → invalid, passed → valid
     is_blocked = (result["action"] == "block")
     verdict = "invalid" if is_blocked else "valid"
     score = 100 if is_blocked else 0
