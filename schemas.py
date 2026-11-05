@@ -117,6 +117,7 @@ class HandshakePayload(BaseModel):
     """النبضة الأولى — بتفتح session."""
     v: int = Field(default=3)
     session_id: str = Field(min_length=8, max_length=64)
+    click_id: str = Field(default="", max_length=64) # <--- P2 Idempotency
     site_key: str = Field(default="", max_length=100)
     campaign_key: str = Field(default="", max_length=100)
     url: str = Field(default="", max_length=2000)
@@ -155,6 +156,7 @@ class FinalPayload(BaseModel):
     """البيانات الكاملة — بتقفل session."""
     v: int = Field(default=3)
     session_id: str = Field(min_length=8, max_length=64)
+    click_id: str = Field(default="", max_length=64) # <--- P2 Idempotency
     seq: int = Field(default=999, ge=0, le=10000)
     t_ms: int = Field(default=0, ge=0)
     site_key: str = Field(default="", max_length=100)
