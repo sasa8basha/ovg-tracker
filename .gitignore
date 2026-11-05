@@ -1,0 +1,3 @@
+# Phase 0 — بيانات المراجعة (حساسة، متترفعش على git)
+data/*.json
+!data/.gitkeep
