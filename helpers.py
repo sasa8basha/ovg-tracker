@@ -6,13 +6,15 @@ Contains:
   - CPM P&L math (used by reports router)
   - Zone scoring & lifecycle
   - Shared DB resolution helper
+  - Campaign resolution (v3 — Phase 0.5)
 """
 import re
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from models import SiteModel, UserModel
+# v3 — إضافة VisitModel + CampaignModel (كانوا ناقصين، سبب NameError في /api/visits)
+from models import SiteModel, UserModel, VisitModel, CampaignModel
 
 
 # =========================================================
@@ -69,6 +71,30 @@ def _resolve_user_site(site_key: str, user: UserModel, db: Session) -> SiteModel
     if not s:
         raise HTTPException(404, "الموقع مش موجود أو مش بتاعك")
     return s
+
+
+def _resolve_user_campaign(campaign_key_or_id, user: UserModel, db: Session) -> CampaignModel:
+    """
+    يقبل campaign_key (str) أو campaign_id (int أو str رقمي).
+    """
+    if not campaign_key_or_id:
+        raise HTTPException(400, "campaign مطلوب")
+
+    q = db.query(CampaignModel).filter(CampaignModel.user_id == user.id)
+
+    if isinstance(campaign_key_or_id, int):
+        q = q.filter(CampaignModel.id == campaign_key_or_id)
+    else:
+        key = str(campaign_key_or_id).strip()
+        if key.isdigit():
+            q = q.filter(CampaignModel.id == int(key))
+        else:
+            q = q.filter(CampaignModel.campaign_key == key)
+
+    c = q.first()
+    if not c:
+        raise HTTPException(404, "الحملة مش موجودة أو مش بتاعتك")
+    return c
 
 
 # =========================================================
