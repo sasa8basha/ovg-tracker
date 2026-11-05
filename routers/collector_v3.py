@@ -1,12 +1,7 @@
 """
-routers/collector_v3.py — Collector v3 (Phase 1.1)
+routers/collector_v3.py — Collector v3 (Phase 1.1 + Fix 1.3.1)
 
-3 endpoints:
-  POST /api/collect/handshake  — بداية زيارة → session_id
-  POST /api/collect/heartbeat  — "لسه هنا" كل 10s
-  POST /api/collect/final      — البيانات الكاملة
-
-بالتوازي مع /api/track القديم (backward compat).
+Fix: /collect/final now accepts text/plain (from sendBeacon) and JSON (from fetch).
 """
 import json
 from datetime import datetime, timedelta
@@ -41,9 +36,6 @@ from collector.constants import (
 router = APIRouter()
 
 
-# =========================================================
-# HELPERS
-# =========================================================
 def _validate_session_id(session_id: str) -> str:
     s = (session_id or "").strip()
     if not s or len(s) < 8 or len(s) > 64:
@@ -52,10 +44,6 @@ def _validate_session_id(session_id: str) -> str:
 
 
 def _resolve_target(site_key: str, campaign_key: str, db: Session):
-    """
-    بيرجع (user_id, site_id, campaign_id).
-    يقبل site_key (legacy) أو campaign_key (v3).
-    """
     user_id = None
     site_id = None
     campaign_id = None
@@ -70,7 +58,6 @@ def _resolve_target(site_key: str, campaign_key: str, db: Session):
             site_id = c.site_id
 
     if not campaign_id and site_key:
-        # backward compat: الـ site_key بيشتغل كـ campaign_key للـ legacy
         c = db.query(CampaignModel).filter(
             CampaignModel.campaign_key == site_key
         ).first()
@@ -83,7 +70,6 @@ def _resolve_target(site_key: str, campaign_key: str, db: Session):
             if s:
                 site_id = s.id
                 user_id = s.user_id
-                # ابحث عن الحملة المرتبطة
                 c2 = db.query(CampaignModel).filter(
                     CampaignModel.site_id == s.id
                 ).first()
@@ -94,7 +80,6 @@ def _resolve_target(site_key: str, campaign_key: str, db: Session):
 
 
 def _extract_fp_brief(fp: dict) -> dict:
-    """ملخص البصمة (للـ session) — مش البيانات الكاملة."""
     if not isinstance(fp, dict):
         return {}
     return {
@@ -106,7 +91,6 @@ def _extract_fp_brief(fp: dict) -> dict:
 
 
 def _compute_fp_hash(fp: dict) -> str:
-    """hash قصير للـ visitor fingerprint (للتكرار detection)."""
     import hashlib
     parts = [
         str(fp.get("canvas_hash") or ""),
@@ -121,7 +105,6 @@ def _compute_fp_hash(fp: dict) -> str:
 
 
 def _check_flood(session_id: str, ip: str, db: Session):
-    """يمنع flood من نفس IP (max sessions في آخر ساعة)."""
     cutoff = datetime.utcnow() - timedelta(hours=1)
     count = db.query(SessionModel).filter(
         SessionModel.ip == ip,
@@ -131,19 +114,12 @@ def _check_flood(session_id: str, ip: str, db: Session):
         raise HTTPException(429, "محاولات كتير — جرب بعد شوية")
 
 
-# =========================================================
-# 1) HANDSHAKE
-# =========================================================
 @router.post("/collect/handshake")
 async def collect_handshake(
     payload: HandshakePayload,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """
-    بداية زيارة. بيرجع session_id + server_time.
-    Idempotent: لو اتبعت تاني بنفس session_id، مفيش تكرار.
-    """
     if not COLLECTOR_V3_ENABLED:
         raise HTTPException(404, "Collector v3 disabled")
 
@@ -152,7 +128,6 @@ async def collect_handshake(
 
     session_id = _validate_session_id(payload.session_id)
 
-    # Idempotency: لو الـ session موجودة، ارجع بياناتها
     existing = db.query(SessionModel).filter(
         SessionModel.session_id == session_id
     ).first()
@@ -170,7 +145,6 @@ async def collect_handshake(
         payload.site_key, payload.campaign_key, db,
     )
 
-    # geo lookup (cached)
     try:
         ip_info = await get_ip_info(client_ip)
         if not isinstance(ip_info, dict):
@@ -213,19 +187,12 @@ async def collect_handshake(
     }
 
 
-# =========================================================
-# 2) HEARTBEAT
-# =========================================================
 @router.post("/collect/heartbeat")
 async def collect_heartbeat(
     payload: HeartbeatPayload,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """
-    نبضة دورية. بتسجل نقطة في visit_heartbeats.
-    Idempotent: لو نفس (session_id, seq) اتبعت تاني، نرجع ok.
-    """
     if not COLLECTOR_V3_ENABLED:
         raise HTTPException(404, "Collector v3 disabled")
 
@@ -237,10 +204,8 @@ async def collect_heartbeat(
         SessionModel.session_id == session_id
     ).first()
     if not session:
-        # مفيش session → handshake ماجاش. متقدرش تسجل heartbeat
         raise HTTPException(400, "session غير موجودة — handshake أولاً")
 
-    # Idempotency: لو نفس seq، متعملش تكرار
     existing = db.query(VisitHeartbeatModel).filter(
         VisitHeartbeatModel.session_id == session_id,
         VisitHeartbeatModel.seq == payload.seq,
@@ -271,23 +236,37 @@ async def collect_heartbeat(
     return {"ok": True, "duplicate": False}
 
 
-# =========================================================
-# 3) FINAL
-# =========================================================
 @router.post("/collect/final")
 async def collect_final(
-    payload: FinalPayload,
     request: Request,
     db: Session = Depends(get_db),
 ):
     """
-    البيانات الكاملة. بتعمل VisitModel + تحديث Session.
-    Idempotent: لو نفس session_id عنده visit، نرجع نفس الـ visit_id.
+    يقبل text/plain (من sendBeacon) أو application/json (من fetch).
+    بيقرأ الـ body يدوياً ويحوله JSON.
     """
     if not COLLECTOR_V3_ENABLED:
         raise HTTPException(404, "Collector v3 disabled")
 
     client_ip = get_client_ip(request)
+
+    # Read raw body
+    try:
+        raw_bytes = await request.body()
+        if not raw_bytes:
+            raise HTTPException(400, "Empty body")
+        try:
+            raw_str = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            raw_str = raw_bytes.decode("utf-8", errors="replace")
+        payload_dict = json.loads(raw_str)
+        payload = FinalPayload(**payload_dict)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[COLLECT_FINAL] payload parse failed: {e}")
+        raise HTTPException(400, f"Invalid payload: {e}")
+
     session_id = _validate_session_id(payload.session_id)
     final_limiter.check(f"{session_id}:{client_ip}")
 
@@ -297,7 +276,6 @@ async def collect_final(
     if not session:
         raise HTTPException(400, "session غير موجودة — handshake أولاً")
 
-    # Idempotency: لو visit موجودة بالفعل للـ session
     if session.visit_id:
         v = db.query(VisitModel).get(session.visit_id)
         if v:
@@ -309,7 +287,6 @@ async def collect_final(
                 "duplicate": True,
             }
 
-    # Parse UA + zone
     ua = str((payload.nav or {}).get("ua") or "")
     try:
         os_name, device, browser = parse_ua(ua)
@@ -321,7 +298,6 @@ async def collect_final(
     except Exception:
         zone_id = "unknown"
 
-    # Geo (cached, already fetched في handshake عادة)
     try:
         ip_info = await get_ip_info(client_ip)
         if not isinstance(ip_info, dict):
@@ -329,7 +305,6 @@ async def collect_final(
     except Exception:
         ip_info = {}
 
-    # Cross-visit aggregation (زي القديم)
     canvas_raw = str((payload.fingerprint or {}).get("canvas_hash") or "")
     recent_fp_count = 0
     same_ip_last_minute = 0
@@ -366,7 +341,6 @@ async def collect_final(
     except Exception as e:
         print(f"[COLLECT_FINAL] cross-visit failed: {e}")
 
-    # Build data dict للـ analyze_visit القديم (backward compat)
     data = {
         "nav": payload.nav or {},
         "fingerprint": payload.fingerprint or {},
@@ -396,7 +370,6 @@ async def collect_final(
                            "low": 0, "human": 0},
         }
 
-    # Augment evidence من الـ payload الجديد
     new_evidence = list(result.get("evidence", []))
 
     if payload.honeypot_triggered:
@@ -412,19 +385,16 @@ async def collect_final(
             "detail": f"Clock drift: {int(payload.clock_drift_ms)}ms",
         })
 
-    # فحص الـ heartbeats
     heartbeat_count = session.total_heartbeats or 0
     time_ms = max(int(payload.t_ms or 0), session.total_time_ms or 0)
 
     if heartbeat_count == 0 and time_ms < 5000:
-        # handshake موجود، مفيش heartbeats، والزيارة قصيرة → بوت درايف-باي
         new_evidence.append({
             "code": SIG_SILENT_AFTER_INITIAL, "severity": "high",
             "score": 60, "detail": "No heartbeat after handshake (drive-by bot?)",
         })
 
     if heartbeat_count >= 2:
-        # فحص الفجوات بين heartbeats
         hbs = db.query(VisitHeartbeatModel).filter(
             VisitHeartbeatModel.session_id == session_id
         ).order_by(VisitHeartbeatModel.seq.asc()).all()
@@ -440,7 +410,6 @@ async def collect_final(
 
     result["evidence"] = new_evidence
 
-    # Save VisitModel
     fp = payload.fingerprint or {}
     behavior = payload.behavior or {}
     events = behavior.get("events") or {}
@@ -452,7 +421,6 @@ async def collect_final(
     if len(canvas_stored) >= 15 and canvas_stored not in ("blocked", "Unknown"):
         canvas_stored = canvas_stored[:15] + "..."
 
-    # Data quality
     dq = payload.data_quality or "full"
     if dq not in ("full", "partial", "failed"):
         dq = "partial"
@@ -487,7 +455,6 @@ async def collect_final(
         scrolls=int(events.get("scrolls", 0) or 0),
         latitude=float(ip_info.get("lat", 0.0) or 0.0),
         longitude=float(ip_info.get("lon", 0.0) or 0.0),
-        # v3 fields
         data_quality=dq,
         is_honeypot_triggered=bool(payload.honeypot_triggered),
         clock_drift_ms=int(payload.clock_drift_ms or 0),
@@ -502,7 +469,6 @@ async def collect_final(
     db.commit()
     db.refresh(visit)
 
-    # Update session
     session.visit_id = visit.id
     session.verdict = visit.verdict
     session.score = visit.score
@@ -511,7 +477,6 @@ async def collect_final(
     session.total_time_ms = time_ms
     db.commit()
 
-    # Invalidate caches
     if session.site_id:
         stats_cache.invalidate(f"stats:site:{session.site_id}")
     if session.user_id:
@@ -524,4 +489,4 @@ async def collect_final(
         "verdict": visit.verdict,
         "score": visit.score,
         "duplicate": False,
-}
+      }
