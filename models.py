@@ -18,6 +18,7 @@ class UserModel(Base):
     cpm_sell = Column(Float, default=1.5, server_default="1.5", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     sites = relationship("SiteModel", back_populates="user", cascade="all, delete-orphan")
+    campaigns = relationship("CampaignModel", back_populates="user", cascade="all, delete-orphan")
 
 
 class SiteModel(Base):
@@ -31,10 +32,91 @@ class SiteModel(Base):
     user = relationship("UserModel", back_populates="sites")
 
 
+# =========================================================
+# v3 — Campaign Foundation (Phase 0.5)
+# =========================================================
+class TrafficSource(Base):
+    """
+    مصدر الترافيك (PopAds, Propeller, Galaksion, custom).
+    Built-in sources بتتعمل seed تلقائياً.
+    """
+    __tablename__ = "traffic_sources"
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(50), unique=True, index=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    default_cpm = Column(Float, default=0.0)
+    notes = Column(String(500), default="")
+    is_builtin = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Destination(Base):
+    """
+    وجهة الترافيك (Adsterra, Monetag, KDM, custom).
+    """
+    __tablename__ = "destinations"
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(50), unique=True, index=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    postback_supported = Column(Boolean, default=False)
+    notes = Column(String(500), default="")
+    is_builtin = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CampaignModel(Base):
+    """
+    الحملة — القلب الحقيقي للنظام.
+
+    - landing: صفحة هبوط (site موجود) + إعلان (destination)
+    - direct: traffic → interstitial (/go/{key}) → destination URL
+    - hybrid: landing + redirect out
+    """
+    __tablename__ = "campaigns"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+
+    name = Column(String(200), nullable=False)
+    type = Column(String(20), nullable=False, default="landing", index=True)
+    # landing | direct | hybrid
+
+    traffic_source_slug = Column(String(50), default="custom", index=True)
+    traffic_source_campaign_id = Column(String(100), default="")  # ID في PopAds مثلاً
+    buy_cpm = Column(Float, default=0.0, nullable=False)
+
+    destination_slug = Column(String(50), default="custom", index=True)
+    destination_url = Column(String(1000), default="")
+    destination_zone_id = Column(String(100), default="")
+    sell_cpm = Column(Float, default=0.0, nullable=False)
+
+    site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), nullable=True, index=True)
+    campaign_key = Column(String(32), unique=True, index=True, nullable=False)
+
+    redirect_delay_ms = Column(Integer, default=500, nullable=False)
+    bot_block_threshold = Column(Integer, default=100, nullable=False)
+    daily_budget = Column(Float, nullable=True)
+
+    status = Column(String(20), default="active", nullable=False, index=True)
+    # active | paused | archived
+
+    notes = Column(String(1000), default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("UserModel", back_populates="campaigns")
+    site = relationship("SiteModel")
+
+    __table_args__ = (
+        Index("ix_campaigns_user_status", "user_id", "status"),
+        Index("ix_campaigns_user_type", "user_id", "type"),
+    )
+
+
 class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
     site_id = Column(Integer, ForeignKey("sites.id"), index=True, nullable=True)
+    campaign_id = Column(Integer, index=True, nullable=True)  # v3 — nullable for backward compat
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     ip = Column(String, index=True)
     user_agent = Column(String)
@@ -68,6 +150,7 @@ class VisitModel(Base):
         Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
         Index("ix_visits_gt_verdict", "ground_truth", "verdict"),
+        Index("ix_visits_campaign_timestamp", "campaign_id", "timestamp"),
     )
 
 
@@ -92,9 +175,6 @@ class EmailVerificationToken(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
-# =========================================================
-# v8 — Ban Risk Snapshots (The Radar)
-# =========================================================
 class BanRiskSnapshot(Base):
     __tablename__ = "ban_risk_snapshots"
     id = Column(Integer, primary_key=True, index=True)
@@ -120,17 +200,7 @@ class BanRiskSnapshot(Base):
     )
 
 
-# =========================================================
-# v8 — Zone Actions (Quick Actions + Decision Log)
-# =========================================================
 class ZoneActionModel(Base):
-    """
-    كل إجراء على زون بيتسجل هنا. بيدي:
-    - Quick Actions التاريخ
-    - Undo capability
-    - Decision Journal future
-    - Council future (يستخدم القرارات السابقة)
-    """
     __tablename__ = "zone_actions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -142,10 +212,8 @@ class ZoneActionModel(Base):
     )
     zone_id = Column(String, index=True, nullable=False)
     action = Column(String(20), nullable=False)
-    # blacklist | pause | scale | resume
     reason = Column(String(200), default="")
     metadata_json = Column(JSON, nullable=True)
-    # for scale: {"percent": 30}; for pause: {"hours": 24}
     timestamp = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
     reverted_at = Column(DateTime, nullable=True)
 
