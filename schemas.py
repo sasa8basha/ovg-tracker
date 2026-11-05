@@ -121,12 +121,8 @@ class HandshakePayload(BaseModel):
     campaign_key: str = Field(default="", max_length=100)
     url: str = Field(default="", max_length=2000)
     t_ms: int = Field(default=0, ge=0)
-
-    # بيانات أولية (مختصرة للسرعة)
     nav: Dict[str, Any] = Field(default_factory=dict)
     fp: Dict[str, Any] = Field(default_factory=dict)
-
-    # consent (لو معروف)
     consent_state: str = Field(default="unknown", max_length=20)
 
 
@@ -136,13 +132,10 @@ class HeartbeatPayload(BaseModel):
     session_id: str = Field(min_length=8, max_length=64)
     seq: int = Field(ge=1, le=10000)
     t_ms: int = Field(ge=0)
-
-    # عدادات تراكمية
     clicks: int = Field(default=0, ge=0)
     scrolls: int = Field(default=0, ge=0)
     mousemoves: int = Field(default=0, ge=0)
     keydowns: int = Field(default=0, ge=0)
-
     is_visible: bool = Field(default=True)
     is_focused: bool = Field(default=True)
 
@@ -150,7 +143,6 @@ class HeartbeatPayload(BaseModel):
 class AdEventPayload(BaseModel):
     """حدث إعلاني واحد."""
     event: str = Field(max_length=50)
-    # ad_script_loaded | ad_impression_start | ad_viewable_50pct_1s | ad_viewable_100pct_1s | ad_click
     zone_id: str = Field(default="", max_length=100)
     t_ms: int = Field(default=0, ge=0)
     viewport_pct: float = Field(default=0.0, ge=0.0, le=100.0)
@@ -165,27 +157,43 @@ class FinalPayload(BaseModel):
     session_id: str = Field(min_length=8, max_length=64)
     seq: int = Field(default=999, ge=0, le=10000)
     t_ms: int = Field(default=0, ge=0)
-
-    # Basic data
     site_key: str = Field(default="", max_length=100)
     campaign_key: str = Field(default="", max_length=100)
     url: str = Field(default="", max_length=2000)
     webrtc_ip: str = Field(default="None", max_length=100)
-
-    # Payloads (نفس الـ TrackPayload القديم + جديد)
     nav: Dict[str, Any] = Field(default_factory=dict)
     fingerprint: Dict[str, Any] = Field(default_factory=dict)
     behavior: Dict[str, Any] = Field(default_factory=dict)
     screen: Dict[str, Any] = Field(default_factory=dict)
-
-    # v3 fields
     milestones: Dict[str, Any] = Field(default_factory=dict)
     first_30s: Dict[str, Any] = Field(default_factory=dict)
     ad_events: List[Dict[str, Any]] = Field(default_factory=list)
     honeypot_triggered: bool = Field(default=False)
     clock_drift_ms: int = Field(default=0)
     consent_state: str = Field(default="unknown", max_length=20)
-
-    # Data quality (يحددها الـ client)
     data_quality: str = Field(default="full", max_length=20)
-    # full | partial | failed
+
+
+# =========================================================
+# v3 — Interstitial Payloads (Phase 1.3)
+# =========================================================
+class InterstitialPrecheckPayload(BaseModel):
+    v: int = Field(default=3)
+    session_id: str = Field(min_length=8, max_length=64)
+    campaign_key: str = Field(min_length=1, max_length=100)
+    t_ms: int = Field(default=0, ge=0)
+    url: str = Field(default="", max_length=2000)
+    nav: Dict[str, Any] = Field(default_factory=dict)
+    fp: Dict[str, Any] = Field(default_factory=dict)
+
+
+class InterstitialLogPayload(BaseModel):
+    v: int = Field(default=3)
+    session_id: str = Field(min_length=8, max_length=64)
+    campaign_key: str = Field(default="", max_length=100)
+    decision: str = Field(default="", max_length=20)
+    # redirect | block | timeout | fallback | error
+    score: int = Field(default=0, ge=0, le=100)
+    reasons: List[str] = Field(default_factory=list)
+    t_ms: int = Field(default=0, ge=0)
+    url: str = Field(default="", max_length=2000)
