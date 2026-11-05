@@ -88,9 +88,6 @@ def migrate_country_code():
         print(f"⚠️ Migration skipped: {e}")
 
 
-# =========================================================
-# v3 — Campaign Foundation (Phase 0.5)
-# =========================================================
 def migrate_visit_campaign_column():
     try:
         insp = inspect(engine)
@@ -109,14 +106,7 @@ def migrate_visit_campaign_column():
         print(f"⚠️ migrate_visit_campaign_column skipped: {e}")
 
 
-# =========================================================
-# v3 — Collector columns (Phase 1.1)
-# =========================================================
 def migrate_v3_visit_columns():
-    """
-    إضافة أعمدة v3 لجدول الزيارات.
-    كلها nullable عشان backward compatible.
-    """
     try:
         insp = inspect(engine)
         if "visits" not in insp.get_table_names():
@@ -141,11 +131,28 @@ def migrate_v3_visit_columns():
                 if col_name not in cols:
                     _safe_alter(conn, sql, f"visits.{col_name}")
 
-            # Indexes
             _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_session ON visits (session_id)", "ix_visits_session")
             _safe_alter(conn, "CREATE INDEX IF NOT EXISTS ix_visits_data_quality ON visits (data_quality)", "ix_visits_data_quality")
     except Exception as e:
         print(f"⚠️ migrate_v3_visit_columns skipped: {e}")
+
+
+def migrate_counting_type():
+    """v3.1 — counting_type field to fix hybrid cost double-counting."""
+    try:
+        insp = inspect(engine)
+        if "visits" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("visits")]
+        if "counting_type" in cols:
+            return
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE visits ADD COLUMN counting_type VARCHAR(20)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_visits_counting_type ON visits (counting_type)"))
+            conn.commit()
+        print("✅ Migration: added visits.counting_type column")
+    except Exception as e:
+        print(f"⚠️ migrate_counting_type skipped: {e}")
 
 
 def seed_traffic_sources():
@@ -308,10 +315,6 @@ def backfill_visits_campaign_id():
 
 
 def backfill_legacy_data_quality():
-    """
-    كل زيارة قديمة (قبل v3) بتتحول لـ data_quality='legacy'.
-    عشان نعرف نفرقها عن الزيارات الجديدة.
-    """
     try:
         insp = inspect(engine)
         if "visits" not in insp.get_table_names():
@@ -337,20 +340,47 @@ def backfill_legacy_data_quality():
         print(f"⚠️ backfill_legacy_data_quality skipped: {e}")
 
 
+def backfill_counting_type():
+    """v3.1 — backfill counting_type for existing visits (default: standalone)."""
+    try:
+        insp = inspect(engine)
+        if "visits" not in insp.get_table_names():
+            return
+        cols = [c["name"] for c in insp.get_columns("visits")]
+        if "counting_type" not in cols:
+            return
+
+        with engine.connect() as conn:
+            n = conn.execute(
+                text("SELECT COUNT(*) FROM visits WHERE counting_type IS NULL")
+            ).scalar() or 0
+
+            if n == 0:
+                return
+
+            conn.execute(
+                text("UPDATE visits SET counting_type = 'standalone' WHERE counting_type IS NULL")
+            )
+            conn.commit()
+            print(f"✅ Backfill: {n} visits tagged as standalone (counting_type)")
+    except Exception as e:
+        print(f"⚠️ backfill_counting_type skipped: {e}")
+
+
 def run_migrations():
     migrate_auth_columns()
     migrate_cpm_columns()
     migrate_ground_truth_columns()
     migrate_country_code()
-    # v3 Campaign (Phase 0.5)
     migrate_visit_campaign_column()
     seed_traffic_sources()
     seed_destinations()
     backfill_campaigns_from_sites()
     backfill_visits_campaign_id()
-    # v3 Collector (Phase 1.1)
     migrate_v3_visit_columns()
+    migrate_counting_type()
     backfill_legacy_data_quality()
+    backfill_counting_type()
 
 
 def get_db():
