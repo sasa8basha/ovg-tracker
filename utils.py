@@ -72,9 +72,22 @@ signup_limiter = WindowRateLimiter(max_req=5, window=300)
 login_limiter = WindowRateLimiter(max_req=15, window=300)
 
 # Rate limiters (Phase 5 — Auth)
-forgot_password_limiter = WindowRateLimiter(max_req=3, window=900)   # 3 / 15 min
-reset_password_limiter = WindowRateLimiter(max_req=5, window=900)    # 5 / 15 min
-verify_resend_limiter = WindowRateLimiter(max_req=3, window=900)     # 3 / 15 min
+forgot_password_limiter = WindowRateLimiter(max_req=3, window=900)
+reset_password_limiter = WindowRateLimiter(max_req=5, window=900)
+verify_resend_limiter = WindowRateLimiter(max_req=3, window=900)
+
+# =========================================================
+# v3 — Collector rate limiters (Phase 1.1)
+# =========================================================
+from config import (
+    HANDSHAKE_RATE_PER_MIN,
+    HEARTBEAT_RATE_PER_MIN,
+    FINAL_RATE_PER_MIN,
+)
+
+handshake_limiter = WindowRateLimiter(max_req=HANDSHAKE_RATE_PER_MIN, window=60)
+heartbeat_limiter = WindowRateLimiter(max_req=HEARTBEAT_RATE_PER_MIN, window=60)
+final_limiter = WindowRateLimiter(max_req=FINAL_RATE_PER_MIN, window=60)
 
 
 def _is_private_ip(ip: str) -> bool:
