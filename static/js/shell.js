@@ -10,7 +10,7 @@
  *   - Modals
  *   - Theme toggle
  *
- * v3 (Phase 0.5): إضافة قسم "الحملات" (campaigns) في الـ NAV + أيقونة campaigns.
+ * v3 (Phase 1.4): إضافة Sessions في NAV + أيقونة sessions.
  */
 (function () {
   'use strict';
@@ -76,6 +76,7 @@
     live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="6" opacity="0.6"/><circle cx="12" cy="12" r="10" opacity="0.3"/></svg>',
     radar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><path d="M12 2 L12 8"/></svg>',
     visits: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    sessions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
     labeling: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
     money: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
     analytics: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
@@ -101,6 +102,7 @@
         { id: 'dashboard', label: 'لوحة التحكم', icon: 'dashboard', href: '/dashboard' },
         { id: 'live',      label: 'Live Monitor', icon: 'live',      href: '/live', needsSite: true },
         { id: 'radar',     label: 'Radar',        icon: 'radar',     href: '/radar' },
+        { id: 'sessions',  label: 'Sessions',     icon: 'sessions',  href: '/sessions' },
         { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/visits', needsSite: true },
         { id: 'labeling',  label: 'المراجعة',     icon: 'labeling',  href: '/labeling', badge: 'labeling' },
       ]},
@@ -120,6 +122,7 @@
         { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
         { id: 'live',      label: 'Live Monitor', icon: 'live', href: '/live', needsSite: true },
         { id: 'radar',     label: 'Radar',     icon: 'radar',     href: '/radar' },
+        { id: 'sessions',  label: 'Sessions',  icon: 'sessions',  href: '/sessions' },
         { id: 'visits',    label: 'Visits',    icon: 'visits',    href: '/visits', needsSite: true },
         { id: 'labeling',  label: 'Labeling',  icon: 'labeling',  href: '/labeling', badge: 'labeling' },
       ]},
@@ -159,7 +162,6 @@
     },
   };
 
-  // ============ SIDEBAR BUILDER ============
   function buildSidebar() {
     const L = T[S.lang];
     const nav = NAV[S.lang] || NAV.ar;
@@ -175,7 +177,6 @@
         const badgeHtml = it.badge
           ? `<span class="sh-nav-badge" data-badge="${esc(it.badge)}" style="display:none;">0</span>`
           : '';
-        // Special "LIVE" indicator for the live nav item
         const livePulse = it.id === 'live'
           ? '<span class="sh-nav-live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#F43F5E;margin-right:6px;box-shadow:0 0 6px #F43F5E;animation:sh-live-pulse 1.5s ease-in-out infinite;"></span>'
           : '';
@@ -217,7 +218,6 @@
       </aside>`;
   }
 
-  // ============ TOPBAR ============
   function buildTopbar() {
     const L = T[S.lang];
     return `
@@ -253,7 +253,7 @@
   }
 
   function buildMobileNav() {
-    const nav = (NAV[S.lang] || NAV.ar)[0].items.slice(0, 5);
+    const nav = (NAV[S.lang] || NAV.ar)[0].items.slice(0, 6);
     return `
       <nav class="sh-mobile-nav">
         ${nav.map(it => {
@@ -268,7 +268,6 @@
       </nav>`;
   }
 
-  // ============ COMMAND PALETTE ============
   function buildCmdPalette() {
     return `
       <div class="sh-cmd-overlay" id="shCmdOverlay">
@@ -380,7 +379,6 @@
     if (overlay) overlay.addEventListener('click', (e) => { if (e.target.id === 'shCmdOverlay') closeCmd(); });
   }
 
-  // ============ TOAST ============
   function ensureToastContainer() {
     let c = document.querySelector('.sh-toast-container');
     if (!c) {
@@ -424,7 +422,6 @@
     }, duration);
   }
 
-  // ============ THEME ============
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-sh-theme', theme);
     const btn = document.getElementById('shThemeBtn');
@@ -468,7 +465,6 @@
     });
   }
 
-  // ============ COLLAPSE ============
   function initCollapse() {
     const key = 'sh_sidebar_collapsed';
     const shell = document.querySelector('.sh-shell');
@@ -481,7 +477,6 @@
     });
   }
 
-  // ============ BREADCRUMB ============
   function setBreadcrumb(items) {
     const el = document.getElementById('shBreadcrumb');
     if (!el) return;
@@ -495,7 +490,6 @@
     }).join('');
   }
 
-  // ============ MONEY PULSE GAME ============
   async function refreshMoneyPulse() {
     try {
       const siteParam = S.currentSite ? '&site=' + encodeURIComponent(S.currentSite.site_key) : '';
@@ -554,7 +548,6 @@
     }
   }
 
-  // ============ ATTENTION ENGINE ============
   async function refreshAttentionCount() {
     try {
       const data = await api('/api/zones/actions/attention-count');
@@ -594,7 +587,6 @@
     }
   }
 
-  // ============ QUICK ACTIONS ============
   function ensureQuickActions() {
     if (S.quickActionsEl) return S.quickActionsEl;
     const el = document.createElement('div');
@@ -749,7 +741,6 @@
     window.addEventListener('scroll', hideQuickActions, { passive: true });
   }
 
-  // ============ MOUNT ============
   async function mount(opts = {}) {
     if (S.mounted) return;
     S.active = opts.active || 'dashboard';
@@ -786,7 +777,6 @@
         ${buildMobileNav()}
       </div>`;
 
-    // Inject the live pulse animation keyframes (once)
     if (!document.getElementById('shLiveKeyframes')) {
       const styleEl = document.createElement('style');
       styleEl.id = 'shLiveKeyframes';
@@ -841,7 +831,6 @@
     return appRoot;
   }
 
-  // ============ PUBLIC ============
   window.Shell = {
     mount,
     toast,
