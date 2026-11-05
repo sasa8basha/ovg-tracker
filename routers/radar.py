@@ -1,12 +1,5 @@
 """
 routers/radar.py — Ban Risk Radar (v8 API)
-
-Endpoints (all under /api prefix):
-  GET  /radar               — current radar (cache 60s)
-  GET  /radar/history       — snapshots timeline
-  POST /radar/snapshot      — manual snapshot
-
-The page (/radar) lives in routers/pages.py.
 """
 from datetime import datetime, timedelta
 
@@ -19,7 +12,7 @@ from models import (
     UserModel, SiteModel, VisitModel, BanRiskSnapshot,
 )
 from auth import current_user
-from helpers import _extract_source
+from metrics import extract_source # <--- استخدام المحرك الموحد
 from utils import TTLCache
 
 router = APIRouter()
@@ -49,9 +42,6 @@ SOURCES_GOOD = 3
 SOURCES_OK = 2
 
 
-# =========================================================
-# HELPERS
-# =========================================================
 def _level_from_score(score):
     if score is None:
         return "unknown"
@@ -115,7 +105,7 @@ def _aggregate_window(site_ids, start, end, db: Session):
 
     source_set = set()
     for zid in zone_ids:
-        src = _extract_source(zid)
+        src = extract_source(zid)
         if src and src != "unknown":
             source_set.add(src)
 
@@ -400,9 +390,6 @@ def _maybe_save_snapshot(user_id: int, result: dict, db: Session):
         return False
 
 
-# =========================================================
-# ENDPOINTS
-# =========================================================
 @router.get("/radar")
 def get_radar(
     force: bool = Query(False),
