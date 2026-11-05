@@ -1,14 +1,5 @@
 """
 routers/campaigns.py — Campaign CRUD + Stats (Phase 0.5).
-
-Endpoints:
-  GET    /api/campaigns                       — list with mini-stats
-  POST   /api/campaigns                       — create
-  GET    /api/campaigns/{id}                  — detail
-  PATCH  /api/campaigns/{id}                  — update
-  DELETE /api/campaigns/{id}                  — delete
-  POST   /api/campaigns/{id}/rotate-key       — rotate campaign_key
-  GET    /api/campaigns/{id}/stats            — P&L over a period
 """
 import secrets
 from datetime import datetime, timedelta
@@ -25,21 +16,18 @@ from models import (
 from schemas import CampaignCreateIn, CampaignUpdateIn
 from auth import current_user
 from utils import stats_cache
+from metrics import compute_pl # <--- استخدام المحرك الموحد
 
 router = APIRouter()
 
 MAX_CAMPAIGNS_PER_USER = 100
 
 
-# =========================================================
-# HELPERS
-# =========================================================
 def _new_campaign_key() -> str:
     return secrets.token_hex(16)
 
 
 def _compute_mini_stats(campaign_id: int, db: Session) -> dict:
-    """P&L سريع لكل حملة (بدون date filter)."""
     row = db.query(
         func.count(VisitModel.id).label("total"),
         func.sum(case((VisitModel.verdict == "valid", 1), else_=0)).label("valid"),
@@ -58,20 +46,6 @@ def _compute_mini_stats(campaign_id: int, db: Session) -> dict:
         "invalid": invalid,
         "suspicious": suspicious,
         "bot_rate": round(invalid / total * 100, 2) if total > 0 else 0.0,
-    }
-
-
-def _compute_pl(total: int, valid: int, buy_cpm: float, sell_cpm: float) -> dict:
-    cost = round(total * buy_cpm / 1000.0, 4)
-    revenue = round(valid * sell_cpm / 1000.0, 4)
-    profit = round(revenue - cost, 4)
-    roi = round((profit / cost * 100.0), 2) if cost > 0 else 0.0
-    return {
-        "cost": cost,
-        "revenue": revenue,
-        "profit": profit,
-        "roi": roi,
-        "is_profitable": profit >= 0,
     }
 
 
@@ -103,9 +77,6 @@ def _validate_destination(slug: str, db: Session):
     return slug
 
 
-# =========================================================
-# CRUD
-# =========================================================
 @router.get("")
 def list_campaigns(user: UserModel = Depends(current_user),
                    db: Session = Depends(get_db)):
@@ -136,7 +107,8 @@ def list_campaigns(user: UserModel = Depends(current_user),
         valid = int(st.valid or 0) if st else 0
         invalid = int(st.invalid or 0) if st else 0
         suspicious = int(st.suspicious or 0) if st else 0
-        pl = _compute_pl(total, valid, float(c.buy_cpm or 0), float(c.sell_cpm or 0))
+        # Using metrics.compute_pl, passing wasted=0 for simplicity in this view
+        pl = compute_pl(total, valid, 0, float(c.buy_cpm or 0), float(c.sell_cpm or 0))
 
         out.append({
             "id": c.id,
@@ -183,7 +155,6 @@ def create_campaign(payload: CampaignCreateIn,
     source_slug = _validate_traffic_source(payload.traffic_source_slug, db)
     dest_slug = _validate_destination(payload.destination_slug, db)
 
-    # site_id validation
     site_id = None
     if payload.site_id and payload.site_id > 0:
         s = db.query(SiteModel).filter(
@@ -242,7 +213,7 @@ def get_campaign(campaign_id: int,
                  db: Session = Depends(get_db)):
     c = _resolve_campaign(campaign_id, user, db)
     mini = _compute_mini_stats(c.id, db)
-    pl = _compute_pl(mini["total"], mini["valid"], float(c.buy_cpm or 0), float(c.sell_cpm or 0))
+    pl = compute_pl(mini["total"], mini["valid"], 0, float(c.buy_cpm or 0), float(c.sell_cpm or 0))
 
     return {
         "id": c.id,
@@ -276,48 +247,35 @@ def update_campaign(campaign_id: int, payload: CampaignUpdateIn,
 
     if payload.name:
         c.name = payload.name.strip()[:200]
-
     if payload.traffic_source_slug:
         c.traffic_source_slug = _validate_traffic_source(payload.traffic_source_slug, db)
-
     if payload.traffic_source_campaign_id is not None:
         c.traffic_source_campaign_id = payload.traffic_source_campaign_id[:100]
-
     if payload.buy_cpm >= 0:
         c.buy_cpm = float(payload.buy_cpm)
-
     if payload.destination_slug:
         c.destination_slug = _validate_destination(payload.destination_slug, db)
-
     if payload.destination_url is not None:
         c.destination_url = (payload.destination_url or "")[:1000]
-
     if payload.destination_zone_id is not None:
         c.destination_zone_id = (payload.destination_zone_id or "")[:100]
-
     if payload.sell_cpm >= 0:
         c.sell_cpm = float(payload.sell_cpm)
-
     if payload.redirect_delay_ms > 0:
         c.redirect_delay_ms = int(payload.redirect_delay_ms)
-
     if payload.bot_block_threshold >= 0:
         c.bot_block_threshold = int(payload.bot_block_threshold)
-
     if payload.daily_budget >= 0:
         c.daily_budget = float(payload.daily_budget) if payload.daily_budget > 0 else None
-
     if payload.status:
         if payload.status not in ("active", "paused", "archived"):
             raise HTTPException(400, "status غير صالح")
         c.status = payload.status
-
     if payload.notes is not None:
         c.notes = (payload.notes or "")[:1000]
 
     db.commit()
     db.refresh(c)
-
     stats_cache.invalidate(f"stats:user:{user.id}:all")
     return {"ok": True, "id": c.id}
 
@@ -327,15 +285,11 @@ def delete_campaign(campaign_id: int,
                     user: UserModel = Depends(current_user),
                     db: Session = Depends(get_db)):
     c = _resolve_campaign(campaign_id, user, db)
-
-    # الزيارات بتفضل موجودة، بس campaign_id بيتحول لـ NULL
-    # (الزيارات دي كانت جزء من الحملة، مش عايزين نفقد تاريخها)
     db.query(VisitModel).filter(VisitModel.campaign_id == c.id).update(
         {VisitModel.campaign_id: None}, synchronize_session=False
     )
     db.delete(c)
     db.commit()
-
     stats_cache.invalidate(f"stats:user:{user.id}:all")
     return {"ok": True}
 
@@ -350,9 +304,6 @@ def rotate_campaign_key(campaign_id: int,
     return {"campaign_key": c.campaign_key}
 
 
-# =========================================================
-# STATS (P&L over period)
-# =========================================================
 @router.get("/{campaign_id}/stats")
 def campaign_stats(
     campaign_id: int,
@@ -376,7 +327,6 @@ def campaign_stats(
             q = q.filter(VisitModel.timestamp >= fd)
         except ValueError:
             pass
-
     if to_date:
         try:
             td = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
@@ -390,7 +340,7 @@ def campaign_stats(
     invalid = int(row.invalid or 0)
     suspicious = int(row.suspicious or 0)
 
-    pl = _compute_pl(total, valid, float(c.buy_cpm or 0), float(c.sell_cpm or 0))
+    pl = compute_pl(total, valid, 0, float(c.buy_cpm or 0), float(c.sell_cpm or 0))
 
     return {
         "campaign_id": c.id,
@@ -402,4 +352,4 @@ def campaign_stats(
         "suspicious": suspicious,
         "bot_rate": round(invalid / total * 100, 2) if total > 0 else 0.0,
         "pl": pl,
-}
+    }
