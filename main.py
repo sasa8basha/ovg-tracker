@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import ALLOWED_ORIGINS, ENV, DEBUG
-from database import engine, Base, run_migrations
+from database import engine, Base, run_data_seeding_and_backfills
 from auth import bootstrap_admin
 from routers import (
     auth as auth_router,
@@ -41,7 +41,7 @@ from routers import (
 # DB INIT
 # =========================================================
 Base.metadata.create_all(bind=engine)
-run_migrations()
+run_data_seeding_and_backfills()
 bootstrap_admin()
 
 
@@ -61,8 +61,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # =========================================================
 # CORS (P0 — NO WILDCARD)
 # =========================================================
-# ALLOWED_ORIGINS is validated in config.py and can never be ["*"].
-# Any request from an unlisted origin is rejected by CORSMiddleware.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
