@@ -33,7 +33,8 @@ class TrackPayload(BaseModel):
     behavior: dict
     screen: dict = {}
     webrtc_ip: str = "None"
-    site_key: str = "" # Legacy, will be treated as campaign_key
+    site_key: str = ""
+    tracking_params: Dict[str, Any] = Field(default_factory=dict)
 
 class CPMSettingsIn(BaseModel):
     cpm_buy: float = Field(ge=0.0, le=100.0)
@@ -56,6 +57,8 @@ class CampaignCreateIn(BaseModel):
     bot_block_threshold: int = Field(default=100, ge=0, le=100)
     daily_budget: float = Field(default=0.0, ge=0.0, le=100000.0)
     notes: str = Field(default="", max_length=1000)
+    adsterra_api_key: str = Field(default="", max_length=255)
+    adsterra_tracking_param: str = Field(default="sub_id", max_length=50)
 
 class CampaignUpdateIn(BaseModel):
     name: str = Field(default="", max_length=200)
@@ -71,6 +74,8 @@ class CampaignUpdateIn(BaseModel):
     daily_budget: float = Field(default=-1.0, ge=-1.0, le=100000.0)
     status: str = Field(default="", max_length=20)
     notes: str = Field(default="", max_length=1000)
+    adsterra_api_key: Optional[str] = None
+    adsterra_tracking_param: str = Field(default="", max_length=50)
 
 class TrafficSourceIn(BaseModel):
     slug: str = Field(min_length=1, max_length=50)
@@ -87,13 +92,14 @@ class DestinationIn(BaseModel):
 class HandshakePayload(BaseModel):
     v: int = Field(default=3)
     session_id: str = Field(min_length=8, max_length=64)
-    click_id: str = Field(default="", max_length=64) 
-    campaign_key: str = Field(default="", max_length=100) # Now required
+    click_id: str = Field(default="", max_length=64)
+    campaign_key: str = Field(default="", max_length=100)
     url: str = Field(default="", max_length=2000)
     t_ms: int = Field(default=0, ge=0)
     nav: Dict[str, Any] = Field(default_factory=dict)
     fp: Dict[str, Any] = Field(default_factory=dict)
     consent_state: str = Field(default="unknown", max_length=20)
+    tracking_params: Dict[str, Any] = Field(default_factory=dict)
 
 class HeartbeatPayload(BaseModel):
     v: int = Field(default=3)
@@ -107,20 +113,11 @@ class HeartbeatPayload(BaseModel):
     is_visible: bool = Field(default=True)
     is_focused: bool = Field(default=True)
 
-class AdEventPayload(BaseModel):
-    event: str = Field(max_length=50)
-    zone_id: str = Field(default="", max_length=100)
-    t_ms: int = Field(default=0, ge=0)
-    viewport_pct: float = Field(default=0.0, ge=0.0, le=100.0)
-    duration_ms: int = Field(default=0, ge=0)
-    is_trusted: Optional[bool] = None
-    meta: Dict[str, Any] = Field(default_factory=dict)
-
 class FinalPayload(BaseModel):
     v: int = Field(default=3)
     session_id: str = Field(min_length=8, max_length=64)
-    click_id: str = Field(default="", max_length=64) 
-    campaign_key: str = Field(default="", max_length=100) # Required
+    click_id: str = Field(default="", max_length=64)
+    campaign_key: str = Field(default="", max_length=100)
     seq: int = Field(default=999, ge=0, le=10000)
     t_ms: int = Field(default=0, ge=0)
     url: str = Field(default="", max_length=2000)
@@ -136,6 +133,7 @@ class FinalPayload(BaseModel):
     clock_drift_ms: int = Field(default=0)
     consent_state: str = Field(default="unknown", max_length=20)
     data_quality: str = Field(default="full", max_length=20)
+    tracking_params: Dict[str, Any] = Field(default_factory=dict)
 
 class InterstitialPrecheckPayload(BaseModel):
     v: int = Field(default=3)
@@ -145,6 +143,7 @@ class InterstitialPrecheckPayload(BaseModel):
     url: str = Field(default="", max_length=2000)
     nav: Dict[str, Any] = Field(default_factory=dict)
     fp: Dict[str, Any] = Field(default_factory=dict)
+    tracking_params: Dict[str, Any] = Field(default_factory=dict)
 
 class InterstitialLogPayload(BaseModel):
     v: int = Field(default=3)
