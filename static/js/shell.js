@@ -1,76 +1,32 @@
 /**
  * shell.js — OVG Tracker v8 Shell
- * Never destroys document.body.
- * Features:
- *   - Money Pulse Game (heartbeat + trend)
- *   - Attention Engine (sidebar badge + title)
- *   - Quick Actions (hover menu + undo)
- *   - Command Palette (Cmd+K)
- *   - Toasts with undo
- *   - Modals
- *   - Theme toggle
- *
- * v3 (Phase 1.4): إضافة Sessions في NAV + أيقونة sessions.
  */
 (function () {
   'use strict';
 
   const S = {
-    user: null,
-    sites: [],
-    currentSite: null,
-    active: null,
-    lang: 'ar',
-    mounted: false,
-    cmdOpen: false,
-    cmdItems: [],
-    cmdSelected: 0,
-    cmdQuery: '',
-    baseTitle: document.title,
-    attentionTimer: null,
-    pulseTimer: null,
-    quickActionsEl: null,
-    quickActionsTarget: null,
+    user: null, sites: [], currentSite: null, active: null, lang: 'ar',
+    mounted: false, cmdOpen: false, cmdItems: [], cmdSelected: 0, cmdQuery: '',
+    baseTitle: document.title, attentionTimer: null, pulseTimer: null,
+    quickActionsEl: null, quickActionsTarget: null,
   };
 
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
-
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtNum = (n) => Number(n || 0).toLocaleString('en-US');
-  const fmtMoney = (n) => {
-    const v = Number(n || 0);
-    const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
-    return sign + '$' + Math.abs(v).toFixed(2);
-  };
+  const fmtMoney = (n) => { const v = Number(n || 0); const sign = v > 0 ? '+' : (v < 0 ? '-' : ''); return sign + '$' + Math.abs(v).toFixed(2); };
   const fmtPct = (n, d = 1) => Number(n || 0).toFixed(d) + '%';
 
-  function localDateStr(d) {
-    const dt = d || new Date();
-    const y = dt.getFullYear();
-    const m = String(dt.getMonth() + 1).padStart(2, '0');
-    const day = String(dt.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
+  function localDateStr(d) { const dt = d || new Date(); const y = dt.getFullYear(); const m = String(dt.getMonth() + 1).padStart(2, '0'); const day = String(dt.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
 
   async function api(url, opts = {}) {
-    const res = await fetch(url, {
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-      ...opts,
-    });
+    const res = await fetch(url, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) }, ...opts });
     if (res.status === 401) { window.location.href = '/'; throw new Error('Unauthorized'); }
-    if (!res.ok) {
-      let msg = 'HTTP ' + res.status;
-      try { const j = await res.json(); msg = j.detail || msg; } catch (_) {}
-      throw new Error(msg);
-    }
+    if (!res.ok) { let msg = 'HTTP ' + res.status; try { const j = await res.json(); msg = j.detail || msg; } catch (_) {} throw new Error(msg); }
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('application/json')) return res.json();
     return res.text();
   }
 
-  // ============ ICONS ============
   const ICON = {
     dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
     live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="6" opacity="0.6"/><circle cx="12" cy="12" r="10" opacity="0.3"/></svg>',
@@ -95,7 +51,6 @@
     campaigns: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
   };
 
-  // ============ NAV ============
   const NAV = {
     ar: [
       { group: 'التحليل', items: [
@@ -140,32 +95,12 @@
   };
 
   const T = {
-    ar: {
-      search: 'بحث سريع',
-      searchPlaceholder: 'اكتب للبحث...',
-      collapse: 'طوي القائمة',
-      empty: 'لا توجد نتائج',
-      nav: 'تنقّل',
-      user: 'الحساب',
-      logout: 'خروج',
-      attnTooltip: 'محتاج انتباه',
-    },
-    en: {
-      search: 'Quick search',
-      searchPlaceholder: 'Type to search...',
-      collapse: 'Collapse',
-      empty: 'No results',
-      nav: 'Navigate',
-      user: 'Account',
-      logout: 'Logout',
-      attnTooltip: 'Needs attention',
-    },
+    ar: { search: 'بحث سريع', searchPlaceholder: 'اكتب للبحث...', collapse: 'طوي القائمة', empty: 'لا توجد نتائج', nav: 'تنقّل', user: 'الحساب', logout: 'خروج', attnTooltip: 'محتاج انتباه' },
+    en: { search: 'Quick search', searchPlaceholder: 'Type to search...', collapse: 'Collapse', empty: 'No results', nav: 'Navigate', user: 'Account', logout: 'Logout', attnTooltip: 'Needs attention' },
   };
 
   function buildSidebar() {
-    const L = T[S.lang];
-    const nav = NAV[S.lang] || NAV.ar;
-    let itemsHtml = '';
+    const L = T[S.lang]; const nav = NAV[S.lang] || NAV.ar; let itemsHtml = '';
     nav.forEach(group => {
       itemsHtml += `<div class="sh-nav-group"><div class="sh-nav-label">${esc(group.group)}</div>`;
       group.items.forEach(it => {
@@ -174,200 +109,66 @@
         const isActive = S.active === it.id ? 'active' : '';
         const disabled = it.needsSite && !S.currentSite;
         const style = disabled ? 'opacity:0.4;pointer-events:none;' : '';
-        const badgeHtml = it.badge
-          ? `<span class="sh-nav-badge" data-badge="${esc(it.badge)}" style="display:none;">0</span>`
-          : '';
-        const livePulse = it.id === 'live'
-          ? '<span class="sh-nav-live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#F43F5E;margin-right:6px;box-shadow:0 0 6px #F43F5E;animation:sh-live-pulse 1.5s ease-in-out infinite;"></span>'
-          : '';
-        itemsHtml += `
-          <a href="${esc(href)}" class="sh-nav-item ${isActive}" style="${style}" data-nav="${esc(it.id)}">
-            ${ICON[it.icon] || ''}
-            <span class="label">${livePulse}${esc(it.label)}</span>
-            ${badgeHtml}
-          </a>`;
+        const badgeHtml = it.badge ? `<span class="sh-nav-badge" data-badge="${esc(it.badge)}" style="display:none;">0</span>` : '';
+        const livePulse = it.id === 'live' ? '<span class="sh-nav-live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#F43F5E;margin-right:6px;box-shadow:0 0 6px #F43F5E;animation:sh-live-pulse 1.5s ease-in-out infinite;"></span>' : '';
+        itemsHtml += `<a href="${esc(href)}" class="sh-nav-item ${isActive}" style="${style}" data-nav="${esc(it.id)}">${ICON[it.icon] || ''}<span class="label">${livePulse}${esc(it.label)}</span>${badgeHtml}</a>`;
       });
       itemsHtml += `</div>`;
     });
-
     const initial = (S.user && S.user.username ? S.user.username[0] : '?').toUpperCase();
     const username = S.user ? S.user.username : '—';
-
-    return `
-      <aside class="sh-sidebar" id="shSidebar">
-        <div class="sh-sidebar-head">
-          <div class="sh-logo">O</div>
-          <div class="sh-logo-text">
-            <div class="t1">OVG Tracker</div>
-            <div class="t2">v8 · PRO</div>
-          </div>
-        </div>
-        <nav class="sh-nav">${itemsHtml}</nav>
-        <div class="sh-sidebar-foot">
-          <a href="/settings" class="sh-user">
-            <div class="sh-avatar">${esc(initial)}</div>
-            <div class="sh-user-info">
-              <div class="n">${esc(username)}</div>
-              <div class="r">${esc(L.user)}</div>
-            </div>
-          </a>
-        </div>
-        <button class="sh-collapse-btn" id="shCollapseBtn" aria-label="${esc(L.collapse)}" title="${esc(L.collapse)}">
-          ${ICON.chevron}
-        </button>
-      </aside>`;
+    return `<aside class="sh-sidebar" id="shSidebar"><div class="sh-sidebar-head"><div class="sh-logo">O</div><div class="sh-logo-text"><div class="t1">OVG Tracker</div><div class="t2">v8 · PRO</div></div></div><nav class="sh-nav">${itemsHtml}</nav><div class="sh-sidebar-foot"><a href="/settings" class="sh-user"><div class="sh-avatar">${esc(initial)}</div><div class="sh-user-info"><div class="n">${esc(username)}</div><div class="r">${esc(L.user)}</div></div></a></div><button class="sh-collapse-btn" id="shCollapseBtn" aria-label="${esc(L.collapse)}" title="${esc(L.collapse)}">${ICON.chevron}</button></aside>`;
   }
 
   function buildTopbar() {
     const L = T[S.lang];
-    return `
-      <header class="sh-topbar">
-        <div class="sh-breadcrumb" id="shBreadcrumb"></div>
-        <div class="sh-topbar-spacer"></div>
-        <button class="sh-topbar-btn sh-search-btn" id="shSearchBtn" type="button">
-          ${ICON.search}
-          <span>${esc(L.search)}</span>
-          <kbd>⌘K</kbd>
-        </button>
-        <button class="sh-money-pulse zero" id="shMoneyPulse" title="P&L اليوم" type="button">
-          <span class="pulse-dot"></span>
-          <span class="sh-mp-value">$0.00</span>
-          <span class="sh-mp-trend flat">—</span>
-        </button>
-        <button class="sh-topbar-btn" id="shThemeBtn" title="Theme" aria-label="Toggle theme" type="button">
-          ${ICON.moon}
-        </button>
-      </header>`;
+    return `<header class="sh-topbar"><div class="sh-breadcrumb" id="shBreadcrumb"></div><div class="sh-topbar-spacer"></div><button class="sh-topbar-btn sh-search-btn" id="shSearchBtn" type="button">${ICON.search}<span>${esc(L.search)}</span><kbd>⌘K</kbd></button><button class="sh-money-pulse zero" id="shMoneyPulse" title="P&L اليوم" type="button"><span class="pulse-dot"></span><span class="sh-mp-value">$0.00</span><span class="sh-mp-trend flat">—</span></button><button class="sh-topbar-btn" id="shThemeBtn" title="Theme" aria-label="Toggle theme" type="button">${ICON.moon}</button></header>`;
   }
 
   function buildStatusbar() {
-    return `
-      <footer class="sh-statusbar">
-        <span class="sh-status-item"><span class="sh-status-dot"></span>LIVE</span>
-        <span class="sh-status-item" id="shStatusVisits">— اليوم</span>
-        <span class="sh-status-item" id="shStatusProfit">—</span>
-        <span class="sh-status-spacer"></span>
-        <span class="sh-status-item">⌘K بحث</span>
-        <span class="sh-status-item">?</span>
-      </footer>`;
+    return `<footer class="sh-statusbar"><span class="sh-status-item"><span class="sh-status-dot"></span>LIVE</span><span class="sh-status-item" id="shStatusVisits">— اليوم</span><span class="sh-status-item" id="shStatusProfit">—</span><span class="sh-status-spacer"></span><span class="sh-status-item">⌘K بحث</span><span class="sh-status-item">?</span></footer>`;
   }
 
   function buildMobileNav() {
     const nav = (NAV[S.lang] || NAV.ar)[0].items.slice(0, 6);
-    return `
-      <nav class="sh-mobile-nav">
-        ${nav.map(it => {
-          const badge = it.badge ? `<span class="sh-mobile-badge" data-mbadge="${esc(it.badge)}" style="display:none;">0</span>` : '';
-          return `
-            <a href="${esc(it.href)}" class="sh-mobile-nav-item ${S.active === it.id ? 'active' : ''}">
-              ${ICON[it.icon] || ''}
-              <span>${esc(it.label)}</span>
-              ${badge}
-            </a>`;
-        }).join('')}
-      </nav>`;
+    return `<nav class="sh-mobile-nav">${nav.map(it => { const badge = it.badge ? `<span class="sh-mobile-badge" data-mbadge="${esc(it.badge)}" style="display:none;">0</span>` : ''; return `<a href="${esc(it.href)}" class="sh-mobile-nav-item ${S.active === it.id ? 'active' : ''}">${ICON[it.icon] || ''}<span>${esc(it.label)}</span>${badge}</a>`; }).join('')}</nav>`;
   }
 
   function buildCmdPalette() {
-    return `
-      <div class="sh-cmd-overlay" id="shCmdOverlay">
-        <div class="sh-cmd">
-          <div class="sh-cmd-input-wrap">
-            ${ICON.search}
-            <input type="text" class="sh-cmd-input" id="shCmdInput" placeholder="${esc(T[S.lang].searchPlaceholder)}" autocomplete="off">
-            <kbd style="padding:2px 6px;background:var(--sh-canvas);border:1px solid var(--sh-line-2);border-radius:3px;font-family:var(--sh-font-mono);font-size:9px;color:var(--sh-ink-mute);">ESC</kbd>
-          </div>
-          <div class="sh-cmd-results" id="shCmdResults"></div>
-        </div>
-      </div>`;
+    return `<div class="sh-cmd-overlay" id="shCmdOverlay"><div class="sh-cmd"><div class="sh-cmd-input-wrap">${ICON.search}<input type="text" class="sh-cmd-input" id="shCmdInput" placeholder="${esc(T[S.lang].searchPlaceholder)}" autocomplete="off"><kbd style="padding:2px 6px;background:var(--sh-canvas);border:1px solid var(--sh-line-2);border-radius:3px;font-family:var(--sh-font-mono);font-size:9px;color:var(--sh-ink-mute);">ESC</kbd></div><div class="sh-cmd-results" id="shCmdResults"></div></div></div>`;
   }
 
   function buildCommands() {
-    const nav = (NAV[S.lang] || NAV.ar).flatMap(g => g.items);
-    const cmds = [];
-    nav.forEach(it => {
-      if (it.needsSite && !S.currentSite) return;
-      const href = it.needsSite ? `${it.href}?site=${encodeURIComponent(S.currentSite.site_key)}` : it.href;
-      cmds.push({ group: T[S.lang].nav, label: it.label, icon: it.icon, action: () => { window.location.href = href; } });
-    });
-    if (S.sites && S.sites.length) {
-      S.sites.forEach(s => {
-        cmds.push({
-          group: T[S.lang].nav, label: s.name, desc: '🌐',
-          action: () => { window.location.href = '/dashboard?site=' + encodeURIComponent(s.site_key); },
-        });
-      });
-    }
-    cmds.push({
-      group: T[S.lang].user, label: T[S.lang].logout, icon: 'logout',
-      action: async () => {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-        window.location.href = '/';
-      },
-    });
+    const nav = (NAV[S.lang] || NAV.ar).flatMap(g => g.items); const cmds = [];
+    nav.forEach(it => { if (it.needsSite && !S.currentSite) return; const href = it.needsSite ? `${it.href}?site=${encodeURIComponent(S.currentSite.site_key)}` : it.href; cmds.push({ group: T[S.lang].nav, label: it.label, icon: it.icon, action: () => { window.location.href = href; } }); });
+    if (S.sites && S.sites.length) { S.sites.forEach(s => { cmds.push({ group: T[S.lang].nav, label: s.name, desc: '🌐', action: () => { window.location.href = '/dashboard?site=' + encodeURIComponent(s.site_key); } }); }); }
+    cmds.push({ group: T[S.lang].user, label: T[S.lang].logout, icon: 'logout', action: async () => { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); window.location.href = '/'; } });
     return cmds;
   }
 
   function renderCmdResults() {
-    const container = document.getElementById('shCmdResults');
-    if (!container) return;
-    const q = S.cmdQuery.trim().toLowerCase();
-    const all = buildCommands();
-    const filtered = q
-      ? all.filter(c => c.label.toLowerCase().includes(q) || (c.desc || '').toLowerCase().includes(q))
-      : all.slice(0, 12);
-    S.cmdItems = filtered;
-    if (S.cmdSelected >= filtered.length) S.cmdSelected = Math.max(0, filtered.length - 1);
-    if (!filtered.length) {
-      container.innerHTML = `<div class="sh-cmd-empty">${esc(T[S.lang].empty)}</div>`;
-      return;
-    }
-    let html = '';
-    let lastGroup = null;
+    const container = document.getElementById('shCmdResults'); if (!container) return;
+    const q = S.cmdQuery.trim().toLowerCase(); const all = buildCommands();
+    const filtered = q ? all.filter(c => c.label.toLowerCase().includes(q) || (c.desc || '').toLowerCase().includes(q)) : all.slice(0, 12);
+    S.cmdItems = filtered; if (S.cmdSelected >= filtered.length) S.cmdSelected = Math.max(0, filtered.length - 1);
+    if (!filtered.length) { container.innerHTML = `<div class="sh-cmd-empty">${esc(T[S.lang].empty)}</div>`; return; }
+    let html = ''; let lastGroup = null;
     filtered.forEach((c, i) => {
-      if (c.group !== lastGroup) {
-        html += `<div class="sh-cmd-group-label">${esc(c.group)}</div>`;
-        lastGroup = c.group;
-      }
+      if (c.group !== lastGroup) { html += `<div class="sh-cmd-group-label">${esc(c.group)}</div>`; lastGroup = c.group; }
       const sel = i === S.cmdSelected ? 'selected' : '';
-      html += `
-        <div class="sh-cmd-item ${sel}" data-idx="${i}">
-          ${c.icon ? ICON[c.icon] || '' : '<span style="width:14px;"></span>'}
-          <span>${esc(c.label)}</span>
-          ${c.desc ? `<span class="desc">${esc(c.desc)}</span>` : ''}
-        </div>`;
+      html += `<div class="sh-cmd-item ${sel}" data-idx="${i}">${c.icon ? ICON[c.icon] || '' : '<span style="width:14px;"></span>'}<span>${esc(c.label)}</span>${c.desc ? `<span class="desc">${esc(c.desc)}</span>` : ''}</div>`;
     });
     container.innerHTML = html;
     container.querySelectorAll('.sh-cmd-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const i = Number(el.dataset.idx);
-        const c = S.cmdItems[i];
-        if (c && c.action) { closeCmd(); setTimeout(c.action, 80); }
-      });
-      el.addEventListener('mouseenter', () => {
-        S.cmdSelected = Number(el.dataset.idx);
-        renderCmdResults();
-      });
+      el.addEventListener('click', () => { const i = Number(el.dataset.idx); const c = S.cmdItems[i]; if (c && c.action) { closeCmd(); setTimeout(c.action, 80); } });
+      el.addEventListener('mouseenter', () => { S.cmdSelected = Number(el.dataset.idx); renderCmdResults(); });
     });
   }
 
-  function openCmd() {
-    S.cmdOpen = true; S.cmdQuery = ''; S.cmdSelected = 0;
-    const ov = document.getElementById('shCmdOverlay');
-    if (!ov) return;
-    ov.classList.add('is-open');
-    const inp = document.getElementById('shCmdInput');
-    if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 30); }
-    renderCmdResults();
-  }
-  function closeCmd() {
-    S.cmdOpen = false;
-    const ov = document.getElementById('shCmdOverlay');
-    if (ov) ov.classList.remove('is-open');
-  }
+  function openCmd() { S.cmdOpen = true; S.cmdQuery = ''; S.cmdSelected = 0; const ov = document.getElementById('shCmdOverlay'); if (!ov) return; ov.classList.add('is-open'); const inp = document.getElementById('shCmdInput'); if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 30); } renderCmdResults(); }
+  function closeCmd() { S.cmdOpen = false; const ov = document.getElementById('shCmdOverlay'); if (ov) ov.classList.remove('is-open'); }
   function bindCmd() {
-    const inp = document.getElementById('shCmdInput');
-    if (!inp) return;
+    const inp = document.getElementById('shCmdInput'); if (!inp) return;
     inp.addEventListener('input', (e) => { S.cmdQuery = e.target.value; S.cmdSelected = 0; renderCmdResults(); });
     inp.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { closeCmd(); e.preventDefault(); }
@@ -375,474 +176,143 @@
       else if (e.key === 'ArrowUp') { S.cmdSelected = Math.max(S.cmdSelected - 1, 0); renderCmdResults(); e.preventDefault(); }
       else if (e.key === 'Enter') { const c = S.cmdItems[S.cmdSelected]; if (c && c.action) { closeCmd(); setTimeout(c.action, 80); } e.preventDefault(); }
     });
-    const overlay = document.getElementById('shCmdOverlay');
-    if (overlay) overlay.addEventListener('click', (e) => { if (e.target.id === 'shCmdOverlay') closeCmd(); });
+    const overlay = document.getElementById('shCmdOverlay'); if (overlay) overlay.addEventListener('click', (e) => { if (e.target.id === 'shCmdOverlay') closeCmd(); });
   }
 
-  function ensureToastContainer() {
-    let c = document.querySelector('.sh-toast-container');
-    if (!c) {
-      c = document.createElement('div');
-      c.className = 'sh-toast-container';
-      document.body.appendChild(c);
-    }
-    return c;
-  }
+  function ensureToastContainer() { let c = document.querySelector('.sh-toast-container'); if (!c) { c = document.createElement('div'); c.className = 'sh-toast-container'; document.body.appendChild(c); } return c; }
 
   function toast(msg, type = 'info', duration = 2600, opts = {}) {
-    const c = ensureToastContainer();
-    const el = document.createElement('div');
-    el.className = `sh-toast ${type}`;
-    el.style.position = 'relative';
-    el.style.overflow = 'hidden';
-
+    const c = ensureToastContainer(); const el = document.createElement('div');
+    el.className = `sh-toast ${type}`; el.style.position = 'relative'; el.style.overflow = 'hidden';
     const iconChar = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
-    el.innerHTML = `
-      <span class="sh-toast-icon">${iconChar}</span>
-      <span class="sh-toast-body">${esc(msg)}</span>
-      ${opts.undoLabel ? `<button class="sh-toast-undo" type="button">${esc(opts.undoLabel)}</button>` : ''}
-      ${opts.undoLabel ? `<span class="sh-toast-timer" style="--sh-toast-dur:${duration}ms;"></span>` : ''}
-    `;
+    el.innerHTML = `<span class="sh-toast-icon">${iconChar}</span><span class="sh-toast-body">${esc(msg)}</span>${opts.undoLabel ? `<button class="sh-toast-undo" type="button">${esc(opts.undoLabel)}</button>` : ''}${opts.undoLabel ? `<span class="sh-toast-timer" style="--sh-toast-dur:${duration}ms;"></span>` : ''}`;
     c.appendChild(el);
-
-    if (opts.undoLabel && typeof opts.onUndo === 'function') {
-      const btn = el.querySelector('.sh-toast-undo');
-      if (btn) btn.addEventListener('click', () => {
-        try { opts.onUndo(); } catch (e) { console.warn(e); }
-        el.classList.add('hiding');
-        setTimeout(() => el.remove(), 200);
-      });
-    }
-
-    setTimeout(() => {
-      if (el.parentNode) {
-        el.classList.add('hiding');
-        setTimeout(() => el.remove(), 200);
-      }
-    }, duration);
+    if (opts.undoLabel && typeof opts.onUndo === 'function') { const btn = el.querySelector('.sh-toast-undo'); if (btn) btn.addEventListener('click', () => { try { opts.onUndo(); } catch (e) { console.warn(e); } el.classList.add('hiding'); setTimeout(() => el.remove(), 200); }); }
+    setTimeout(() => { if (el.parentNode) { el.classList.add('hiding'); setTimeout(() => el.remove(), 200); } }, duration);
   }
 
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-sh-theme', theme);
-    const btn = document.getElementById('shThemeBtn');
-    if (btn) btn.innerHTML = theme === 'dark' ? ICON.moon : ICON.sun;
+    const btn = document.getElementById('shThemeBtn'); if (btn) btn.innerHTML = theme === 'dark' ? ICON.moon : ICON.sun;
     const root = document.documentElement;
-    if (theme === 'light') {
-      root.style.setProperty('--sh-canvas', '#F8FAFC');
-      root.style.setProperty('--sh-surface', '#FFFFFF');
-      root.style.setProperty('--sh-elevated', '#F1F5F9');
-      root.style.setProperty('--sh-raised', '#E2E8F0');
-      root.style.setProperty('--sh-line-1', '#E2E8F0');
-      root.style.setProperty('--sh-line-2', '#CBD5E1');
-      root.style.setProperty('--sh-line-3', '#94A3B8');
-      root.style.setProperty('--sh-ink-hi', '#0F172A');
-      root.style.setProperty('--sh-ink-md', '#334155');
-      root.style.setProperty('--sh-ink-lo', '#64748B');
-      root.style.setProperty('--sh-ink-mute', '#94A3B8');
-    } else {
-      root.style.setProperty('--sh-canvas', '#08090D');
-      root.style.setProperty('--sh-surface', '#0F1117');
-      root.style.setProperty('--sh-elevated', '#161822');
-      root.style.setProperty('--sh-raised', '#1C1F2E');
-      root.style.setProperty('--sh-line-1', '#1A1D29');
-      root.style.setProperty('--sh-line-2', '#232734');
-      root.style.setProperty('--sh-line-3', '#2E3446');
-      root.style.setProperty('--sh-ink-hi', '#F8FAFC');
-      root.style.setProperty('--sh-ink-md', '#CBD5E1');
-      root.style.setProperty('--sh-ink-lo', '#7B8496');
-      root.style.setProperty('--sh-ink-mute', '#4A5263');
-    }
+    if (theme === 'light') { root.style.setProperty('--sh-canvas', '#F8FAFC'); root.style.setProperty('--sh-surface', '#FFFFFF'); root.style.setProperty('--sh-elevated', '#F1F5F9'); root.style.setProperty('--sh-raised', '#E2E8F0'); root.style.setProperty('--sh-line-1', '#E2E8F0'); root.style.setProperty('--sh-line-2', '#CBD5E1'); root.style.setProperty('--sh-line-3', '#94A3B8'); root.style.setProperty('--sh-ink-hi', '#0F172A'); root.style.setProperty('--sh-ink-md', '#334155'); root.style.setProperty('--sh-ink-lo', '#64748B'); root.style.setProperty('--sh-ink-mute', '#94A3B8'); }
+    else { root.style.setProperty('--sh-canvas', '#08090D'); root.style.setProperty('--sh-surface', '#0F1117'); root.style.setProperty('--sh-elevated', '#161822'); root.style.setProperty('--sh-raised', '#1C1F2E'); root.style.setProperty('--sh-line-1', '#1A1D29'); root.style.setProperty('--sh-line-2', '#232734'); root.style.setProperty('--sh-line-3', '#2E3446'); root.style.setProperty('--sh-ink-hi', '#F8FAFC'); root.style.setProperty('--sh-ink-md', '#CBD5E1'); root.style.setProperty('--sh-ink-lo', '#7B8496'); root.style.setProperty('--sh-ink-mute', '#4A5263'); }
   }
-  function initTheme() {
-    const saved = localStorage.getItem('sh_theme') || 'dark';
-    applyTheme(saved);
-    const btn = document.getElementById('shThemeBtn');
-    if (btn) btn.addEventListener('click', () => {
-      const cur = document.documentElement.getAttribute('data-sh-theme') || 'dark';
-      const next = cur === 'dark' ? 'light' : 'dark';
-      applyTheme(next);
-      localStorage.setItem('sh_theme', next);
-    });
-  }
-
-  function initCollapse() {
-    const key = 'sh_sidebar_collapsed';
-    const shell = document.querySelector('.sh-shell');
-    if (!shell) return;
-    if (localStorage.getItem(key) === '1') shell.classList.add('is-collapsed');
-    const btn = document.getElementById('shCollapseBtn');
-    if (btn) btn.addEventListener('click', () => {
-      shell.classList.toggle('is-collapsed');
-      localStorage.setItem(key, shell.classList.contains('is-collapsed') ? '1' : '0');
-    });
-  }
+  function initTheme() { const saved = localStorage.getItem('sh_theme') || 'dark'; applyTheme(saved); const btn = document.getElementById('shThemeBtn'); if (btn) btn.addEventListener('click', () => { const cur = document.documentElement.getAttribute('data-sh-theme') || 'dark'; const next = cur === 'dark' ? 'light' : 'dark'; applyTheme(next); localStorage.setItem('sh_theme', next); }); }
+  function initCollapse() { const key = 'sh_sidebar_collapsed'; const shell = document.querySelector('.sh-shell'); if (!shell) return; if (localStorage.getItem(key) === '1') shell.classList.add('is-collapsed'); const btn = document.getElementById('shCollapseBtn'); if (btn) btn.addEventListener('click', () => { shell.classList.toggle('is-collapsed'); localStorage.setItem(key, shell.classList.contains('is-collapsed') ? '1' : '0'); }); }
 
   function setBreadcrumb(items) {
-    const el = document.getElementById('shBreadcrumb');
-    if (!el) return;
-    if (!items || !items.length) { el.innerHTML = ''; return; }
-    el.innerHTML = items.map((it, i) => {
-      const isLast = i === items.length - 1;
-      const crumb = it.href
-        ? `<a href="${esc(it.href)}" class="crumb" style="color:inherit;text-decoration:none;">${esc(it.label)}</a>`
-        : `<span class="crumb ${isLast ? 'active' : ''}">${esc(it.label)}</span>`;
-      return (i > 0 ? '<span class="sep">/</span>' : '') + crumb;
-    }).join('');
+    const el = document.getElementById('shBreadcrumb'); if (!el) return; if (!items || !items.length) { el.innerHTML = ''; return; }
+    el.innerHTML = items.map((it, i) => { const isLast = i === items.length - 1; const crumb = it.href ? `<a href="${esc(it.href)}" class="crumb" style="color:inherit;text-decoration:none;">${esc(it.label)}</a>` : `<span class="crumb ${isLast ? 'active' : ''}">${esc(it.label)}</span>`; return (i > 0 ? '<span class="sep">/</span>' : '') + crumb; }).join('');
   }
 
   async function refreshMoneyPulse() {
     try {
       const siteParam = S.currentSite ? '&site=' + encodeURIComponent(S.currentSite.site_key) : '';
-      const today = localDateStr();
-      const yest = localDateStr(new Date(Date.now() - 86400000));
-
+      const today = localDateStr(); const yest = localDateStr(new Date(Date.now() - 86400000));
       const [todayTotal, todayValid, yestTotal, yestValid] = await Promise.all([
         api(`/api/visits?from_date=${today}&to_date=${today}&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
         api(`/api/visits?from_date=${today}&to_date=${today}&verdict=valid&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
         api(`/api/visits?from_date=${yest}&to_date=${yest}&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
         api(`/api/visits?from_date=${yest}&to_date=${yest}&verdict=valid&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
       ]);
-
-      const buyCpm = Number(S.user?.cpm_buy ?? 1.0);
-      const sellCpm = Number(S.user?.cpm_sell ?? 1.5);
+      const buyCpm = Number(S.user?.cpm_buy ?? 1.0); const sellCpm = Number(S.user?.cpm_sell ?? 1.5);
       const todayProfit = (todayValid * sellCpm / 1000) - (todayTotal * buyCpm / 1000);
       const yestProfit = (yestValid * sellCpm / 1000) - (yestTotal * buyCpm / 1000);
-
-      let trendPct = 0;
-      let trendDir = 'flat';
-      if (Math.abs(yestProfit) > 0.01) {
-        trendPct = ((todayProfit - yestProfit) / Math.abs(yestProfit)) * 100;
-        if (trendPct > 5) trendDir = 'up';
-        else if (trendPct < -5) trendDir = 'down';
-      } else if (todayProfit > 0.01) trendDir = 'up';
-      else if (todayProfit < -0.01) trendDir = 'down';
-
+      let trendPct = 0; let trendDir = 'flat';
+      if (Math.abs(yestProfit) > 0.01) { trendPct = ((todayProfit - yestProfit) / Math.abs(yestProfit)) * 100; if (trendPct > 5) trendDir = 'up'; else if (trendPct < -5) trendDir = 'down'; } else if (todayProfit > 0.01) trendDir = 'up'; else if (todayProfit < -0.01) trendDir = 'down';
       const pulse = document.getElementById('shMoneyPulse');
       if (pulse) {
-        const cls = todayProfit > 0.01 ? 'pos' : todayProfit < -0.01 ? 'neg' : 'zero';
-        pulse.className = `sh-money-pulse ${cls}`;
-        const valEl = pulse.querySelector('.sh-mp-value');
-        if (valEl) valEl.textContent = fmtMoney(todayProfit);
-        const trendEl = pulse.querySelector('.sh-mp-trend');
-        if (trendEl) {
-          if (trendDir === 'flat') {
-            trendEl.textContent = '—';
-            trendEl.className = 'sh-mp-trend flat';
-          } else {
-            const arrow = trendDir === 'up' ? '↑' : '↓';
-            trendEl.textContent = `${arrow}${Math.abs(trendPct).toFixed(0)}%`;
-            trendEl.className = `sh-mp-trend ${trendDir}`;
-          }
-        }
+        const cls = todayProfit > 0.01 ? 'pos' : todayProfit < -0.01 ? 'neg' : 'zero'; pulse.className = `sh-money-pulse ${cls}`;
+        const valEl = pulse.querySelector('.sh-mp-value'); if (valEl) valEl.textContent = fmtMoney(todayProfit);
+        const trendEl = pulse.querySelector('.sh-mp-trend'); if (trendEl) { if (trendDir === 'flat') { trendEl.textContent = '—'; trendEl.className = 'sh-mp-trend flat'; } else { const arrow = trendDir === 'up' ? '↑' : '↓'; trendEl.textContent = `${arrow}${Math.abs(trendPct).toFixed(0)}%`; trendEl.className = `sh-mp-trend ${trendDir}`; } }
       }
-
-      const visitsEl = document.getElementById('shStatusVisits');
-      if (visitsEl) visitsEl.textContent = fmtNum(todayTotal) + ' زيارة';
-      const profitEl = document.getElementById('shStatusProfit');
-      if (profitEl) {
-        profitEl.textContent = fmtMoney(todayProfit);
-        profitEl.style.color = todayProfit > 0 ? 'var(--sh-green)' : todayProfit < 0 ? 'var(--sh-rose)' : 'var(--sh-ink-lo)';
-      }
-    } catch (err) {
-      // silent
-    }
+      const visitsEl = document.getElementById('shStatusVisits'); if (visitsEl) visitsEl.textContent = fmtNum(todayTotal) + ' زيارة';
+      const profitEl = document.getElementById('shStatusProfit'); if (profitEl) { profitEl.textContent = fmtMoney(todayProfit); profitEl.style.color = todayProfit > 0 ? 'var(--sh-green)' : todayProfit < 0 ? 'var(--sh-rose)' : 'var(--sh-ink-lo)'; }
+    } catch (err) {}
   }
 
   async function refreshAttentionCount() {
     try {
-      const data = await api('/api/zones/actions/attention-count');
-      const total = Number(data.total || 0);
-
+      const data = await api('/api/zones/actions/attention-count'); const total = Number(data.total || 0);
       document.querySelectorAll('.sh-nav-badge').forEach(badge => {
         if (badge.dataset.badge === 'labeling') {
-          if (data.labeling > 0) {
-            badge.style.display = '';
-            badge.textContent = data.labeling > 99 ? '99+' : data.labeling;
-            const tier = data.labeling >= 10 ? 'tier-3' : data.labeling >= 5 ? 'tier-2' : 'tier-1';
-            badge.className = 'sh-nav-badge ' + tier;
-          } else {
-            badge.style.display = 'none';
-          }
+          if (data.labeling > 0) { badge.style.display = ''; badge.textContent = data.labeling > 99 ? '99+' : data.labeling; const tier = data.labeling >= 10 ? 'tier-3' : data.labeling >= 5 ? 'tier-2' : 'tier-1'; badge.className = 'sh-nav-badge ' + tier; }
+          else { badge.style.display = 'none'; }
         }
       });
-
       document.querySelectorAll('.sh-mobile-badge').forEach(badge => {
         if (badge.dataset.mbadge === 'labeling') {
-          if (data.labeling > 0) {
-            badge.style.display = '';
-            badge.textContent = data.labeling > 9 ? '9+' : data.labeling;
-          } else {
-            badge.style.display = 'none';
-          }
+          if (data.labeling > 0) { badge.style.display = ''; badge.textContent = data.labeling > 9 ? '9+' : data.labeling; }
+          else { badge.style.display = 'none'; }
         }
       });
-
-      if (total > 0) {
-        document.title = `(${total}) ${S.baseTitle}`;
-      } else {
-        document.title = S.baseTitle;
-      }
-    } catch (err) {
-      // silent
-    }
+      if (total > 0) { document.title = `(${total}) ${S.baseTitle}`; } else { document.title = S.baseTitle; }
+    } catch (err) {}
   }
 
-  function ensureQuickActions() {
-    if (S.quickActionsEl) return S.quickActionsEl;
-    const el = document.createElement('div');
-    el.className = 'sh-qactions';
-    el.id = 'shQactions';
-    document.body.appendChild(el);
-    S.quickActionsEl = el;
-    return el;
-  }
+  function ensureQuickActions() { if (S.quickActionsEl) return S.quickActionsEl; const el = document.createElement('div'); el.className = 'sh-qactions'; el.id = 'shQactions'; document.body.appendChild(el); S.quickActionsEl = el; return el; }
 
   function buildQuickActionsHTML(zoneId, zoneInfo) {
-    const actions = [];
-    const grade = zoneInfo.grade || '';
-    const trust = zoneInfo.trust;
-
-    if (grade === 'F' || grade === 'D' || (trust !== undefined && trust < 40)) {
-      actions.push({ id: 'blacklist', icon: 'ban', label: 'حظر فوري', cls: 'danger', kbd: 'X' });
-    }
+    const actions = []; const grade = zoneInfo.grade || ''; const trust = zoneInfo.trust;
+    if (grade === 'F' || grade === 'D' || (trust !== undefined && trust < 40)) { actions.push({ id: 'blacklist', icon: 'ban', label: 'حظر فوري', cls: 'danger', kbd: 'X' }); }
     actions.push({ id: 'pause', icon: 'pause', label: 'Pause 24h', cls: 'warn', kbd: 'P' });
-    if (grade === 'S' || grade === 'A' || (trust !== undefined && trust > 70)) {
-      actions.push({ id: 'scale', icon: 'scale', label: 'Scale +30%', cls: 'success', kbd: '+' });
-    }
+    if (grade === 'S' || grade === 'A' || (trust !== undefined && trust > 70)) { actions.push({ id: 'scale', icon: 'scale', label: 'Scale +30%', cls: 'success', kbd: '+' }); }
     actions.push({ id: 'details', icon: 'eye', label: 'التفاصيل', cls: '', kbd: '↵' });
-
-    return `
-      <div class="sh-qactions-head">${esc(zoneId)}</div>
-      ${actions.map(a => `
-        <button type="button" class="sh-qactions-item ${a.cls}" data-action="${a.id}">
-          ${ICON[a.icon] || ''}
-          <span>${esc(a.label)}</span>
-          ${a.kbd ? `<span class="kbd">${esc(a.kbd)}</span>` : ''}
-        </button>
-      `).join('')}
-    `;
+    return `<div class="sh-qactions-head">${esc(zoneId)}</div>${actions.map(a => `<button type="button" class="sh-qactions-item ${a.cls}" data-action="${a.id}">${ICON[a.icon] || ''}<span>${esc(a.label)}</span>${a.kbd ? `<span class="kbd">${esc(a.kbd)}</span>` : ''}</button>`).join('')}`;
   }
 
   function showQuickActions(targetEl) {
-    const zoneId = targetEl.dataset.zoneId;
-    if (!zoneId) return;
-
-    const zoneInfo = {
-      grade: targetEl.dataset.zoneGrade || '',
-      trust: targetEl.dataset.zoneTrust ? Number(targetEl.dataset.zoneTrust) : undefined,
-    };
-
-    const menu = ensureQuickActions();
-    menu.innerHTML = buildQuickActionsHTML(zoneId, zoneInfo);
-
-    const rect = targetEl.getBoundingClientRect();
-    const menuW = 200;
-    let left = rect.left - menuW - 8;
-    if (left < 8) left = rect.right + 8;
-    let top = rect.top;
-    if (top + 200 > window.innerHeight) top = window.innerHeight - 210;
-
-    menu.style.left = left + 'px';
-    menu.style.top = top + 'px';
-    menu.classList.add('is-open');
-    S.quickActionsTarget = targetEl;
-
-    menu.querySelectorAll('.sh-qactions-item').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const action = btn.dataset.action;
-        hideQuickActions();
-        applyZoneAction(targetEl, zoneId, action);
-      });
-    });
+    const zoneId = targetEl.dataset.zoneId; if (!zoneId) return;
+    const zoneInfo = { grade: targetEl.dataset.zoneGrade || '', trust: targetEl.dataset.zoneTrust ? Number(targetEl.dataset.zoneTrust) : undefined };
+    const menu = ensureQuickActions(); menu.innerHTML = buildQuickActionsHTML(zoneId, zoneInfo);
+    const rect = targetEl.getBoundingClientRect(); const menuW = 200; let left = rect.left - menuW - 8; if (left < 8) left = rect.right + 8; let top = rect.top; if (top + 200 > window.innerHeight) top = window.innerHeight - 210;
+    menu.style.left = left + 'px'; menu.style.top = top + 'px'; menu.classList.add('is-open'); S.quickActionsTarget = targetEl;
+    menu.querySelectorAll('.sh-qactions-item').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); const action = btn.dataset.action; hideQuickActions(); applyZoneAction(targetEl, zoneId, action); }); });
   }
 
-  function hideQuickActions() {
-    if (S.quickActionsEl) S.quickActionsEl.classList.remove('is-open');
-    S.quickActionsTarget = null;
-  }
+  function hideQuickActions() { if (S.quickActionsEl) S.quickActionsEl.classList.remove('is-open'); S.quickActionsTarget = null; }
 
   async function applyZoneAction(targetEl, zoneId, action) {
-    if (action === 'details') {
-      window.location.href = `/smart-reports?zone=${encodeURIComponent(zoneId)}`;
-      return;
-    }
-
-    const prev = targetEl.style.opacity;
-    targetEl.style.opacity = '0.5';
-
+    if (action === 'details') { window.location.href = `/smart-reports?zone=${encodeURIComponent(zoneId)}`; return; }
+    const prev = targetEl.style.opacity; targetEl.style.opacity = '0.5';
     try {
-      const res = await api(`/api/zones/${encodeURIComponent(zoneId)}/action`, {
-        method: 'POST',
-        body: JSON.stringify({
-          action,
-          reason: 'Quick Action',
-          metadata: action === 'scale' ? { percent: 30 } : action === 'pause' ? { hours: 24 } : {},
-        }),
-      });
-
+      const res = await api(`/api/zones/${encodeURIComponent(zoneId)}/action`, { method: 'POST', body: JSON.stringify({ action, reason: 'Quick Action', metadata: action === 'scale' ? { percent: 30 } : action === 'pause' ? { hours: 24 } : {} }) });
       const actionLabels = { blacklist: 'حظر', pause: 'Pause', scale: 'Scale +30%' };
       targetEl.classList.add('sh-action-applied');
-
-      toast(`${actionLabels[action] || action} — ${zoneId}`, 'success', 5000, {
-        undoLabel: 'تراجع',
-        onUndo: async () => {
-          try {
-            await api(`/api/zones/${encodeURIComponent(zoneId)}/action/${res.id}`, { method: 'DELETE' });
-            targetEl.classList.remove('sh-action-applied');
-            targetEl.style.opacity = prev;
-            toast('تم التراجع', 'info');
-          } catch (e) {
-            toast('فشل التراجع: ' + e.message, 'error');
-          }
-        },
-      });
-    } catch (err) {
-      targetEl.style.opacity = prev;
-      toast('فشل: ' + err.message, 'error');
-    }
+      toast(`${actionLabels[action] || action} — ${zoneId}`, 'success', 5000, { undoLabel: 'تراجع', onUndo: async () => { try { await api(`/api/zones/${encodeURIComponent(zoneId)}/action/${res.id}`, { method: 'DELETE' }); targetEl.classList.remove('sh-action-applied'); targetEl.style.opacity = prev; toast('تم التراجع', 'info'); } catch (e) { toast('فشل التراجع: ' + e.message, 'error'); } } });
+    } catch (err) { targetEl.style.opacity = prev; toast('فشل: ' + err.message, 'error'); }
   }
 
   function initQuickActions() {
-    let hoverTimer = null;
-    let currentEl = null;
-
-    document.addEventListener('mouseover', (e) => {
-      const target = e.target.closest('[data-zone-id]');
-      if (!target || target === currentEl) return;
-      if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#shQactions')) return;
-      clearTimeout(hoverTimer);
-      currentEl = target;
-      hoverTimer = setTimeout(() => showQuickActions(target), 200);
-    }, true);
-
-    document.addEventListener('mouseout', (e) => {
-      const target = e.target.closest('[data-zone-id]');
-      if (!target) return;
-      if (e.relatedTarget && (
-        (e.relatedTarget.closest && e.relatedTarget.closest('#shQactions')) ||
-        e.relatedTarget.closest?.('[data-zone-id]') === target
-      )) return;
-      clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(hideQuickActions, 250);
-    }, true);
-
-    document.addEventListener('mouseover', (e) => {
-      if (e.target.closest && e.target.closest('#shQactions')) clearTimeout(hoverTimer);
-    }, true);
-
-    document.addEventListener('mouseout', (e) => {
-      if (e.target.closest && e.target.closest('#shQactions') && !e.relatedTarget?.closest?.('#shQactions')) {
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(hideQuickActions, 250);
-      }
-    }, true);
-
+    let hoverTimer = null; let currentEl = null;
+    document.addEventListener('mouseover', (e) => { const target = e.target.closest('[data-zone-id]'); if (!target || target === currentEl) return; if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#shQactions')) return; clearTimeout(hoverTimer); currentEl = target; hoverTimer = setTimeout(() => showQuickActions(target), 200); }, true);
+    document.addEventListener('mouseout', (e) => { const target = e.target.closest('[data-zone-id]'); if (!target) return; if (e.relatedTarget && ((e.relatedTarget.closest && e.relatedTarget.closest('#shQactions')) || e.relatedTarget.closest?.('[data-zone-id]') === target)) return; clearTimeout(hoverTimer); hoverTimer = setTimeout(hideQuickActions, 250); }, true);
+    document.addEventListener('mouseover', (e) => { if (e.target.closest && e.target.closest('#shQactions')) clearTimeout(hoverTimer); }, true);
+    document.addEventListener('mouseout', (e) => { if (e.target.closest && e.target.closest('#shQactions') && !e.relatedTarget?.closest?.('#shQactions')) { clearTimeout(hoverTimer); hoverTimer = setTimeout(hideQuickActions, 250); } }, true);
     window.addEventListener('scroll', hideQuickActions, { passive: true });
   }
 
   async function mount(opts = {}) {
-    if (S.mounted) return;
-    S.active = opts.active || 'dashboard';
-    S.lang = opts.lang || 'ar';
-    S.currentSite = opts.currentSite || null;
-    S.baseTitle = opts.title || document.title;
-
+    if (S.mounted) return; S.active = opts.active || 'dashboard'; S.lang = opts.lang || 'ar'; S.currentSite = opts.currentSite || null; S.baseTitle = opts.title || document.title;
     document.body.classList.add('sh-body');
-    if (S.lang === 'ar') {
-      document.body.classList.add('ar');
-      document.documentElement.setAttribute('dir', 'rtl');
-      document.documentElement.setAttribute('lang', 'ar');
-    }
-
-    try { S.user = await api('/api/auth/me'); }
-    catch (e) { throw new Error('فشل تحميل بيانات المستخدم: ' + e.message); }
-    try { S.sites = await api('/api/sites'); }
-    catch (e) { S.sites = []; }
-
-    const appRoot = document.getElementById('shAppRoot');
-    const contentEl = document.getElementById('shContent');
-    if (!appRoot) throw new Error('Missing #shAppRoot in HTML');
-    if (!contentEl) throw new Error('Missing #shContent in HTML');
-
+    if (S.lang === 'ar') { document.body.classList.add('ar'); document.documentElement.setAttribute('dir', 'rtl'); document.documentElement.setAttribute('lang', 'ar'); }
+    try { S.user = await api('/api/auth/me'); } catch (e) { throw new Error('فشل تحميل بيانات المستخدم: ' + e.message); }
+    try { S.sites = await api('/api/sites'); } catch (e) { S.sites = []; }
+    const appRoot = document.getElementById('shAppRoot'); const contentEl = document.getElementById('shContent');
+    if (!appRoot) throw new Error('Missing #shAppRoot in HTML'); if (!contentEl) throw new Error('Missing #shContent in HTML');
     const innerContent = contentEl.innerHTML;
-    appRoot.innerHTML = `
-      <div class="sh-shell">
-        ${buildSidebar()}
-        <div class="sh-main">
-          ${buildTopbar()}
-          <main class="sh-content" id="shContentInner">${innerContent}</main>
-          ${buildStatusbar()}
-        </div>
-        ${buildMobileNav()}
-      </div>`;
-
-    if (!document.getElementById('shLiveKeyframes')) {
-      const styleEl = document.createElement('style');
-      styleEl.id = 'shLiveKeyframes';
-      styleEl.textContent = `
-        @keyframes sh-live-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.75); }
-        }
-      `;
-      document.head.appendChild(styleEl);
-    }
-
-    const cmdWrapper = document.createElement('div');
-    cmdWrapper.innerHTML = buildCmdPalette();
-    document.body.appendChild(cmdWrapper.firstElementChild);
-
-    ensureToastContainer();
-    initTheme();
-    initCollapse();
-    bindCmd();
-    initQuickActions();
-
-    const searchBtn = document.getElementById('shSearchBtn');
-    if (searchBtn) searchBtn.addEventListener('click', openCmd);
-
-    const moneyPulse = document.getElementById('shMoneyPulse');
-    if (moneyPulse) {
-      moneyPulse.addEventListener('click', () => {
-        const today = localDateStr();
-        const href = S.currentSite
-          ? `/smart-reports?site=${encodeURIComponent(S.currentSite.site_key)}&from_date=${today}&to_date=${today}`
-          : `/smart-reports?from_date=${today}&to_date=${today}`;
-        window.location.href = href;
-      });
-    }
-
-    document.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        openCmd();
-      }
-    });
-
+    appRoot.innerHTML = `<div class="sh-shell">${buildSidebar()}<div class="sh-main">${buildTopbar()}<main class="sh-content" id="shContentInner">${innerContent}</main>${buildStatusbar()}</div>${buildMobileNav()}</div>`;
+    if (!document.getElementById('shLiveKeyframes')) { const styleEl = document.createElement('style'); styleEl.id = 'shLiveKeyframes'; styleEl.textContent = `@keyframes sh-live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.75); } }`; document.head.appendChild(styleEl); }
+    const cmdWrapper = document.createElement('div'); cmdWrapper.innerHTML = buildCmdPalette(); document.body.appendChild(cmdWrapper.firstElementChild);
+    ensureToastContainer(); initTheme(); initCollapse(); bindCmd(); initQuickActions();
+    const searchBtn = document.getElementById('shSearchBtn'); if (searchBtn) searchBtn.addEventListener('click', openCmd);
+    const moneyPulse = document.getElementById('shMoneyPulse'); if (moneyPulse) { moneyPulse.addEventListener('click', () => { const today = localDateStr(); const href = S.currentSite ? `/smart-reports?site=${encodeURIComponent(S.currentSite.site_key)}&from_date=${today}&to_date=${today}` : `/smart-reports?from_date=${today}&to_date=${today}`; window.location.href = href; }); }
+    document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCmd(); } });
     setBreadcrumb(opts.breadcrumb || [{ label: T[S.lang].nav }]);
-
-    refreshMoneyPulse();
-    refreshAttentionCount();
-    setInterval(refreshMoneyPulse, 30000);
-    setInterval(refreshAttentionCount, 60000);
-
-    S.mounted = true;
-    return appRoot;
+    refreshMoneyPulse(); refreshAttentionCount(); setInterval(refreshMoneyPulse, 30000); setInterval(refreshAttentionCount, 60000);
+    S.mounted = true; return appRoot;
   }
 
-  window.Shell = {
-    mount,
-    toast,
-    openCmd,
-    closeCmd,
-    api,
-    setBreadcrumb,
-    refreshMoneyPulse,
-    refreshAttentionCount,
-    applyTheme,
-    esc, fmtNum, fmtMoney, fmtPct, localDateStr,
-    ICON,
-    state: S,
-  };
+  window.Shell = { mount, toast, openCmd, closeCmd, api, setBreadcrumb, refreshMoneyPulse, refreshAttentionCount, applyTheme, esc, fmtNum, fmtMoney, fmtPct, localDateStr, ICON, state: S };
 })();
