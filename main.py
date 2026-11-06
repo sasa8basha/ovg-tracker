@@ -10,7 +10,7 @@ from config import ALLOWED_ORIGINS, ENV, DEBUG
 from database import engine, Base, run_data_seeding_and_backfills
 from auth import bootstrap_admin
 from routers import (
-    auth as auth_router, settings as settings_router, sites as sites_router,
+    auth as auth_router, settings as settings_router,
     tracker as tracker_router, stats as stats_router, reports as reports_router,
     labeling as labeling_router, data_quality as data_quality_router,
     zones_analytics as zones_analytics_router, radar as radar_router,
@@ -28,7 +28,6 @@ bootstrap_admin()
 app = FastAPI(title="OVG Tracker", version="5.9", docs_url="/docs" if DEBUG else None, redoc_url="/redoc" if DEBUG else None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 🔴 1. CORS للداشبورد (محمي)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -37,25 +36,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔴 2. Custom Middleware للتراكر (يسمح لأي مدونة)
 @app.middleware("http")
 async def tracker_cors_middleware(request: Request, call_next):
     if request.url.path.startswith(("/api/track", "/api/collect", "/api/interstitial")):
         if request.method == "OPTIONS":
-            return Response(status_code=200, headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            })
+            return Response(status_code=200, headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "*"})
         response = await call_next(request)
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
     return await call_next(request)
 
-# Routers
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
-app.include_router(sites_router.router, prefix="/api/sites", tags=["sites"])
 app.include_router(campaigns_router.router, prefix="/api/campaigns", tags=["campaigns"])
 app.include_router(traffic_sources_router.router, prefix="/api/traffic-sources", tags=["traffic-sources"])
 app.include_router(destinations_router.router, prefix="/api/destinations", tags=["destinations"])
@@ -72,11 +64,3 @@ app.include_router(zone_actions_router.router, prefix="/api", tags=["zone-action
 app.include_router(live_router.router, prefix="/api", tags=["live"])
 app.include_router(sessions_router.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(pages_router.router, tags=["pages"])
-
-@app.on_event("startup")
-async def _startup_banner():
-    print("=" * 60)
-    print(f"  OVG Tracker v5.9 — ENV={ENV}  DEBUG={DEBUG}")
-    print(f"  Dashboard CORS origins: {ALLOWED_ORIGINS}")
-    print("  Tracker CORS: ALLOWED (*)")
-    print("=" * 60)
