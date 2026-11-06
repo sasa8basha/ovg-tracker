@@ -1,5 +1,5 @@
 """
-routers/collector_v3.py — Collector v3 (P2 — Idempotency & Speed + Fixes 1-4)
+routers/collector_v3.py — Collector v3 (Separating Site & Campaign Tracking)
 """
 import json
 from datetime import datetime, timedelta
@@ -8,26 +8,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 
-from config import (
-    COLLECTOR_V3_ENABLED, MAX_SESSIONS_PER_IP_HOUR,
-)
+from config import COLLECTOR_V3_ENABLED, MAX_SESSIONS_PER_IP_HOUR
 from database import get_db, SessionLocal
-from models import (
-    SessionModel, VisitHeartbeatModel, VisitModel,
-    SiteModel, CampaignModel,
-)
+from models import SessionModel, VisitHeartbeatModel, VisitModel, SiteModel, CampaignModel
 from schemas import HandshakePayload, HeartbeatPayload, FinalPayload
-from utils import (
-    get_client_ip,
-    handshake_limiter, heartbeat_limiter, final_limiter,
-    stats_cache,
-)
+from utils import get_client_ip, handshake_limiter, heartbeat_limiter, final_limiter, stats_cache
 from analysis import get_ip_info, parse_ua, extract_zone_id
 from collector.filter_engine import evaluate_visit
 from helpers import extract_zone_id_from_url
 
 router = APIRouter()
-
 
 def _validate_session_id(session_id: str) -> str:
     s = (session_id or "").strip()
@@ -35,89 +25,60 @@ def _validate_session_id(session_id: str) -> str:
         raise HTTPException(400, "session_id غير صالح")
     return s
 
-
 def _resolve_target(site_key: str, campaign_key: str, db: Session):
     user_id = None
     site_id = None
     campaign_id = None
 
+    # 1. Try campaign_key first (Highest priority)
     if campaign_key:
         c = db.query(CampaignModel).filter(CampaignModel.campaign_key == campaign_key).first()
         if c:
             campaign_id = c.id
             user_id = c.user_id
             site_id = c.site_id
+            return user_id, site_id, campaign_id
 
-    if not campaign_id and site_key:
-        c = db.query(CampaignModel).filter(CampaignModel.campaign_key == site_key).first()
-        if c:
-            campaign_id = c.id
-            user_id = c.user_id
-            site_id = c.site_id
-        else:
-            s = db.query(SiteModel).filter(SiteModel.site_key == site_key).first()
-            if s:
-                site_id = s.id
-                user_id = s.user_id
-                c2 = db.query(CampaignModel).filter(CampaignModel.site_id == s.id).first()
-                if c2:
-                    campaign_id = c2.id
+    # 2. Fallback to site_key (No auto-assigning to campaigns)
+    if site_key:
+        s = db.query(SiteModel).filter(SiteModel.site_key == site_key).first()
+        if s:
+            site_id = s.id
+            user_id = s.user_id
+            # ❌ REMOVED: Auto-assigning to the first campaign.
+            # Site visits stay as site visits unless campaign_key is explicitly passed.
 
     return user_id, site_id, campaign_id
 
-
 def _extract_fp_brief(fp: dict) -> dict:
     if not isinstance(fp, dict): return {}
-    return {
-        "canvas": str(fp.get("canvas_hash") or "")[:20],
-        "tz": str(fp.get("timezone") or "")[:50],
-        "lang": str(fp.get("language") or "")[:10],
-        "ua_short": str((fp.get("ua") or ""))[:100],
-    }
-
+    return {"canvas": str(fp.get("canvas_hash") or "")[:20], "tz": str(fp.get("timezone") or "")[:50], "lang": str(fp.get("language") or "")[:10], "ua_short": str((fp.get("ua") or ""))[:100]}
 
 def _compute_fp_hash(fp: dict) -> str:
     import hashlib
-    parts = [
-        str(fp.get("canvas_hash") or ""),
-        str(fp.get("timezone") or ""),
-        str(fp.get("language") or ""),
-        str(fp.get("hardwareConcurrency") or ""),
-        str(fp.get("deviceMemory") or ""),
-        str((fp.get("webgl") or {}).get("renderer") or ""),
-    ]
+    parts = [str(fp.get("canvas_hash") or ""), str(fp.get("timezone") or ""), str(fp.get("language") or ""), str(fp.get("hardwareConcurrency") or ""), str(fp.get("deviceMemory") or ""), str((fp.get("webgl") or {}).get("renderer") or "")]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
-
 
 def _check_flood(session_id: str, ip: str, db: Session):
     cutoff = datetime.utcnow() - timedelta(hours=1)
-    count = db.query(SessionModel).filter(
-        SessionModel.ip == ip, SessionModel.started_at >= cutoff,
-    ).count()
-    if count >= MAX_SESSIONS_PER_IP_HOUR:
-        raise HTTPException(429, "محاولات كتير — جرب بعد شوية")
-
+    count = db.query(SessionModel).filter(SessionModel.ip == ip, SessionModel.started_at >= cutoff).count()
+    if count >= MAX_SESSIONS_PER_IP_HOUR: raise HTTPException(429, "محاولات كتير — جرب بعد شوية")
 
 @router.post("/collect/handshake")
 async def collect_handshake(payload: HandshakePayload, request: Request, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED: raise HTTPException(404, "Collector v3 disabled")
-
-    client_ip = get_client_ip(request)
-    handshake_limiter.check(client_ip)
+    client_ip = get_client_ip(request); handshake_limiter.check(client_ip)
     session_id = _validate_session_id(payload.session_id)
 
     existing = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
-    if existing:
-        return {"ok": True, "session_id": existing.session_id, "server_time": int(datetime.utcnow().timestamp() * 1000), "duplicate": True}
+    if existing: return {"ok": True, "session_id": existing.session_id, "server_time": int(datetime.utcnow().timestamp() * 1000), "duplicate": True}
 
     _check_flood(session_id, client_ip, db)
     user_id, site_id, campaign_id = _resolve_target(payload.site_key, payload.campaign_key, db)
 
-    try:
-        ip_info = await get_ip_info(client_ip)
-        if not isinstance(ip_info, dict): ip_info = {}
-    except Exception:
-        ip_info = {}
+    try: ip_info = await get_ip_info(client_ip)
+    except Exception: ip_info = {}
+    if not isinstance(ip_info, dict): ip_info = {}
 
     ua = str((payload.nav or {}).get("ua") or "")
     cc = str(ip_info.get("country_code") or "").upper().strip()
@@ -131,17 +92,13 @@ async def collect_handshake(payload: HandshakePayload, request: Request, db: Ses
         visitor_fp_hash=_compute_fp_hash(payload.fp or {}),
         meta={"fp_brief": _extract_fp_brief(payload.fp or {})},
     )
-    db.add(session)
-    db.commit()
-    db.refresh(session)
+    db.add(session); db.commit(); db.refresh(session)
     return {"ok": True, "session_id": session.session_id, "server_time": int(datetime.utcnow().timestamp() * 1000), "duplicate": False}
-
 
 @router.post("/collect/heartbeat")
 async def collect_heartbeat(payload: HeartbeatPayload, request: Request, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED: raise HTTPException(404, "Collector v3 disabled")
-    client_ip = get_client_ip(request)
-    session_id = _validate_session_id(payload.session_id)
+    client_ip = get_client_ip(request); session_id = _validate_session_id(payload.session_id)
     heartbeat_limiter.check(f"{session_id}:{client_ip}")
 
     session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
@@ -163,15 +120,11 @@ async def collect_heartbeat(payload: HeartbeatPayload, request: Request, db: Ses
     db.commit()
     return {"ok": True, "duplicate": False}
 
-
 def _process_final_background(session_id: str, payload_dict: dict, client_ip: str, headers_dict: dict, http_version: str):
     db = SessionLocal()
     try:
         session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
-        
-        # حماية: لو الـ Interstitial سجل الزيارة خلاص، بلاش نسجل تاني
-        if not session or session.visit_id:
-            return 
+        if not session or session.visit_id: return 
 
         payload = FinalPayload(**payload_dict)
         ua = str((payload.nav or {}).get("ua") or "")
@@ -187,26 +140,20 @@ def _process_final_background(session_id: str, payload_dict: dict, client_ip: st
                 elif c and c.destination_url: zone_id = extract_zone_id_from_url(c.destination_url) or "unknown"
         if not zone_id: zone_id = "unknown"
 
-        # 🔴 إصلاح باج 3: جلب الـ IP Info في الخلفية (مش بيأثر على سرعة الرد)
-        try:
-            ip_info = __import__('asyncio').run(get_ip_info(client_ip)) # Run async in sync context
-        except Exception:
-            ip_info = {"country": "Unknown", "country_code": session.country_code, "isp": "Unknown", "asn": "", "security": {}, "lat": 0.0, "lon": 0.0}
+        try: ip_info = __import__('asyncio').run(get_ip_info(client_ip)) 
+        except Exception: ip_info = {"country": "Unknown", "country_code": session.country_code, "isp": "Unknown", "asn": "", "security": {}, "lat": 0.0, "lon": 0.0}
 
-        # 🔴 إصلاح باج 4: حساب تكرار الـ IP والبصمة
         recent_fp_count = 0; same_ip_last_minute = 0; same_canvas_ip_count = 0; same_ip_canvas_count = 0
         try:
             cutoff_1m = datetime.utcnow() - timedelta(minutes=1)
             cutoff_1h = datetime.utcnow() - timedelta(hours=1)
             same_ip_last_minute = db.query(VisitModel).filter(VisitModel.ip == client_ip, VisitModel.timestamp > cutoff_1m).count()
-            
             canvas_raw = str((payload.fingerprint or {}).get("canvas_hash") or "")
             if len(canvas_raw) >= 15 and canvas_raw not in ("blocked", "Unknown"):
                 recent_fp_count = db.query(VisitModel).filter(VisitModel.canvas_hash == canvas_raw[:15] + "...", VisitModel.timestamp > cutoff_1m).count()
                 same_canvas_ip_count = int(db.query(func.count(distinct(VisitModel.ip))).filter(VisitModel.canvas_hash == canvas_raw[:15] + "...", VisitModel.timestamp > cutoff_1h).scalar() or 0)
                 same_ip_canvas_count = int(db.query(func.count(distinct(VisitModel.canvas_hash))).filter(VisitModel.ip == client_ip, VisitModel.timestamp > cutoff_1h).scalar() or 0)
-        except Exception as e:
-            print(f"[BG] Cross-visit fail: {e}")
+        except Exception as e: print(f"[BG] Cross-visit fail: {e}")
 
         heartbeats = db.query(VisitHeartbeatModel).filter(VisitHeartbeatModel.session_id == session_id).order_by(VisitHeartbeatModel.seq.asc()).all()
         heartbeats_list = [{"seq": hb.seq, "t_ms": hb.t_ms, "clicks": hb.clicks, "scrolls": hb.scrolls, "mousemoves": hb.mousemoves, "keydowns": hb.keydowns} for hb in heartbeats]
@@ -225,8 +172,7 @@ def _process_final_background(session_id: str, payload_dict: dict, client_ip: st
         }
 
         try: result = evaluate_visit(data, ip_info)
-        except Exception as e:
-            result = {"score": 50, "verdict": "suspicious", "evidence": [], "filter_reason": "ENGINE_ERROR"}
+        except Exception as e: result = {"score": 50, "verdict": "suspicious", "evidence": [], "filter_reason": "ENGINE_ERROR"}
 
         fp = payload.fingerprint or {}; behavior = payload.behavior or {}; events = behavior.get("events") or {}
         cc = str(ip_info.get("country_code") or "").upper().strip()
@@ -249,20 +195,14 @@ def _process_final_background(session_id: str, payload_dict: dict, client_ip: st
             if session.site_id: stats_cache.invalidate(f"stats:site:{session.site_id}")
             if session.user_id: stats_cache.invalidate(f"stats:user:{session.user_id}:all")
         except Exception as e:
-            db.rollback()
-            print(f"[BG] Failed to save visit: {e}")
-
-    except Exception as e:
-        print(f"[BG] Fatal error: {e}")
-    finally:
-        db.close()
-
+            db.rollback(); print(f"[BG] Failed to save visit: {e}")
+    except Exception as e: print(f"[BG] Fatal error: {e}")
+    finally: db.close()
 
 @router.post("/collect/final")
 async def collect_final(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED: raise HTTPException(404, "Collector v3 disabled")
     client_ip = get_client_ip(request)
-
     try:
         raw_bytes = await request.body()
         payload_dict = json.loads(raw_bytes.decode("utf-8", errors="replace"))
@@ -271,7 +211,6 @@ async def collect_final(request: Request, background_tasks: BackgroundTasks, db:
 
     session_id = _validate_session_id(payload.session_id)
     final_limiter.check(f"{session_id}:{client_ip}")
-
     session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
     if not session: raise HTTPException(400, "session غير موجودة")
 
@@ -281,6 +220,5 @@ async def collect_final(request: Request, background_tasks: BackgroundTasks, db:
 
     headers_dict = {str(k).lower(): str(v) for k, v in request.headers.items()}
     http_version = str(request.scope.get("http_version", "1.1"))
-
     background_tasks.add_task(_process_final_background, session_id, payload_dict, client_ip, headers_dict, http_version)
     return {"ok": True, "status": "processing", "duplicate": False}
