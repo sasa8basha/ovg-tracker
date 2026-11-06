@@ -4,80 +4,74 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OVG · تفاصيل الحملة</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/shell.css">
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
     body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
     #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
-    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 13px; z-index: 9998; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; z-index: 9998; }
     .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
     @keyframes db-spin { to { transform: rotate(360deg); } }
+
     .cd-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-    .cd-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
-    .cd-title { font-size: 22px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.02em; margin: 0; }
-    .cd-sub { font-size: 12px; color: #7B8496; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .cd-badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+    .cd-title { font-size: 22px; font-weight: 900; color: #F8FAFC; margin: 0 0 6px 0; }
+    .cd-sub { font-size: 12px; color: #7B8496; display: flex; align-items: center; gap: 8px; }
+    .cd-badge { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
     .cd-badge.active { background: rgba(16,185,129,0.15); color: #10B981; }
     .cd-badge.paused { background: rgba(245,158,11,0.15); color: #F59E0B; }
-    .cd-badge.archived { background: rgba(74,82,99,0.3); color: #7B8496; }
-    .cd-badge.landing { background: rgba(59,130,246,0.15); color: #93C5FD; }
-    .cd-badge.direct  { background: rgba(168,85,247,0.15); color: #C4B5FD; }
-    .cd-badge.hybrid  { background: rgba(16,185,129,0.15); color: #6EE7B7; }
+    
     .cd-hero { background: linear-gradient(135deg, #0F1117 0%, #161822 100%); border: 1px solid #232734; border-radius: 16px; padding: 22px 26px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 24px; position: relative; overflow: hidden; }
     .cd-hero::before { content: ''; position: absolute; top: -50%; right: -30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(34,211,238,0.2) 0%, transparent 70%); pointer-events: none; }
     .cd-hero.neg::before { background: radial-gradient(circle, rgba(244,63,94,0.2) 0%, transparent 70%); }
     .cd-hero-label { font-size: 10px; font-weight: 700; color: #7B8496; text-transform: uppercase; letter-spacing: 0.1em; }
-    .cd-hero-val { font-family: 'JetBrains Mono', monospace; font-size: 40px; font-weight: 900; line-height: 1; margin-top: 8px; letter-spacing: -0.03em; color: #22D3EE; text-shadow: 0 0 32px rgba(34,211,238,0.35); font-feature-settings: "tnum"; }
-    .cd-hero.neg .cd-hero-val { color: #F43F5E; text-shadow: 0 0 32px rgba(244,63,94,0.35); }
+    .cd-hero-val { font-family: 'JetBrains Mono', monospace; font-size: 40px; font-weight: 900; line-height: 1; margin-top: 8px; letter-spacing: -0.03em; color: #22D3EE; font-feature-settings: "tnum"; }
+    .cd-hero.neg .cd-hero-val { color: #F43F5E; }
     .cd-hero-roi { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
     .cd-hero-roi.pos { background: rgba(34,211,238,0.12); color: #22D3EE; }
     .cd-hero-roi.neg { background: rgba(244,63,94,0.12); color: #F43F5E; }
     .cd-hero-stats { display: grid; grid-template-columns: repeat(3, auto); gap: 24px; align-items: end; position: relative; }
     .cd-hero-stat-label { font-size: 9px; color: #4A5263; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
     .cd-hero-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; color: #F8FAFC; }
+    
     .cd-section { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
-    .cd-section-title { font-size: 12px; font-weight: 800; color: #F8FAFC; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
+    .cd-section-title { font-size: 12px; font-weight: 800; color: #F8FAFC; margin: 0 0 12px 0; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+    
     .cd-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .cd-info-item { padding: 10px 12px; background: #161822; border-radius: 8px; }
-    .cd-info-label { font-size: 10px; color: #4A5263; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin-bottom: 4px; }
+    .cd-info-label { font-size: 10px; color: #4A5263; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
     .cd-info-value { font-size: 13px; color: #F8FAFC; font-weight: 700; font-family: 'JetBrains Mono', monospace; word-break: break-all; }
-    .cd-info-value.small { font-size: 11px; font-family: 'Inter', sans-serif; color: #CBD5E1; }
-    .cd-info-value.muted { color: #7B8496; font-style: italic; font-family: 'Inter', sans-serif; }
-    .cd-key-box { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-    .cd-key-input { flex: 1; height: 36px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #9B80FF; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; outline: none; }
-    .cd-copy-btn { height: 36px; padding: 0 16px; background: #7C5CFF; color: white; border: none; border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 120ms; white-space: nowrap; }
-    .cd-copy-btn:hover { background: #9B80FF; box-shadow: 0 0 24px rgba(124,92,255,0.4); }
+    
+    .cd-code-box { background: #08090D; border: 1px solid #232734; border-radius: 8px; padding: 14px; position: relative; margin-top: 10px; }
+    .cd-code-box pre { margin: 0; color: #10B981; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 250px; overflow-y: auto; }
+    .cd-copy-btn { position: absolute; top: 10px; left: 10px; height: 28px; padding: 0 12px; background: #7C5CFF; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 120ms; }
+    .cd-copy-btn:hover { background: #9B80FF; }
     .cd-copy-btn.copied { background: #10B981; }
-    .cd-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-    .cd-action-btn { height: 34px; padding: 0 14px; border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid #232734; background: #161822; color: #CBD5E1; transition: all 120ms; display: inline-flex; align-items: center; gap: 5px; }
-    .cd-action-btn:hover { background: #1C1F2E; color: #F8FAFC; border-color: #2E3446; }
-    .cd-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .cd-action-btn.danger { color: #F43F5E; border-color: rgba(244,63,94,0.35); background: rgba(244,63,94,0.1); }
-    .cd-action-btn.danger:hover { background: #F43F5E; color: white; }
-    .cd-action-btn.warn { color: #F59E0B; border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.1); }
-    .cd-action-btn.warn:hover { background: #F59E0B; color: white; }
-    .cd-action-btn.success { color: #10B981; border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.1); }
-    .cd-action-btn.success:hover { background: #10B981; color: white; }
-    .cd-preview-box { padding: 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #10B981; word-break: break-all; margin-top: 8px; line-height: 1.5; }
-    .cd-empty { padding: 60px 20px; text-align: center; color: #7B8496; }
-    .cd-empty-icon { font-size: 56px; opacity: 0.4; display: block; margin-bottom: 14px; }
-    .cd-empty-title { font-size: 17px; font-weight: 800; color: #F8FAFC; margin-bottom: 8px; }
+    
+    .cd-url-box { padding: 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #10B981; word-break: break-all; margin-top: 8px; }
+    
+    .cd-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
   </style>
 </head>
 <body>
+
   <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
   <div id="shAppRoot" style="display:none;">
     <main id="shContent">
       <div class="cd-header">
         <div>
-          <div class="cd-title-row"><h1 class="cd-title" id="cdTitle">—</h1><span id="cdBadgeType" class="cd-badge">—</span><span id="cdBadgeStatus" class="cd-badge">—</span></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+            <h1 class="cd-title" id="cdTitle">—</h1>
+            <span id="cdBadge" class="cd-badge">—</span>
+          </div>
           <div class="cd-sub" id="cdSub">—</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;"><a href="/campaigns" class="cd-action-btn">← كل الحملات</a></div>
+        <a href="/campaigns" class="sh-btn sh-btn-ghost">← كل الحملات</a>
       </div>
+
       <div id="cdLoading" style="text-align:center;padding:40px;color:#7B8496;">جاري التحميل…</div>
+
       <div id="cdContent" style="display:none;">
         <div class="cd-hero" id="cdHero">
           <div><div class="cd-hero-label">صافي الربح</div><div class="cd-hero-val" id="heroProfit">$0.00</div><div class="cd-hero-roi pos" id="heroRoi">ROI 0%</div></div>
@@ -87,138 +81,150 @@
             <div><div class="cd-hero-stat-label">الزيارات</div><div class="cd-hero-stat-val" id="heroTotal">0</div></div>
           </div>
         </div>
-        <div class="cd-section">
-          <h3 class="cd-section-title">📊 الأرقام الأساسية</h3>
-          <div class="cd-info-grid">
-            <div class="cd-info-item"><div class="cd-info-label">إجمالي</div><div class="cd-info-value" id="infoTotal">0</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">Valid</div><div class="cd-info-value" style="color:#10B981;" id="infoValid">0</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">Invalid (Bot)</div><div class="cd-info-value" style="color:#F43F5E;" id="infoInvalid">0</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">Suspicious</div><div class="cd-info-value" style="color:#F59E0B;" id="infoSuspicious">0</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">Bot Rate</div><div class="cd-info-value" id="infoBotRate">0%</div></div>
-          </div>
-        </div>
+
         <div class="cd-section">
           <h3 class="cd-section-title">⚙️ الإعدادات</h3>
           <div class="cd-info-grid">
-            <div class="cd-info-item"><div class="cd-info-label">مصدر الترافيك</div><div class="cd-info-value small" id="infoSource">—</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">المصدر</div><div class="cd-info-value" id="infoSource">—</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">الوجهة</div><div class="cd-info-value" id="infoDest">—</div></div>
             <div class="cd-info-item"><div class="cd-info-label">Buy CPM</div><div class="cd-info-value" id="infoBuyCpm">$0.00</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">الوجهة</div><div class="cd-info-value small" id="infoDest">—</div></div>
             <div class="cd-info-item"><div class="cd-info-label">Sell CPM</div><div class="cd-info-value" id="infoSellCpm">$0.00</div></div>
-            <div class="cd-info-item" id="infoZoneIdBox"><div class="cd-info-label">Zone ID</div><div class="cd-info-value" id="infoZoneId">—</div></div>
-            <div class="cd-info-item" id="infoDelayBox"><div class="cd-info-label">Redirect Delay</div><div class="cd-info-value" id="infoDelay">—</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">Block Threshold</div><div class="cd-info-value" id="infoBlockThreshold">—</div></div>
-            <div class="cd-info-item" id="infoBudgetBox"><div class="cd-info-label">Daily Budget</div><div class="cd-info-value" id="infoBudget">—</div></div>
           </div>
         </div>
+
         <div class="cd-section" id="trackingSection">
-          <h3 class="cd-section-title">🔗 كود/رابط التتبع</h3>
+          <h3 class="cd-section-title" id="trackingTitle">🔗 كود التتبع / الرابط</h3>
           <div id="trackingBody"></div>
         </div>
+
         <div class="cd-section">
           <h3 class="cd-section-title">🎬 الإجراءات</h3>
-          <div class="cd-btn-row">
-            <button class="cd-action-btn" id="btnViewVisits">👁 عرض الزيارات</button>
-            <button class="cd-action-btn" id="btnRotateKey">🔄 تجديد المفتاح</button>
-            <button class="cd-action-btn warn" id="btnTogglePause">⏸ إيقاف</button>
-            <button class="cd-action-btn danger" id="btnDelete">🗑 حذف الحملة</button>
+          <div class="cd-actions">
+            <a href="/visits?campaign_id=" id="btnViewVisits" class="sh-btn sh-btn-ghost">👁 عرض الزيارات</a>
+            <button class="sh-btn sh-btn-ghost" id="btnRotateKey">🔄 تجديد المفتاح</button>
+            <button class="sh-btn sh-btn-danger" id="btnTogglePause">⏸ إيقاف</button>
+            <button class="sh-btn sh-btn-danger" id="btnDelete" style="background:rgba(244,63,94,0.15);border-color:rgba(244,63,94,0.3);">🗑 حذف الحملة</button>
           </div>
         </div>
       </div>
-      <div id="cdError" class="cd-empty" style="display:none;"><span class="cd-empty-icon">⚠️</span><div class="cd-empty-title">فشل التحميل</div><div style="font-size:12px;" id="cdErrorMessage">—</div><a href="/campaigns" class="cd-action-btn" style="margin-top:16px;display:inline-flex;">← رجوع للحملات</a></div>
     </main>
   </div>
+
   <script src="/static/js/shell.js"></script>
   <script>
     const CD = { campaignId: null, data: null };
-    const esc = Shell.esc;
-    const fmtNum = Shell.fmtNum;
-    const fmtMoney = (n) => { const v = Number(n || 0); if (Math.abs(v) < 0.005) return '$0.00'; return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2); };
 
-    function copyToClipboard(text, btn) {
-      if (!text) return;
-      const orig = btn.textContent;
+    function fmtMoney(n) { const v = Number(n || 0); if (Math.abs(v) < 0.005) return '$0.00'; return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2); }
+
+    function copyText(text, btn) {
       navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = '✓ تم'; btn.classList.add('copied');
+        const orig = btn.textContent; btn.textContent = '✓ تم'; btn.classList.add('copied');
         setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
       }).catch(() => Shell.toast('فشل النسخ', 'error'));
     }
 
-    function renderTracking(c) {
+    async function renderTracking(c) {
       const body = document.getElementById('trackingBody');
+      
       if (c.type === 'direct') {
-        const baseUrl = window.location.origin;
-        const interstitialUrl = `${baseUrl}/go/${c.campaign_key}`;
+        document.getElementById('trackingTitle').textContent = '🔗 رابط التتبع المباشر (Direct Link)';
+        const url = `${window.location.origin}/go/${c.campaign_key}`;
         body.innerHTML = `
-          <div style="margin-bottom:10px;font-size:12px;color:#CBD5E1;line-height:1.6;">استخدم رابط الـ interstitial ده في حملة ${esc(c.traffic_source_slug)}:</div>
-          <div class="cd-preview-box">${esc(interstitialUrl)}</div>
-          <div class="cd-btn-row">
-            <button class="cd-copy-btn" onclick="copyToClipboard('${esc(interstitialUrl)}', this)" type="button">📋 انسخ الرابط</button>
-            <a href="${esc(interstitialUrl)}" target="_blank" class="cd-action-btn">🔗 افتح للتجربة</a>
-          </div>
+          <div style="font-size:12px;color:#CBD5E1;margin-bottom:8px;">استخدم هذا الرابط في حملة ${Shell.esc(c.traffic_source_slug)}. الزوار سيتم توجيههم إلى ${Shell.esc(c.destination_slug)} بعد الفحص.</div>
+          <div class="cd-url-box">${Shell.esc(url)}</div>
+          <div style="margin-top:12px;"><button class="sh-btn sh-btn-primary" id="copyUrlBtn">📋 نسخ الرابط</button></div>
         `;
-      } else if (c.site_id) {
-        body.innerHTML = `
-          <div style="margin-bottom:10px;font-size:12px;color:#CBD5E1;line-height:1.6;">استخدم كود التتبع الخاص بالموقع المرتبط بالحملة:</div>
-          <div class="cd-info-label">Campaign Key</div>
-          <div class="cd-key-box"><input class="cd-key-input" readonly value="${esc(c.campaign_key)}" id="campKeyInput"><button class="cd-copy-btn" onclick="copyToClipboard(document.getElementById('campKeyInput').value, this)" type="button">📋 انسخ</button></div>
-          <div class="cd-btn-row">
-            <a href="/tracker?site=${esc(c.site_key)}&campaign_key=${esc(c.campaign_key)}" class="cd-action-btn">🔧 اذهب لصفحة الكود</a>
-          </div>
-        `;
+        document.getElementById('copyUrlBtn').onclick = function() { copyText(url, this); };
+        
       } else {
-        body.innerHTML = `<div style="color:#7B8496;font-size:12px;">مفيش كود/رابط تتبع متاح لهذه الحملة.</div>`;
+        document.getElementById('trackingTitle').textContent = '🔧 كود التتبع (Tracking Code)';
+        body.innerHTML = `<div style="font-size:12px;color:#7B8496;text-align:center;padding:20px;">جاري جلب الكود...</div>`;
+        
+        try {
+          const codeData = await Shell.api(`/api/campaigns/${c.id}/tracker-code-v3`);
+          body.innerHTML = `
+            <div style="font-size:12px;color:#CBD5E1;margin-bottom:8px;">ضع هذا الكود في صفحة الهبوط (Landing Page) الخاصة بهذه الحملة.</div>
+            <div class="cd-code-box">
+              <button class="cd-copy-btn" id="copyCodeBtn">📋 نسخ الكود</button>
+              <pre id="codeBlock">${Shell.esc(codeData.full)}</pre>
+            </div>
+            <div style="font-size:10px;color:#4A5263;margin-top:8px;">حجم الكود: ${Math.round(codeData.size_bytes / 1024)} KB · ${codeData.lines} سطر</div>
+          `;
+          document.getElementById('copyCodeBtn').onclick = function() { copyText(codeData.full, this); };
+        } catch (e) {
+          body.innerHTML = `<div style="color:#F43F5E;font-size:12px;">فشل جلب الكود: ${Shell.esc(e.message)}</div>`;
+        }
       }
     }
 
-    function render(c) {
-      CD.data = c;
-      document.getElementById('cdTitle').textContent = c.name;
-      const typeBadge = document.getElementById('cdBadgeType'); typeBadge.className = 'cd-badge ' + c.type; typeBadge.textContent = { landing: '🏠 Landing', direct: '🔗 Direct', hybrid: '🔀 Hybrid' }[c.type] || c.type;
-      const statusBadge = document.getElementById('cdBadgeStatus'); statusBadge.className = 'cd-badge ' + c.status; statusBadge.textContent = { active: '✓ نشطة', paused: '⏸ موقوفة', archived: '📦 مؤرشفة' }[c.status] || c.status;
-      document.getElementById('cdSub').innerHTML = `<span>${esc(c.traffic_source_slug)} → ${esc(c.destination_slug)}</span>${c.destination_zone_id ? `<span style="color:#9B80FF;font-family:'JetBrains Mono',monospace;">Zone ${esc(c.destination_zone_id)}</span>` : ''}`;
-      
-      const st = c.stats || {}; const pl = st.pl || { cost: 0, revenue: 0, profit: 0, roi: 0 }; const isPos = pl.profit >= 0;
-      const hero = document.getElementById('cdHero'); hero.classList.toggle('neg', !isPos);
-      document.getElementById('heroProfit').textContent = fmtMoney(pl.profit);
-      const roiEl = document.getElementById('heroRoi'); roiEl.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`; roiEl.className = 'cd-hero-roi ' + (isPos ? 'pos' : 'neg');
-      document.getElementById('heroCost').textContent = '$' + Number(pl.cost || 0).toFixed(2);
-      document.getElementById('heroRev').textContent = '$' + Number(pl.revenue || 0).toFixed(2);
-      document.getElementById('heroTotal').textContent = fmtNum(st.total || 0);
-      
-      document.getElementById('infoTotal').textContent = fmtNum(st.total || 0); document.getElementById('infoValid').textContent = fmtNum(st.valid || 0); document.getElementById('infoInvalid').textContent = fmtNum(st.invalid || 0); document.getElementById('infoSuspicious').textContent = fmtNum(st.suspicious || 0); document.getElementById('infoBotRate').textContent = Number(st.bot_rate || 0).toFixed(1) + '%';
-      document.getElementById('infoSource').textContent = c.traffic_source_slug; document.getElementById('infoBuyCpm').textContent = '$' + Number(c.buy_cpm || 0).toFixed(2); document.getElementById('infoDest').textContent = c.destination_slug; document.getElementById('infoSellCpm').textContent = '$' + Number(c.sell_cpm || 0).toFixed(2); document.getElementById('infoZoneId').textContent = c.destination_zone_id || '—'; document.getElementById('infoDelay').textContent = c.redirect_delay_ms + ' ms'; document.getElementById('infoBlockThreshold').textContent = c.bot_block_threshold; document.getElementById('infoBudget').textContent = c.daily_budget ? '$' + Number(c.daily_budget).toFixed(2) : '—';
-      
-      document.getElementById('infoZoneIdBox').style.display = c.destination_zone_id ? '' : 'none'; document.getElementById('infoDelayBox').style.display = (c.type === 'direct' || c.type === 'hybrid') ? '' : 'none'; document.getElementById('infoBudgetBox').style.display = c.daily_budget ? '' : 'none';
-      
-      renderTracking(c);
-      const btnPause = document.getElementById('btnTogglePause');
-      if (c.status === 'active') { btnPause.textContent = '⏸ إيقاف'; btnPause.className = 'cd-action-btn warn'; }
-      else if (c.status === 'paused') { btnPause.textContent = '▶ استئناف'; btnPause.className = 'cd-action-btn success'; }
-      else { btnPause.style.display = 'none'; }
-
-      document.getElementById('cdLoading').style.display = 'none'; document.getElementById('cdContent').style.display = '';
-    }
-
     async function loadCampaign() {
-      try { CD.data = await Shell.api('/api/campaigns/' + CD.campaignId); render(CD.data); }
-      catch (e) { document.getElementById('cdLoading').style.display = 'none'; document.getElementById('cdError').style.display = ''; document.getElementById('cdErrorMessage').textContent = e.message; }
+      try {
+        CD.data = await Shell.api('/api/campaigns/' + CD.campaignId);
+        const c = CD.data;
+        
+        document.getElementById('cdTitle').textContent = c.name;
+        const badge = document.getElementById('cdBadge');
+        badge.className = 'cd-badge ' + c.status;
+        badge.textContent = c.status === 'active' ? 'نشطة' : c.status === 'paused' ? 'موقوفة' : 'مؤرشفة';
+        
+        document.getElementById('cdSub').innerHTML = `<span>${Shell.esc(c.type)}</span> · <span>${Shell.esc(c.traffic_source_slug)} → ${Shell.esc(c.destination_slug)}</span>`;
+        document.getElementById('infoSource').textContent = c.traffic_source_slug;
+        document.getElementById('infoDest').textContent = c.destination_slug;
+        document.getElementById('infoBuyCpm').textContent = '$' + Number(c.buy_cpm).toFixed(2);
+        document.getElementById('infoSellCpm').textContent = '$' + Number(c.sell_cpm).toFixed(2);
+        document.getElementById('btnViewVisits').href = '/visits?campaign_id=' + c.id;
+        
+        const st = c.stats || {}; const pl = st.pl || { profit: 0, roi: 0 };
+        document.getElementById('heroProfit').textContent = fmtMoney(pl.profit);
+        document.getElementById('heroCost').textContent = '$' + Number(pl.cost || 0).toFixed(2);
+        document.getElementById('heroRev').textContent = '$' + Number(pl.revenue || 0).toFixed(2);
+        document.getElementById('heroTotal').textContent = Shell.fmtNum(st.total || 0);
+        
+        const roiEl = document.getElementById('heroRoi');
+        roiEl.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`;
+        roiEl.className = 'cd-hero-roi ' + (pl.profit >= 0 ? 'pos' : 'neg');
+        
+        await renderTracking(c);
+        
+        document.getElementById('cdLoading').style.display = 'none';
+        document.getElementById('cdContent').style.display = '';
+      } catch (e) {
+        document.getElementById('cdLoading').innerHTML = `<span style="color:#F43F5E;">فشل التحميل: ${Shell.esc(e.message)}</span>`;
+      }
     }
 
-    async function togglePause() { if (!CD.data) return; const newStatus = CD.data.status === 'active' ? 'paused' : 'active'; try { await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) }); Shell.toast(newStatus === 'paused' ? 'تم الإيقاف' : 'تم الاستئناف', 'success'); loadCampaign(); } catch (e) { Shell.toast('فشل: ' + e.message, 'error'); } }
-    async function rotateKey() { if (!confirm('تجديد المفتاح هيبطّل الكود/الرابط القديم. متأكد؟')) return; try { await Shell.api('/api/campaigns/' + CD.campaignId + '/rotate-key', { method: 'POST' }); Shell.toast('تم التجديد ✅', 'success'); loadCampaign(); } catch (e) { Shell.toast('فشل: ' + e.message, 'error'); } }
-    async function deleteCampaign() { if (!confirm('هتحذف الحملة. الزيارات هتفضل موجودة. متأكد؟')) return; try { await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'DELETE' }); Shell.toast('تم الحذف', 'success'); setTimeout(() => window.location.href = '/campaigns', 500); } catch (e) { Shell.toast('فشل: ' + e.message, 'error'); } }
+    async function togglePause() {
+      const newStatus = CD.data.status === 'active' ? 'paused' : 'active';
+      try {
+        await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+        Shell.toast('تم التحديث', 'success'); loadCampaign();
+      } catch (e) { Shell.toast('فشل', 'error'); }
+    }
+
+    async function rotateKey() {
+      if (!confirm('تجديد المفتاح هيبطّل الكود/الرابط القديم. متأكد؟')) return;
+      try { await Shell.api('/api/campaigns/' + CD.campaignId + '/rotate-key', { method: 'POST' }); Shell.toast('تم التجديد', 'success'); loadCampaign(); }
+      catch (e) { Shell.toast('فشل', 'error'); }
+    }
+
+    async function deleteCampaign() {
+      if (!confirm('هتحذف الحملة وكل زياراتها. متأكد؟')) return;
+      try { await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'DELETE' }); Shell.toast('تم الحذف', 'success'); setTimeout(() => window.location.href = '/campaigns', 500); }
+      catch (e) { Shell.toast('فشل', 'error'); }
+    }
 
     (async function boot() {
       try {
         CD.campaignId = parseInt(window.location.pathname.split('/').pop()) || 0;
         await Shell.mount({ active: 'campaigns', lang: 'ar', breadcrumb: [{ label: 'الحملات', href: '/campaigns' }, { label: 'تفاصيل' }] });
         document.getElementById('bootSkeleton').style.display = 'none'; document.getElementById('shAppRoot').style.display = '';
+        
         document.getElementById('btnTogglePause').addEventListener('click', togglePause);
         document.getElementById('btnRotateKey').addEventListener('click', rotateKey);
         document.getElementById('btnDelete').addEventListener('click', deleteCampaign);
-        document.getElementById('btnViewVisits').addEventListener('click', () => { window.location.href = '/visits?campaign_id=' + CD.campaignId; });
+        
         await loadCampaign();
-      } catch (e) { console.error('[Campaign Detail Boot]', e); const skel = document.getElementById('bootSkeleton'); if (skel) { skel.innerHTML = `<div style="color:#F43F5E;font-weight:700;">فشل التحميل</div><div style="font-size:12px;margin-top:8px;">${Shell.esc(e.message || '')}</div>`; } }
+      } catch (e) { document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`; }
     })();
   </script>
 </body>
