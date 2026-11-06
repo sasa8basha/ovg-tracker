@@ -1,17 +1,9 @@
 """
 routers/tracker.py — Tracking routes + tracker JS templates.
-
-Contains:
-  - Legacy v2 JS template (TRACKER_CODE_TEMPLATE)
-  - v3 JS template (imported from collector.tracker_v3_template)
-  - /sites/{id}/tracker-code      (v2 — legacy)
-  - /sites/{id}/tracker-code-v3   (v3 — split + download)
-  - /track                      (v2 — backward compat)
 """
 import json
 from datetime import datetime, timedelta
-
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 
@@ -20,21 +12,13 @@ from database import get_db
 from models import UserModel, SiteModel, VisitModel, CampaignModel
 from schemas import TrackPayload
 from auth import current_user
-from analysis import (
-    get_ip_info, parse_ua, extract_zone_id, new_site_key, analyze_visit,
-)
+from analysis import get_ip_info, parse_ua, extract_zone_id, new_site_key, analyze_visit
 from helpers import _resolve_user_site
-from utils import (
-    get_client_ip, safe_origin, track_limiter, stats_cache,
-)
+from utils import get_client_ip, safe_origin, track_limiter, stats_cache
 from collector.tracker_v3_template import TRACKER_V3_JS
 
 router = APIRouter()
 
-
-# =========================================================
-# LEGACY tracker (v2) — شغال زي ما هو
-# =========================================================
 TRACKER_CODE_TEMPLATE = r"""<script>
 (function () {
   "use strict";
@@ -319,287 +303,151 @@ TRACKER_CODE_TEMPLATE = r"""<script>
 })();
 </script>"""
 
-
-# =========================================================
-# LEGACY tracker code endpoint (v2)
-# =========================================================
 @router.get("/sites/{site_id}/tracker-code")
-def get_tracker_code(site_id: int, request: Request,
-                     user: UserModel = Depends(current_user),
-                     db: Session = Depends(get_db)):
-    site = db.query(SiteModel).filter(
-        SiteModel.id == site_id, SiteModel.user_id == user.id
-    ).first()
-    if not site:
-        raise HTTPException(404, "الموقع مش موجود")
+def get_tracker_code(site_id: int, request: Request, user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    site = db.query(SiteModel).filter(SiteModel.id == site_id, SiteModel.user_id == user.id).first()
+    if not site: raise HTTPException(404, "الموقع مش موجود")
     if not HEX_KEY_RE.match(site.site_key or ""):
-        site.site_key = new_site_key()
-        db.commit()
+        site.site_key = new_site_key(); db.commit()
     origin = safe_origin(request)
     endpoint = f"{origin}/api/track"
     code = TRACKER_CODE_TEMPLATE.replace("__OVG_SITE_KEY__", site.site_key).replace("__OVG_ENDPOINT__", endpoint)
-    return Response(
-        content='{"code":' + json.dumps(code) + ', "version": "v2"}',
-        media_type="application/json",
-        headers={"Cache-Control": "no-store, max-age=0"},
-    )
+    return Response(content='{"code":' + json.dumps(code) + ', "version": "v2"}', media_type="application/json", headers={"Cache-Control": "no-store, max-age=0"})
 
-
-# =========================================================
-# v3 tracker code endpoint (split into 2 parts)
-# =========================================================
 def _split_tracker_js(js: str):
-    """
-    يقسم الـ JS لجزئين عند حد دالة (function) قريب من المنتصف.
-    يضمن إن كل جزء متكامل (مش وسط دالة).
-    """
     total = len(js)
-    if total < 5000:
-        return (js, "")
-
-    mid = total // 2
-    search_start = max(0, mid - 4000)
-    search_end = min(total, mid + 4000)
-
-    candidates = []
-    idx = search_start
+    if total < 5000: return (js, "")
+    mid = total // 2; search_start = max(0, mid - 4000); search_end = min(total, mid + 4000)
+    candidates = []; idx = search_start
     while idx < search_end:
         found = js.find("\n  function ", idx)
-        if found == -1 or found >= search_end:
-            break
-        candidates.append(found)
-        idx = found + 1
-
+        if found == -1 or found >= search_end: break
+        candidates.append(found); idx = found + 1
     if candidates:
         best = min(candidates, key=lambda x: abs(x - mid))
         return (js[:best].rstrip() + "\n", js[best:].lstrip())
-
     idx = js.find('\n', mid)
-    if idx == -1:
-        idx = mid
+    if idx == -1: idx = mid
     return (js[:idx].rstrip() + "\n", js[idx:].lstrip())
 
-
 @router.get("/sites/{site_id}/tracker-code-v3")
-def get_tracker_code_v3(site_id: int, request: Request,
-                        user: UserModel = Depends(current_user),
-                        db: Session = Depends(get_db)):
-    """
-    الـ v3 JS template — مقسوم جزئين عشان يبقى سهل النسخ.
-    بيرجع:
-      - part1, part2 (مقسومين عند حد دالة)
-      - full (الكود كامل)
-      - size_bytes, lines, campaign_key
-    """
-    site = db.query(SiteModel).filter(
-        SiteModel.id == site_id, SiteModel.user_id == user.id
-    ).first()
-    if not site:
-        raise HTTPException(404, "الموقع مش موجود")
+def get_tracker_code_v3(
+    site_id: int, 
+    request: Request, 
+    campaign_key: str = Query(None),
+    user: UserModel = Depends(current_user), 
+    db: Session = Depends(get_db)
+):
+    site = db.query(SiteModel).filter(SiteModel.id == site_id, SiteModel.user_id == user.id).first()
+    if not site: raise HTTPException(404, "الموقع مش موجود")
 
     if not HEX_KEY_RE.match(site.site_key or ""):
-        site.site_key = new_site_key()
-        db.commit()
+        site.site_key = new_site_key(); db.commit()
 
-    campaign = db.query(CampaignModel).filter(
-        CampaignModel.site_id == site.id,
-        CampaignModel.user_id == user.id,
-    ).first()
-
-    campaign_key = campaign.campaign_key if campaign else site.site_key
+    final_campaign_key = ""
+    if campaign_key:
+        c = db.query(CampaignModel).filter(CampaignModel.campaign_key == campaign_key, CampaignModel.user_id == user.id).first()
+        if c: final_campaign_key = c.campaign_key
 
     origin = safe_origin(request)
     js_inner = TRACKER_V3_JS \
         .replace("__OVG_SITE_KEY__", site.site_key) \
-        .replace("__OVG_CAMPAIGN_KEY__", campaign_key) \
+        .replace("__OVG_CAMPAIGN_KEY__", final_campaign_key) \
         .replace("__OVG_ENDPOINT_BASE__", origin)
 
     full_code = "<script>\n" + js_inner + "\n</script>"
-
     part1, part2 = _split_tracker_js(full_code)
 
     return Response(
-        content=json.dumps({
-            "part1": part1,
-            "part2": part2,
-            "full": full_code,
-            "version": "v3",
-            "campaign_key": campaign_key,
-            "size_bytes": len(full_code.encode("utf-8")),
-            "lines": full_code.count("\n") + 1,
-        }),
-        media_type="application/json",
-        headers={"Cache-Control": "no-store, max-age=0"},
+        content=json.dumps({"part1": part1, "part2": part2, "full": full_code, "version": "v3", "campaign_key": final_campaign_key, "size_bytes": len(full_code.encode("utf-8")), "lines": full_code.count("\n") + 1}),
+        media_type="application/json", headers={"Cache-Control": "no-store, max-age=0"},
     )
 
-
-# =========================================================
-# Legacy /track — شغال زي ما هو (backward compat)
-# =========================================================
 @router.post("/track")
-async def track_visit(payload: TrackPayload, request: Request,
-                      db: Session = Depends(get_db)):
+async def track_visit(payload: TrackPayload, request: Request, db: Session = Depends(get_db)):
     try:
         client_ip = get_client_ip(request)
         print(f"[TRACK] incoming from {client_ip} site_key={(payload.site_key or '')[:12]}")
+        try: track_limiter.check(client_ip)
+        except Exception as e: print(f"[TRACK] rate-limit hit: {client_ip} - {e}"); raise
 
-        try:
-            track_limiter.check(client_ip)
-        except Exception as e:
-            print(f"[TRACK] rate-limit hit: {client_ip} - {e}")
-            raise
-
-        try:
-            zone_id = extract_zone_id(payload.url)
-        except Exception as e:
-            print(f"[TRACK] extract_zone_id failed: {e} url={payload.url!r}")
-            zone_id = None
+        try: zone_id = extract_zone_id(payload.url)
+        except Exception as e: print(f"[TRACK] extract_zone_id failed: {e} url={payload.url!r}"); zone_id = None
 
         ua = (payload.nav or {}).get("ua") or ""
-        try:
-            os_name, device, browser = parse_ua(ua)
-        except Exception as e:
-            print(f"[TRACK] parse_ua failed: {e}")
-            os_name, device, browser = "Unknown", "Unknown", "Unknown"
+        try: os_name, device, browser = parse_ua(ua)
+        except Exception as e: print(f"[TRACK] parse_ua failed: {e}"); os_name, device, browser = "Unknown", "Unknown", "Unknown"
 
         try:
             ip_info = await get_ip_info(client_ip)
-            if not isinstance(ip_info, dict):
-                raise ValueError(f"ip_info not dict: {type(ip_info)}")
+            if not isinstance(ip_info, dict): raise ValueError(f"ip_info not dict: {type(ip_info)}")
         except Exception as e:
             print(f"[TRACK] get_ip_info failed: {e} — using fallback")
-            ip_info = {
-                "country": "Unknown", "country_code": None, "isp": "Unknown",
-                "asn": "", "type": "unknown", "security": {}, "lat": 0.0, "lon": 0.0,
-            }
+            ip_info = {"country": "Unknown", "country_code": None, "isp": "Unknown", "asn": "", "type": "unknown", "security": {}, "lat": 0.0, "lon": 0.0}
 
-        site_id = None
-        campaign_id = None
-        site_owner_id = None
-
+        site_id = None; campaign_id = None; site_owner_id = None
         if payload.site_key:
             c = db.query(CampaignModel).filter(CampaignModel.campaign_key == payload.site_key).first()
-            if c:
-                campaign_id = c.id
-                site_id = c.site_id
-                site_owner_id = c.user_id
+            if c: campaign_id = c.id; site_id = c.site_id; site_owner_id = c.user_id
             else:
                 s = db.query(SiteModel).filter(SiteModel.site_key == payload.site_key).first()
                 if s:
-                    site_id = s.id
-                    site_owner_id = s.user_id
+                    site_id = s.id; site_owner_id = s.user_id
                     c2 = db.query(CampaignModel).filter(CampaignModel.site_id == s.id).first()
-                    if c2:
-                        campaign_id = c2.id
+                    if c2: campaign_id = c2.id
 
-        try:
-            data = payload.model_dump()
-        except AttributeError:
-            data = payload.dict()
+        try: data = payload.model_dump()
+        except AttributeError: data = payload.dict()
         data["client_ip"] = client_ip
 
         canvas_raw = str((data.get("fingerprint") or {}).get("canvas_hash") or "")
-        recent_fp_count = 0
-        same_ip_last_minute = 0
-        same_canvas_ip_count = 0
-        same_ip_canvas_count = 0
+        recent_fp_count = 0; same_ip_last_minute = 0; same_canvas_ip_count = 0; same_ip_canvas_count = 0
 
         try:
             cutoff_1m = datetime.utcnow() - timedelta(minutes=1)
             cutoff_1h = datetime.utcnow() - timedelta(hours=1)
-
-            same_ip_last_minute = db.query(VisitModel).filter(
-                VisitModel.ip == client_ip,
-                VisitModel.timestamp > cutoff_1m,
-            ).count()
-
+            same_ip_last_minute = db.query(VisitModel).filter(VisitModel.ip == client_ip, VisitModel.timestamp > cutoff_1m).count()
             if len(canvas_raw) >= 15 and canvas_raw not in ("blocked", "Unknown"):
                 canvas_stored = canvas_raw[:15] + "..."
-                recent_fp_count = db.query(VisitModel).filter(
-                    VisitModel.canvas_hash == canvas_stored,
-                    VisitModel.timestamp > cutoff_1m,
-                ).count()
-                same_canvas_ip_count = int(
-                    db.query(func.count(distinct(VisitModel.ip))).filter(
-                        VisitModel.canvas_hash == canvas_stored,
-                        VisitModel.timestamp > cutoff_1h,
-                    ).scalar() or 0
-                )
-                same_ip_canvas_count = int(
-                    db.query(func.count(distinct(VisitModel.canvas_hash))).filter(
-                        VisitModel.ip == client_ip,
-                        VisitModel.timestamp > cutoff_1h,
-                    ).scalar() or 0
-                )
-        except Exception as e:
-            print(f"[TRACK] cross-visit query failed: {e}")
+                recent_fp_count = db.query(VisitModel).filter(VisitModel.canvas_hash == canvas_stored, VisitModel.timestamp > cutoff_1m).count()
+                same_canvas_ip_count = int(db.query(func.count(distinct(VisitModel.ip))).filter(VisitModel.canvas_hash == canvas_stored, VisitModel.timestamp > cutoff_1h).scalar() or 0)
+                same_ip_canvas_count = int(db.query(func.count(distinct(VisitModel.canvas_hash))).filter(VisitModel.ip == client_ip, VisitModel.timestamp > cutoff_1h).scalar() or 0)
+        except Exception as e: print(f"[TRACK] cross-visit query failed: {e}")
 
-        data["_recent_fp_count"] = recent_fp_count
-        data["_same_ip_last_minute"] = same_ip_last_minute
-        data["_same_canvas_ip_count"] = same_canvas_ip_count
-        data["_same_ip_canvas_count"] = same_ip_canvas_count
+        data["_recent_fp_count"] = recent_fp_count; data["_same_ip_last_minute"] = same_ip_last_minute
+        data["_same_canvas_ip_count"] = same_canvas_ip_count; data["_same_ip_canvas_count"] = same_ip_canvas_count
 
-        try:
-            result = analyze_visit(data, ip_info)
+        try: result = analyze_visit(data, ip_info)
         except Exception as e:
             print(f"[TRACK] analyze_visit failed: {e}")
-            import traceback as _tb
-            _tb.print_exc()
-            result = {
-                "score": 50,
-                "verdict": "suspicious",
-                "evidence": [{"signal": "analysis_error", "score": 0, "detail": str(e)[:200]}],
-            }
+            result = {"score": 50, "verdict": "suspicious", "evidence": [{"signal": "analysis_error", "score": 0, "detail": str(e)[:200]}]}
 
-        fp = data.get("fingerprint") or {}
-        behavior = data.get("behavior") or {}
-        events = behavior.get("events") or {}
-
+        fp = data.get("fingerprint") or {}; behavior = data.get("behavior") or {}; events = behavior.get("events") or {}
         cc = str(ip_info.get("country_code") or "").upper().strip()
         cc_stored = None if cc in ("LO", "XX", "") else cc[:2]
 
         visit = VisitModel(
-            site_id=site_id, campaign_id=campaign_id, ip=client_ip, user_agent=ua,
-            zone_id=zone_id,
-            score=result.get("score", 0),
-            verdict=result.get("verdict", "suspicious"),
-            evidence=result.get("evidence", []),
-            os=os_name, device=device, browser=browser,
-            country=ip_info.get("country", "Unknown"),
-            country_code=cc_stored,
-            isp=ip_info.get("isp", "Unknown"),
-            timezone=fp.get("timezone", "Unknown"),
+            site_id=site_id, campaign_id=campaign_id, ip=client_ip, user_agent=ua, zone_id=zone_id,
+            score=result.get("score", 0), verdict=result.get("verdict", "suspicious"), evidence=result.get("evidence", []),
+            os=os_name, device=device, browser=browser, country=ip_info.get("country", "Unknown"), country_code=cc_stored,
+            isp=ip_info.get("isp", "Unknown"), timezone=fp.get("timezone", "Unknown"),
             canvas_hash=(str(fp.get("canvas_hash", "Unknown"))[:15] + "..."),
             hardware=f"{fp.get('hardwareConcurrency', 0)} cores / {fp.get('deviceMemory', 0)} GB",
-            connection_type=ip_info.get("type", "unknown"),
-            asn=str(ip_info.get("asn", "")),
+            connection_type=ip_info.get("type", "unknown"), asn=str(ip_info.get("asn", "")),
             is_vpn=(ip_info.get("security", {}).get("vpn") is True or ip_info.get("type") == "hosting"),
-            webrtc_ip=payload.webrtc_ip,
-            time_on_page=behavior.get("time_on_page_ms", 0),
+            webrtc_ip=payload.webrtc_ip, time_on_page=behavior.get("time_on_page_ms", 0),
             clicks=events.get("clicks", 0), scrolls=events.get("scrolls", 0),
-            latitude=ip_info.get("lat", 0.0), longitude=ip_info.get("lon", 0.0),
-            data_quality="legacy",
+            latitude=ip_info.get("lat", 0.0), longitude=ip_info.get("lon", 0.0), data_quality="legacy",
         )
 
         try:
-            db.add(visit); db.commit()
-            print(f"[TRACK] saved visit id={visit.id} site_id={site_id} verdict={visit.verdict} score={visit.score}")
+            db.add(visit); db.commit(); print(f"[TRACK] saved visit id={visit.id} site_id={site_id} verdict={visit.verdict} score={visit.score}")
         except Exception as e:
-            db.rollback()
-            print(f"[TRACK] DB write failed: {e}")
-            raise HTTPException(500, "DB write failed")
+            db.rollback(); print(f"[TRACK] DB write failed: {e}"); raise HTTPException(500, "DB write failed")
 
-        if site_id:
-            stats_cache.invalidate(f"stats:site:{site_id}")
-        if site_owner_id:
-            stats_cache.invalidate(f"stats:user:{site_owner_id}:all")
-
+        if site_id: stats_cache.invalidate(f"stats:site:{site_id}")
+        if site_owner_id: stats_cache.invalidate(f"stats:user:{site_owner_id}:all")
         return {"status": "success"}
-
-    except HTTPException:
-        raise
+    except HTTPException: raise
     except Exception as e:
-        import traceback as _tb
-        _tb.print_exc()
-        print(f"[TRACK] unhandled error: {e}")
-        raise HTTPException(500, "track failed")
+        import traceback as _tb; _tb.print_exc(); print(f"[TRACK] unhandled error: {e}"); raise HTTPException(500, "track failed")
