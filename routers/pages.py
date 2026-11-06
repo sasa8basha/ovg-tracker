@@ -94,6 +94,16 @@ def smart_reports_page(request: Request, db: Session = Depends(get_db)):
     if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("smart_reports.html"))
 
+@router.get("/popads-report", response_class=HTMLResponse)
+def popads_report_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("popads_report.html"))
+
+@router.get("/adsterra-report", response_class=HTMLResponse)
+def adsterra_report_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("adsterra_report.html"))
+
 @router.get("/labeling", response_class=HTMLResponse)
 def labeling_page(request: Request, db: Session = Depends(get_db)):
     if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
