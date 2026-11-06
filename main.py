@@ -1,6 +1,7 @@
 """
 main.py — OVG Tracker entry point.
 """
+import asyncio
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -9,6 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from config import ALLOWED_ORIGINS, ENV, DEBUG
 from database import engine, Base, run_data_seeding_and_backfills
 from auth import bootstrap_admin
+from adsterra_sync import sync_adsterra_loop
+
 from routers import (
     auth as auth_router, settings as settings_router,
     tracker as tracker_router, stats as stats_router, reports as reports_router,
@@ -25,7 +28,7 @@ Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="5.9", docs_url="/docs" if DEBUG else None, redoc_url="/redoc" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="9.1", docs_url="/docs" if DEBUG else None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -45,6 +48,15 @@ async def tracker_cors_middleware(request: Request, call_next):
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
     return await call_next(request)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(sync_adsterra_loop())
+    print("=" * 60)
+    print(f"  OVG Tracker v9.1 — ENV={ENV}  DEBUG={DEBUG}")
+    print("  Security posture: P0-hardened (no wildcards)")
+    print("  Adsterra Background Sync: Running (every 5 mins)")
+    print("=" * 60)
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
