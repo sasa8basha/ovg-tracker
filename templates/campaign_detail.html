@@ -157,14 +157,12 @@
           </div>
         `;
       } else if (c.site_id) {
-        // 🔴 Fix 5: Use site_key instead of campaign_key for the tracker page
         body.innerHTML = `
           <div style="margin-bottom:10px;font-size:12px;color:#CBD5E1;line-height:1.6;">استخدم كود التتبع الخاص بالموقع المرتبط بالحملة:</div>
           <div class="cd-info-label">Campaign Key</div>
           <div class="cd-key-box"><input class="cd-key-input" readonly value="${esc(c.campaign_key)}" id="campKeyInput"><button class="cd-copy-btn" onclick="copyToClipboard(document.getElementById('campKeyInput').value, this)" type="button">📋 انسخ</button></div>
           <div class="cd-btn-row">
-            <!-- تم التعديل هنا لاستخدام site_key -->
-            <a href="/tracker?site=${esc(c.site_key)}" class="cd-action-btn">🔧 اذهب لصفحة الكود</a>
+            <a href="/tracker?site=${esc(c.site_key)}&campaign_key=${esc(c.campaign_key)}" class="cd-action-btn">🔧 اذهب لصفحة الكود</a>
           </div>
         `;
       } else {
