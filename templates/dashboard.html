@@ -5,746 +5,202 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OVG · لوحة التحكم</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/shell.css">
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
-    body {
-      font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif;
-      color: #CBD5E1;
-      -webkit-font-smoothing: antialiased;
-      overflow: hidden;
-    }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
     #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
-    .db-shell-skel {
-      position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px;
-      background: #08090D; color: #7B8496;
-      font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 13px;
-      z-index: 9998;
-    }
-    .db-shell-skel .spinner {
-      width: 32px; height: 32px;
-      border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%;
-      animation: db-spin 0.8s linear infinite;
-    }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-size: 13px; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
     @keyframes db-spin { to { transform: rotate(360deg); } }
 
     .db-hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
     @media (max-width: 900px) { .db-hero { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 500px) { .db-hero { grid-template-columns: 1fr; } }
-
-    .db-kpi {
-      position: relative;
-      background: #0F1117; border: 1px solid #232734; border-radius: 14px;
-      padding: 16px; overflow: hidden;
-      transition: border-color 120ms, transform 120ms;
-    }
-    .db-kpi::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-      background: var(--kpi-color, #7C5CFF); opacity: 0.65;
-    }
+    .db-kpi { position: relative; background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px; overflow: hidden; transition: border-color 120ms, transform 120ms; }
+    .db-kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--kpi-color, #7C5CFF); opacity: 0.65; }
     .db-kpi:hover { border-color: #2E3446; transform: translateY(-1px); }
-    .db-kpi-label {
-      font-size: 10px; font-weight: 700; color: #4A5263;
-      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
-    }
-    .db-kpi-value {
-      font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 800;
-      color: #F8FAFC; font-feature-settings: "tnum"; line-height: 1.05; letter-spacing: -0.02em;
-    }
-    .db-kpi-trend { font-size: 11px; font-weight: 700; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
-    .db-kpi-trend.up { color: #10B981; }
-    .db-kpi-trend.down { color: #F43F5E; }
-    .db-kpi-trend.flat { color: #7B8496; }
-
+    .db-kpi-label { font-size: 10px; font-weight: 700; color: #4A5263; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .db-kpi-value { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 800; color: #F8FAFC; line-height: 1.05; letter-spacing: -0.02em; }
+    
     .db-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
     @media (max-width: 900px) { .db-split { grid-template-columns: 1fr; } }
-
-    .db-radar {
-      background: linear-gradient(135deg, #0F1117 0%, #161822 100%);
-      border: 1px solid #232734; border-radius: 14px; padding: 18px;
-      display: flex; align-items: center; gap: 16px;
-      text-decoration: none; color: inherit;
-      transition: border-color 120ms;
-    }
-    .db-radar:hover { border-color: #7C5CFF; }
-    .db-radar-gauge { width: 72px; height: 72px; flex-shrink: 0; position: relative; }
-    .db-radar-gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-    .db-radar-gauge .ring { fill: none; stroke-width: 6; stroke-linecap: round; }
-    .db-radar-gauge .ring-bg { stroke: #232734; }
-    .db-radar-gauge .ring-fg { transition: stroke-dashoffset 900ms cubic-bezier(0.16,1,0.3,1), stroke 300ms; }
-    .db-radar-gauge .score {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 900; color: #F8FAFC;
-    }
-    .db-radar-text { flex: 1; min-width: 0; }
-    .db-radar-title {
-      font-size: 10px; font-weight: 700; color: #4A5263;
-      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px;
-    }
-    .db-radar-level { font-size: 18px; font-weight: 800; color: #F8FAFC; line-height: 1.2; }
-    .db-radar-desc { font-size: 11px; color: #7B8496; margin-top: 3px; }
-    .db-radar-arrow { color: #7B8496; font-size: 20px; flex-shrink: 0; }
-
-    .db-attention {
-      background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px;
-      display: flex; flex-direction: column;
-    }
-    .db-attention-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .db-attention-title { font-size: 12px; font-weight: 800; color: #F8FAFC; }
-    .db-attention-count {
-      font-size: 10px; padding: 2px 8px; border-radius: 999px;
-      background: rgba(244,63,94,0.12); color: #F43F5E; font-weight: 800;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .db-alert {
-      display: flex; align-items: center; gap: 10px; padding: 8px 10px;
-      border-radius: 6px; background: #161822; margin-bottom: 6px;
-      font-size: 12px; color: #CBD5E1; text-decoration: none;
-      transition: background 120ms;
-    }
-    .db-alert:hover { background: #1C1F2E; }
-    .db-alert-icon { font-size: 14px; flex-shrink: 0; }
-    .db-alert-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .db-alert-action { color: #9B80FF; font-size: 11px; font-weight: 700; }
-    .db-alert-empty { text-align: center; padding: 24px 12px; color: #4A5263; font-size: 12px; }
-    .db-alert-empty .icon { font-size: 28px; display: block; margin-bottom: 6px; opacity: 0.5; }
-
-    .db-zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
-    @media (max-width: 900px) { .db-zones { grid-template-columns: 1fr; } }
-    .db-zone-col { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 14px; }
-    .db-zone-col-head {
-      display: flex; align-items: center; gap: 8px;
-      padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid #1A1D29;
-    }
-    .db-zone-col-title { font-size: 12px; font-weight: 800; color: #F8FAFC; flex: 1; }
-    .db-zone-col-count { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #4A5263; font-weight: 700; }
-    .db-zone-item {
-      display: flex; align-items: center; gap: 8px; padding: 7px 6px;
-      border-radius: 6px; font-size: 11px; text-decoration: none;
-      color: #CBD5E1; transition: background 120ms; margin-bottom: 2px;
-      position: relative;
-    }
-    .db-zone-item:hover { background: #161822; }
-    .db-zone-name {
-      flex: 1; min-width: 0; font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; font-weight: 700; color: #F8FAFC;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .db-zone-metric { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; }
-    .db-zone-empty { text-align: center; padding: 16px 8px; color: #4A5263; font-size: 11px; }
-
-    .db-recent { background: #0F1117; border: 1px solid #232734; border-radius: 14px; overflow: hidden; }
-    .db-recent-head {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 14px; border-bottom: 1px solid #1A1D29;
-    }
-    .db-recent-title { font-size: 12px; font-weight: 800; color: #F8FAFC; }
-    .db-recent-link { font-size: 11px; color: #9B80FF; font-weight: 700; text-decoration: none; }
-    .db-visit-row {
-      display: grid; grid-template-columns: 70px 1fr 100px 80px 60px 70px;
-      align-items: center; gap: 10px; padding: 7px 14px;
-      font-size: 11px; border-bottom: 1px solid #1A1D29;
-      text-decoration: none; color: #CBD5E1; transition: background 120ms;
-    }
-    .db-visit-row:last-child { border-bottom: none; }
-    .db-visit-row:hover { background: #161822; }
-    .db-visit-time { font-family: 'JetBrains Mono', monospace; color: #4A5263; font-size: 10px; }
-    .db-visit-zone {
-      font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F8FAFC;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .db-visit-country { font-size: 11px; }
-    .db-visit-score { font-family: 'JetBrains Mono', monospace; font-weight: 800; text-align: center; }
-    .db-visit-verdict { text-align: center; }
-    @media (max-width: 700px) {
-      .db-visit-row { grid-template-columns: 60px 1fr 60px 50px; gap: 6px; }
-      .db-visit-country, .db-visit-score { display: none; }
-    }
-
-    .db-sites-head {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
-      gap: 12px; flex-wrap: wrap;
-    }
-    .db-sites-title { font-size: 20px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.02em; }
-    .db-sites-sub { font-size: 12px; color: #7B8496; margin-top: 2px; }
-    .db-sites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-    .db-site-card {
-      background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px;
-      cursor: pointer; transition: all 120ms;
-      text-decoration: none; color: inherit; display: block;
-    }
-    .db-site-card:hover {
-      border-color: #7C5CFF; transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-    }
-    .db-site-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-    .db-site-name { font-size: 15px; font-weight: 800; color: #F8FAFC; line-height: 1.2; }
-    .db-site-domain { font-size: 11px; color: #7B8496; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
-    .db-site-icon {
-      width: 36px; height: 36px; border-radius: 8px;
-      background: rgba(124,92,255,0.12); color: #9B80FF;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; flex-shrink: 0;
-    }
-    .db-site-metrics {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-      padding-top: 12px; border-top: 1px solid #1A1D29;
-    }
-    .db-site-metric-lbl {
-      font-size: 9px; color: #4A5263; text-transform: uppercase;
-      letter-spacing: 0.06em; font-weight: 700; margin-bottom: 2px;
-    }
-    .db-site-metric-val { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 800; color: #F8FAFC; }
-    .db-site-empty {
-      text-align: center; padding: 40px 20px; color: #7B8496;
-      border: 2px dashed #232734; border-radius: 14px; grid-column: 1 / -1;
-    }
-    .db-site-empty .icon { font-size: 48px; opacity: 0.4; display: block; margin-bottom: 12px; }
-
-    .db-loading { display: flex; flex-direction: column; gap: 12px; }
-    .db-loading-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    @media (max-width: 900px) { .db-loading-row { grid-template-columns: 1fr 1fr; } }
-    .db-skel {
-      background: linear-gradient(90deg, #161822 0%, #232734 50%, #161822 100%);
-      background-size: 1000px 100%; animation: db-shimmer 1.6s infinite linear;
-      border-radius: 14px;
-    }
-    @keyframes db-shimmer {
-      0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; }
-    }
-    .db-error { text-align: center; padding: 60px 20px; color: #7B8496; }
-    .db-error-icon { font-size: 48px; display: block; margin-bottom: 12px; opacity: 0.6; }
-    .db-error-title { font-size: 16px; font-weight: 800; color: #F8FAFC; margin-bottom: 8px; }
-    .db-modal-form { display: flex; flex-direction: column; gap: 12px; }
-
-    #shContentInner > * { animation: sh-dash-fade-up 300ms cubic-bezier(0.16,1,0.3,1); }
-    @keyframes sh-dash-fade-up {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    
+    .db-card { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; }
+    .db-card-title { font-size: 13px; font-weight: 800; color: #F8FAFC; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+    
+    .db-camp-row { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #161822; border-radius: 8px; margin-bottom: 8px; text-decoration: none; color: inherit; transition: background 120ms; }
+    .db-camp-row:hover { background: #1C1F2E; }
+    .db-camp-name { font-size: 13px; font-weight: 700; color: #F8FAFC; margin-bottom: 2px; }
+    .db-camp-meta { font-size: 10px; color: #7B8496; }
+    .db-camp-val { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 800; }
+    .db-camp-val.pos { color: #10B981; }
+    .db-camp-val.neg { color: #F43F5E; }
+    
+    .db-empty { text-align: center; padding: 32px 16px; color: #7B8496; font-size: 12px; }
+    .db-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.5; }
   </style>
 </head>
 <body>
 
-  <div class="db-shell-skel" id="bootSkeleton">
-    <div class="spinner"></div>
-    <div>جاري التحميل…</div>
-  </div>
+  <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
 
   <div id="shAppRoot" style="display:none;">
     <main id="shContent">
-
-      <div id="viewSites" style="display:none;">
-        <div class="db-sites-head">
-          <div>
-            <h1 class="db-sites-title">المواقع</h1>
-            <p class="db-sites-sub" id="sitesCount">0 / 20 موقع</p>
-          </div>
-          <button class="sh-btn sh-btn-primary" onclick="openNewSiteModal()" type="button">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            موقع جديد
-          </button>
+      <div class="db-hero" id="heroKpis">
+        <div class="db-kpi" style="--kpi-color: #7C5CFF;">
+          <div class="db-kpi-label">إجمالي الزيارات</div>
+          <div class="db-kpi-value" id="kpiTotal">0</div>
         </div>
-        <div class="db-sites-grid" id="sitesGrid"></div>
-      </div>
-
-      <div id="viewOverview" style="display:none;">
-
-        <div class="db-hero" id="heroKpis">
-          <div class="db-kpi" style="--kpi-color: #7C5CFF;">
-            <div class="db-kpi-label">زيارات اليوم</div>
-            <div class="db-kpi-value" id="kpiTotal">0</div>
-            <div class="db-kpi-trend flat" id="kpiTotalTrend">—</div>
-          </div>
-          <div class="db-kpi" style="--kpi-color: #22D3EE;">
-            <div class="db-kpi-label">الربح اليوم</div>
-            <div class="db-kpi-value" id="kpiProfit" style="color:#22D3EE;">$0.00</div>
-            <div class="db-kpi-trend flat" id="kpiProfitTrend">—</div>
-          </div>
-          <div class="db-kpi" style="--kpi-color: #10B981;">
-            <div class="db-kpi-label">زيارات صالحة</div>
-            <div class="db-kpi-value" id="kpiValid" style="color:#10B981;">0</div>
-            <div class="db-kpi-trend flat" id="kpiValidTrend">—</div>
-          </div>
-          <div class="db-kpi" style="--kpi-color: #F43F5E;">
-            <div class="db-kpi-label">Bot Rate</div>
-            <div class="db-kpi-value" id="kpiBot" style="color:#F43F5E;">0%</div>
-            <div class="db-kpi-trend flat" id="kpiBotTrend">—</div>
-          </div>
+        <div class="db-kpi" style="--kpi-color: #10B981;">
+          <div class="db-kpi-label">الزيارات الصالحة</div>
+          <div class="db-kpi-value" id="kpiValid" style="color:#10B981;">0</div>
         </div>
-
-        <div class="db-split">
-          <a href="/radar" class="db-radar" id="radarWidget">
-            <div class="db-radar-gauge">
-              <svg viewBox="0 0 72 72">
-                <circle class="ring ring-bg" cx="36" cy="36" r="30"></circle>
-                <circle class="ring ring-fg" id="radarRing" cx="36" cy="36" r="30"
-                        stroke="#10B981" stroke-dasharray="188.5" stroke-dashoffset="188.5"></circle>
-              </svg>
-              <div class="score" id="radarScore">—</div>
-            </div>
-            <div class="db-radar-text">
-              <div class="db-radar-title">Ban Risk Radar</div>
-              <div class="db-radar-level" id="radarLevel">جاري الحساب</div>
-              <div class="db-radar-desc" id="radarDesc">—</div>
-            </div>
-            <div class="db-radar-arrow">←</div>
-          </a>
-
-          <div class="db-attention">
-            <div class="db-attention-head">
-              <div class="db-attention-title">🔥 يحتاج انتباهك</div>
-              <div class="db-attention-count" id="attnCount">0</div>
-            </div>
-            <div id="attentionList"></div>
-          </div>
+        <div class="db-kpi" style="--kpi-color: #F43F5E;">
+          <div class="db-kpi-label">الزيارات المرفوضة</div>
+          <div class="db-kpi-value" id="kpiInvalid" style="color:#F43F5E;">0</div>
         </div>
-
-        <div class="db-zones">
-          <div class="db-zone-col">
-            <div class="db-zone-col-head">
-              <span style="font-size:14px;">⭐</span>
-              <span class="db-zone-col-title">أفضل الزونات</span>
-              <span class="db-zone-col-count" id="zonesStarsCount">0</span>
-            </div>
-            <div id="zonesStars"></div>
-          </div>
-          <div class="db-zone-col">
-            <div class="db-zone-col-head">
-              <span style="font-size:14px;">👀</span>
-              <span class="db-zone-col-title">مراقبة</span>
-              <span class="db-zone-col-count" id="zonesWatchCount">0</span>
-            </div>
-            <div id="zonesWatch"></div>
-          </div>
-          <div class="db-zone-col">
-            <div class="db-zone-col-head">
-              <span style="font-size:14px;">🚨</span>
-              <span class="db-zone-col-title">مشاكل</span>
-              <span class="db-zone-col-count" id="zonesProbsCount">0</span>
-            </div>
-            <div id="zonesProbs"></div>
-          </div>
-        </div>
-
-        <div class="db-recent">
-          <div class="db-recent-head">
-            <div class="db-recent-title">📡 آخر الزيارات</div>
-            <a href="#" class="db-recent-link" id="recentVisitsLink">كل الزيارات ←</a>
-          </div>
-          <div id="recentVisitsBody"></div>
+        <div class="db-kpi" style="--kpi-color: #22D3EE;">
+          <div class="db-kpi-label">إجمالي الربح</div>
+          <div class="db-kpi-value" id="kpiProfit" style="color:#22D3EE;">$0.00</div>
         </div>
       </div>
 
-      <div id="viewLoading" style="display:none;">
-        <div class="db-loading">
-          <div class="db-loading-row">
-            <div class="db-skel" style="height:100px;"></div>
-            <div class="db-skel" style="height:100px;"></div>
-            <div class="db-skel" style="height:100px;"></div>
-            <div class="db-skel" style="height:100px;"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="db-skel" style="height:130px;"></div>
-            <div class="db-skel" style="height:130px;"></div>
-          </div>
-          <div class="db-skel" style="height:200px;"></div>
+      <div class="db-split">
+        <!-- Top Performing Campaigns -->
+        <div class="db-card">
+          <div class="db-card-title">🔥 أفضل الحملات (أعلى ربح)</div>
+          <div id="topCampaigns"></div>
+        </div>
+
+        <!-- Worst Performing Campaigns -->
+        <div class="db-card">
+          <div class="db-card-title">🚨 حملات بتخسر (أقل ربح)</div>
+          <div id="worstCampaigns"></div>
         </div>
       </div>
 
-      <div id="viewError" style="display:none;">
-        <div class="db-error">
-          <span class="db-error-icon">⚠️</span>
-          <div class="db-error-title">فشل تحميل البيانات</div>
-          <p id="errorMessage">—</p>
-          <button class="sh-btn sh-btn-primary" style="margin-top:12px;" onclick="location.reload()" type="button">
-            🔄 إعادة المحاولة
-          </button>
+      <!-- Recent Campaigns Grid -->
+      <div class="db-card">
+        <div class="db-card-title">
+          🎯 كل الحملات 
+          <a href="/campaigns" class="sh-btn sh-btn-ghost sh-btn-sm" style="text-decoration:none;">عرض الكل ←</a>
         </div>
+        <div id="allCampaignsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:12px;"></div>
       </div>
     </main>
   </div>
 
-  <div class="sh-modal-overlay" id="newSiteModal">
-    <div class="sh-modal">
-      <div class="sh-modal-head">
-        <h3 class="sh-modal-title">موقع جديد</h3>
-        <button class="sh-modal-close" onclick="closeNewSiteModal()" type="button">✕</button>
-      </div>
-      <div class="sh-modal-body">
-        <form id="newSiteForm" class="db-modal-form">
-          <div>
-            <label class="sh-label">اسم الموقع *</label>
-            <input type="text" class="sh-input" id="newSiteName" required maxlength="100" placeholder="متجر الأناقة">
-          </div>
-          <div>
-            <label class="sh-label">الدومين (اختياري)</label>
-            <input type="text" class="sh-input" id="newSiteDomain" maxlength="253" placeholder="shop.example.com">
-          </div>
-        </form>
-      </div>
-      <div class="sh-modal-foot">
-        <button class="sh-btn sh-btn-ghost" onclick="closeNewSiteModal()" type="button">إلغاء</button>
-        <button class="sh-btn sh-btn-primary" onclick="submitNewSite(event)" type="button">إنشاء</button>
-      </div>
-    </div>
-  </div>
-
   <script src="/static/js/shell.js"></script>
   <script>
-    (function bindModal() {
-      const form = document.getElementById('newSiteForm');
-      if (form) form.addEventListener('submit', submitNewSite);
-      const modal = document.getElementById('newSiteModal');
-      if (modal) modal.addEventListener('click', (e) => {
-        if (e.target.id === 'newSiteModal') closeNewSiteModal();
-      });
-    })();
+    const DB = { campaigns: [] };
 
-    (async function boot() {
+    function fmtMoney(n) { const v = Number(n || 0); if (Math.abs(v) < 0.005) return '$0.00'; return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2); }
+
+    async function loadDashboard() {
       try {
-        const params = new URLSearchParams(location.search);
-        const siteKey = params.get('site');
-
-        await Shell.mount({
-          active: 'dashboard',
-          lang: 'ar',
-          breadcrumb: [{ label: 'لوحة التحكم' }],
+        // جلب كل الحملات
+        DB.campaigns = await Shell.api('/api/campaigns');
+        
+        let totalAll = 0, totalValid = 0, totalInvalid = 0, totalProfit = 0;
+        
+        DB.campaigns.forEach(c => {
+          const st = c.stats || {};
+          totalAll += (st.total || 0);
+          totalValid += (st.valid || 0);
+          totalInvalid += (st.invalid || 0);
+          totalProfit += ((st.pl && st.pl.profit) || 0);
         });
 
-        const skel = document.getElementById('bootSkeleton');
-        if (skel) skel.style.display = 'none';
-        const root = document.getElementById('shAppRoot');
-        if (root) root.style.display = '';
+        document.getElementById('kpiTotal').textContent = Shell.fmtNum(totalAll);
+        document.getElementById('kpiValid').textContent = Shell.fmtNum(totalValid);
+        document.getElementById('kpiInvalid').textContent = Shell.fmtNum(totalInvalid);
+        
+        const profEl = document.getElementById('kpiProfit');
+        profEl.textContent = fmtMoney(totalProfit);
+        profEl.style.color = totalProfit >= 0 ? '#22D3EE' : '#F43F5E';
 
-        if (siteKey) await showOverview(siteKey);
-        else if (Shell.state.sites.length > 0) await showOverview(Shell.state.sites[0].site_key);
-        else await showSites();
+        // ترتيب الحملات حسب الربح
+        const sorted = [...DB.campaigns].sort((a, b) => {
+          const pA = (a.stats?.pl?.profit) || 0;
+          const pB = (b.stats?.pl?.profit) || 0;
+          return pB - pA; // تنازلي (الأعلى ربحاً)
+        });
+
+        // أفضل الحملات
+        const top = sorted.filter(c => (c.stats?.total || 0) > 0).slice(0, 3);
+        renderCampaignList('topCampaigns', top, 'لا توجد بيانات كافية بعد');
+
+        // أسوأ الحملات
+        const worst = [...sorted].reverse().filter(c => (c.stats?.total || 0) > 0).slice(0, 3);
+        renderCampaignList('worstCampaigns', worst, 'لا توجد بيانات كافية بعد');
+
+        // كل الحملات
+        renderCampaignsGrid(DB.campaigns);
+
       } catch (e) {
-        console.error('[Boot] failed:', e);
-        const skel = document.getElementById('bootSkeleton');
-        if (skel) {
-          skel.innerHTML = `
-            <div style="color:#F43F5E;font-weight:700;margin-bottom:8px;">فشل التحميل</div>
-            <div style="font-size:12px;color:#7B8496;max-width:340px;text-align:center;line-height:1.6;">${Shell.esc(e.message || 'خطأ غير معروف')}</div>
-            <button onclick="location.reload()" style="margin-top:16px;padding:8px 16px;background:#7C5CFF;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;">🔄 إعادة المحاولة</button>
-          `;
-        }
+        console.error(e);
+        Shell.toast('فشل تحميل البيانات', 'error');
       }
-    })();
-
-    function setView(name) {
-      ['viewSites', 'viewOverview', 'viewLoading', 'viewError'].forEach(v => {
-        const el = document.getElementById(v);
-        if (el) el.style.display = v === name ? '' : 'none';
-      });
-    }
-    function setLoading() { setView('viewLoading'); }
-    function setError(msg) {
-      setView('viewError');
-      const el = document.getElementById('errorMessage');
-      if (el) el.textContent = msg || 'حدث خطأ غير متوقع';
     }
 
-    async function showSites() {
-      setLoading();
-      try {
-        const sites = await Shell.api('/api/sites');
-        Shell.state.sites = sites;
-        const countEl = document.getElementById('sitesCount');
-        if (countEl) countEl.textContent = sites.length + ' / 20 موقع';
-
-        const grid = document.getElementById('sitesGrid');
-        if (!sites.length) {
-          grid.innerHTML = `
-            <div class="db-site-empty">
-              <span class="icon">🌐</span>
-              <div style="font-size:16px;font-weight:800;color:#F8FAFC;margin-bottom:6px;">مفيش مواقع بعد</div>
-              <div style="font-size:12px;margin-bottom:16px;">أضف موقع الأول عشان تبدأ التتبع</div>
-              <button class="sh-btn sh-btn-primary" onclick="openNewSiteModal()" type="button">+ أضف موقع</button>
-            </div>`;
-        } else {
-          grid.innerHTML = sites.map(s => {
-            const total = s.total || 0;
-            const valid = s.valid || 0;
-            const invalid = s.invalid || 0;
-            const botRate = total > 0 ? ((invalid / total) * 100).toFixed(0) : '0';
-            return `
-              <a href="/dashboard?site=${encodeURIComponent(s.site_key)}" class="db-site-card">
-                <div class="db-site-head">
-                  <div>
-                    <div class="db-site-name">${Shell.esc(s.name)}</div>
-                    <div class="db-site-domain">${Shell.esc(s.domain || 'بدون دومين')}</div>
-                  </div>
-                  <div class="db-site-icon">🌐</div>
-                </div>
-                <div class="db-site-metrics">
-                  <div>
-                    <div class="db-site-metric-lbl">إجمالي</div>
-                    <div class="db-site-metric-val">${Shell.fmtNum(total)}</div>
-                  </div>
-                  <div>
-                    <div class="db-site-metric-lbl">صالح</div>
-                    <div class="db-site-metric-val" style="color:#10B981;">${Shell.fmtNum(valid)}</div>
-                  </div>
-                  <div>
-                    <div class="db-site-metric-lbl">Bot %</div>
-                    <div class="db-site-metric-val" style="color:${botRate > 30 ? '#F43F5E' : botRate > 15 ? '#F59E0B' : '#10B981'};">${botRate}%</div>
-                  </div>
-                </div>
-              </a>`;
-          }).join('');
-        }
-        setView('viewSites');
-      } catch (e) { setError(e.message); }
-    }
-
-    async function showOverview(siteKey) {
-      setLoading();
-      const site = Shell.state.sites.find(s => s.site_key === siteKey);
-      if (!site) { await showSites(); return; }
-      Shell.state.currentSite = site;
-
-      Shell.setBreadcrumb([
-        { label: 'المواقع', href: '/dashboard' },
-        { label: site.name },
-      ]);
-
-      try {
-        const [stats, radar, anomalies, smart] = await Promise.all([
-          Shell.api('/api/stats?site=' + encodeURIComponent(site.site_key)),
-          Shell.api('/api/radar').catch(() => null),
-          Shell.api('/api/zones/anomalies?site=' + encodeURIComponent(site.site_key)).catch(() => ({ anomalies: [] })),
-          Shell.api('/api/reports/smart?site=' + encodeURIComponent(site.site_key)).catch(() => ({ zones: [], summary: {} })),
-        ]);
-
-        const total = stats.total || 0;
-        const valid = stats.valid || 0;
-        const invalid = stats.invalid || 0;
-        const botRate = total > 0 ? (invalid / total) * 100 : 0;
-
-        const buyCpm = Number(Shell.state.user?.cpm_buy ?? 1.0);
-        const sellCpm = Number(Shell.state.user?.cpm_sell ?? 1.5);
-        const profit = (valid * sellCpm / 1000) - (total * buyCpm / 1000);
-
-        animateNumber('kpiTotal', 0, total);
-        animateNumber('kpiValid', 0, valid);
-        const botEl = document.getElementById('kpiBot');
-        if (botEl) botEl.textContent = botRate.toFixed(1) + '%';
-        const profitEl = document.getElementById('kpiProfit');
-        if (profitEl) {
-          profitEl.textContent = (profit >= 0 ? '+' : '') + '$' + Math.abs(profit).toFixed(2);
-          profitEl.style.color = profit >= 0 ? '#22D3EE' : '#F43F5E';
-        }
-
-        renderRadarWidget(radar);
-        renderAttention(anomalies.anomalies || [], smart.zones || []);
-        renderZoneColumns(smart.zones || []);
-        renderRecentVisits(stats.recent || [], site);
-
-        setView('viewOverview');
-        Shell.refreshMoneyPulse?.();
-      } catch (e) { setError(e.message); }
-    }
-
-    function animateNumber(id, start, end) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const duration = 800;
-      const t0 = performance.now();
-      function step(now) {
-        const p = Math.min((now - t0) / duration, 1);
-        const eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = Shell.fmtNum(Math.round(start + (end - start) * eased));
-        if (p < 1) requestAnimationFrame(step);
-      }
-      requestAnimationFrame(step);
-    }
-
-    function renderRadarWidget(radar) {
-      const ring = document.getElementById('radarRing');
-      const scoreEl = document.getElementById('radarScore');
-      const levelEl = document.getElementById('radarLevel');
-      const descEl = document.getElementById('radarDesc');
-      if (!ring) return;
-
-      if (!radar || radar.insufficient_data) {
-        scoreEl.textContent = '—';
-        levelEl.textContent = 'بيانات غير كافية';
-        levelEl.style.color = '#F8FAFC';
-        descEl.textContent = (radar && radar.message) || 'محتاج زيارات أكتر';
-        ring.style.stroke = '#7B8496';
-        ring.style.strokeDashoffset = 188.5;
+    function renderCampaignList(containerId, campaigns, emptyMsg) {
+      const el = document.getElementById(containerId);
+      if (!campaigns.length) {
+        el.innerHTML = `<div class="db-empty"><span class="db-empty-icon">📭</span>${emptyMsg}</div>`;
         return;
       }
-
-      const score = radar.score;
-      const level = radar.level;
-      const colors = { low: '#10B981', medium: '#F59E0B', high: '#F97316', critical: '#F43F5E' };
-      const labels = { low: 'منخفض', medium: 'متوسط', high: 'عالي', critical: 'حرج' };
-
-      scoreEl.textContent = score;
-      levelEl.textContent = labels[level] || level;
-      levelEl.style.color = colors[level] || '#F8FAFC';
-      descEl.textContent = 'خطر حظر Adsterra';
-
-      ring.style.stroke = colors[level] || '#10B981';
-      const c = 2 * Math.PI * 30;
-      const offset = c * (1 - score / 100);
-      ring.style.strokeDasharray = c;
-      ring.style.strokeDashoffset = c;
-      requestAnimationFrame(() => { ring.style.strokeDashoffset = offset; });
-    }
-
-    function renderAttention(anomalies, zones) {
-      const list = document.getElementById('attentionList');
-      const countEl = document.getElementById('attnCount');
-      if (!list) return;
-
-      const items = [];
-      anomalies.slice(0, 3).forEach(a => {
-        items.push({
-          icon: '⚡',
-          text: `${a.zone}: bot rate ${a.current_rate.toFixed(0)}% (${a.anomaly.severity})`,
-          action: 'شوف',
-          href: '/zone-analytics?site=' + encodeURIComponent(Shell.state.currentSite.site_key),
-        });
-      });
-
-      const badZones = zones.filter(z => z.score.grade === 'F' || (z.pl && z.pl.profit < 0));
-      badZones.slice(0, 3).forEach(z => {
-        items.push({
-          icon: '🚨',
-          text: `${z.zone} · ${z.score.grade} · ${(z.pl.profit >= 0 ? '+' : '')}$${Math.abs(z.pl.profit).toFixed(2)}`,
-          action: 'راجع',
-          href: '/smart-reports?site=' + encodeURIComponent(Shell.state.currentSite.site_key),
-        });
-      });
-
-      countEl.textContent = items.length;
-
-      if (!items.length) {
-        list.innerHTML = `<div class="db-alert-empty"><span class="icon">✅</span>كل حاجة تمام</div>`;
-        return;
-      }
-
-      list.innerHTML = items.slice(0, 4).map(it => `
-        <a href="${Shell.esc(it.href)}" class="db-alert">
-          <span class="db-alert-icon">${it.icon}</span>
-          <span class="db-alert-text">${Shell.esc(it.text)}</span>
-          <span class="db-alert-action">${it.action} ←</span>
-        </a>
-      `).join('');
-    }
-
-    function renderZoneColumns(zones) {
-      const stars = zones.filter(z => z.score.grade === 'S' || z.score.grade === 'A');
-      const watch = zones.filter(z => z.score.grade === 'B' || z.score.grade === 'C');
-      const probs = zones.filter(z => z.score.grade === 'D' || z.score.grade === 'F');
-
-      const setCount = (id, n) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = n;
-      };
-      setCount('zonesStarsCount', stars.length);
-      setCount('zonesWatchCount', watch.length);
-      setCount('zonesProbsCount', probs.length);
-
-      const renderList = (containerId, list, metricFn) => {
-        const c = document.getElementById(containerId);
-        if (!c) return;
-        if (!list.length) { c.innerHTML = `<div class="db-zone-empty">—</div>`; return; }
-        c.innerHTML = list.slice(0, 5).map(z => {
-          const m = metricFn(z);
-          // Quick Actions data attributes
-          const trustAttr = z.score && typeof z.score.composite === 'number' ? z.score.composite : '';
-          return `
-            <a href="/smart-reports?site=${encodeURIComponent(Shell.state.currentSite.site_key)}&zone=${encodeURIComponent(z.zone)}"
-               class="db-zone-item"
-               data-zone-id="${Shell.esc(z.zone)}"
-               data-zone-grade="${Shell.esc(z.score.grade)}"
-               data-zone-trust="${trustAttr}">
-              <span class="sh-grade sh-grade-${z.score.grade}">${z.score.grade}</span>
-              <span class="db-zone-name">${Shell.esc(z.zone)}</span>
-              <span class="db-zone-metric" style="color:${m.color};">${m.text}</span>
-            </a>`;
-        }).join('');
-      };
-
-      renderList('zonesStars', stars, z => ({
-        text: (z.pl.roi >= 0 ? '+' : '') + z.pl.roi + '%',
-        color: z.pl.roi >= 0 ? '#10B981' : '#F43F5E',
-      }));
-      renderList('zonesWatch', watch, z => ({
-        text: z.bot_rate.toFixed(0) + '% bot',
-        color: z.bot_rate > 15 ? '#F59E0B' : '#CBD5E1',
-      }));
-      renderList('zonesProbs', probs, z => ({
-        text: (z.pl.profit >= 0 ? '+' : '') + '$' + z.pl.profit.toFixed(2),
-        color: z.pl.profit >= 0 ? '#10B981' : '#F43F5E',
-      }));
-    }
-
-    function renderRecentVisits(visits, site) {
-      const body = document.getElementById('recentVisitsBody');
-      const link = document.getElementById('recentVisitsLink');
-      if (link) link.href = '/visits?site=' + encodeURIComponent(site.site_key);
-      if (!body) return;
-
-      if (!visits.length) {
-        body.innerHTML = `<div style="padding:32px 16px;text-align:center;color:#4A5263;font-size:12px;">مفيش زيارات لسه — ركّب كود التتبع</div>`;
-        return;
-      }
-
-      body.innerHTML = visits.slice(0, 10).map(v => {
-        const badge = v.verdict === 'valid' ? 'sh-badge sh-badge-good'
-                    : v.verdict === 'invalid' ? 'sh-badge sh-badge-bad'
-                    : 'sh-badge sh-badge-warn';
-        const scoreColor = v.score > 80 ? '#F43F5E' : v.score > 40 ? '#F59E0B' : '#10B981';
+      el.innerHTML = campaigns.map(c => {
+        const st = c.stats || {}; const profit = (st.pl && st.pl.profit) || 0;
+        const cls = profit >= 0 ? 'pos' : 'neg';
         return `
-          <a href="/visits/${v.id}" class="db-visit-row">
-            <span class="db-visit-time">${Shell.esc(v.time || '')}</span>
-            <span class="db-visit-zone">${Shell.esc(v.zone || '—')}</span>
-            <span class="db-visit-country">${Shell.esc(v.country || '—')}</span>
-            <span class="db-visit-score" style="color:${scoreColor};">${v.score || 0}</span>
-            <span class="db-visit-verdict"><span class="${badge}">${(v.verdict || '').toUpperCase()}</span></span>
-            <span style="color:#4A5263;text-align:center;">←</span>
+          <a href="/campaigns/${c.id}" class="db-camp-row">
+            <div>
+              <div class="db-camp-name">${Shell.esc(c.name)}</div>
+              <div class="db-camp-meta">${Shell.esc(c.traffic_source_slug)} → ${Shell.esc(c.destination_slug)}</div>
+            </div>
+            <div class="db-camp-val ${cls}">${fmtMoney(profit)}</div>
           </a>`;
       }).join('');
     }
 
-    function openNewSiteModal() {
-      document.getElementById('newSiteName').value = '';
-      document.getElementById('newSiteDomain').value = '';
-      document.getElementById('newSiteModal').classList.add('is-open');
-      setTimeout(() => document.getElementById('newSiteName').focus(), 100);
-    }
-    function closeNewSiteModal() {
-      document.getElementById('newSiteModal').classList.remove('is-open');
+    function renderCampaignsGrid(campaigns) {
+      const grid = document.getElementById('allCampaignsGrid');
+      if (!campaigns.length) {
+        grid.innerHTML = `<div class="db-empty" style="grid-column:1/-1;"><span class="db-empty-icon">🎯</span>مفيش حملات لسه. ابدأ بإضافة حملة جديدة.</div>`;
+        return;
+      }
+      grid.innerHTML = campaigns.slice(0, 6).map(c => {
+        const st = c.stats || {}; const profit = (st.pl && st.pl.profit) || 0;
+        const cls = profit >= 0 ? 'pos' : 'neg';
+        const badge = c.status === 'active' ? '🟢 نشطة' : c.status === 'paused' ? '⏸ موقوفة' : '📦 مؤرشفة';
+        return `
+          <a href="/campaigns/${c.id}" class="db-camp-row" style="flex-direction:column;align-items:flex-start;">
+            <div style="width:100%;display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+              <div>
+                <div class="db-camp-name">${Shell.esc(c.name)}</div>
+                <div class="db-camp-meta">${badge} · ${Shell.esc(c.type)}</div>
+              </div>
+              <div class="db-camp-val ${cls}">${fmtMoney(profit)}</div>
+            </div>
+            <div style="width:100%;display:flex;justify-content:space-between;font-size:10px;color:#4A5263;border-top:1px solid #1A1D29;padding-top:8px;">
+              <span>إجمالي: ${Shell.fmtNum(st.total || 0)}</span>
+              <span style="color:#F43F5E;">بوت: ${Number(st.bot_rate || 0).toFixed(0)}%</span>
+            </div>
+          </a>`;
+      }).join('');
     }
 
-    async function submitNewSite(e) {
-      if (e) e.preventDefault();
-      const name = document.getElementById('newSiteName').value.trim();
-      const domain = document.getElementById('newSiteDomain').value.trim();
-      if (!name) return;
+    (async function boot() {
       try {
-        const res = await Shell.api('/api/sites', {
-          method: 'POST',
-          body: JSON.stringify({ name, domain }),
-        });
-        closeNewSiteModal();
-        Shell.toast('تم إنشاء الموقع ✅', 'success');
-        Shell.state.sites.push(res);
-        window.location.href = '/dashboard?site=' + encodeURIComponent(res.site_key);
-      } catch (err) {
-        Shell.toast(err.message || 'فشل الإنشاء', 'error');
+        await Shell.mount({ active: 'dashboard', lang: 'ar', breadcrumb: [{ label: 'لوحة التحكم' }] });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+        await loadDashboard();
+      } catch (e) {
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">فشل التحميل: ${Shell.esc(e.message)}</div>`;
       }
-    }
+    })();
   </script>
 </body>
-</html>
+            </html>
