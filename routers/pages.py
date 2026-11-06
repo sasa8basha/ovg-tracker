@@ -124,6 +124,11 @@ def live_page(request: Request, db: Session = Depends(get_db)):
     if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("live.html"))
 
+@router.get("/404", response_class=HTMLResponse)
+def page_404():
+    html = "<html><head><title>404 Not Found</title></head><body style='background:#fff;color:#000;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;'><h1>404 Not Found</h1></body></html>"
+    return HTMLResponse(content=html, status_code=404)
+
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "9.0"}
+    return {"status": "ok", "version": "9.1"}
