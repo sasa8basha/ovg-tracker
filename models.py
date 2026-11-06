@@ -16,18 +16,7 @@ class UserModel(Base):
     cpm_buy = Column(Float, default=1.0, server_default="1.0", nullable=False)
     cpm_sell = Column(Float, default=1.5, server_default="1.5", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    sites = relationship("SiteModel", back_populates="user", cascade="all, delete-orphan")
     campaigns = relationship("CampaignModel", back_populates="user", cascade="all, delete-orphan")
-
-class SiteModel(Base):
-    __tablename__ = "sites"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
-    name = Column(String, nullable=False)
-    domain = Column(String, default="")
-    site_key = Column(String, unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    user = relationship("UserModel", back_populates="sites")
 
 class TrafficSource(Base):
     __tablename__ = "traffic_sources"
@@ -53,16 +42,18 @@ class CampaignModel(Base):
     __tablename__ = "campaigns"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+
     name = Column(String(200), nullable=False)
-    type = Column(String(20), nullable=False, default="landing", index=True)
+    type = Column(String(20), nullable=False, default="landing", index=True) # landing | direct | hybrid
     traffic_source_slug = Column(String(50), default="custom", index=True)
     traffic_source_campaign_id = Column(String(100), default="")
     buy_cpm = Column(Float, default=0.0, nullable=False)
+    
     destination_slug = Column(String(50), default="custom", index=True)
     destination_url = Column(String(1000), default="")
     destination_zone_id = Column(String(100), default="")
     sell_cpm = Column(Float, default=0.0, nullable=False)
-    site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), nullable=True, index=True)
+    
     campaign_key = Column(String(32), unique=True, index=True, nullable=False)
     redirect_delay_ms = Column(Integer, default=500, nullable=False)
     bot_block_threshold = Column(Integer, default=100, nullable=False)
@@ -73,7 +64,6 @@ class CampaignModel(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("UserModel", back_populates="campaigns")
-    site = relationship("SiteModel")
 
     __table_args__ = (
         Index("ix_campaigns_user_status", "user_id", "status"),
@@ -86,7 +76,6 @@ class SessionModel(Base):
     session_id = Column(String(36), unique=True, index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", ondelete="SET NULL"), index=True, nullable=True)
-    site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), index=True, nullable=True)
     ip = Column(String(45), index=True)
     country_code = Column(String(2), nullable=True, index=True)
     user_agent = Column(String(500), default="")
@@ -135,11 +124,12 @@ class VisitHeartbeatModel(Base):
 class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id", ondelete="CASCADE"), index=True, nullable=False) # 🔴 Direct link to campaign
+    session_id = Column(String(36), nullable=True, index=True)
+    
     click_id = Column(String(36), unique=True, index=True, nullable=True)
     filter_reason = Column(String(100), nullable=True, index=True)
-    site_id = Column(Integer, ForeignKey("sites.id"), index=True, nullable=True)
-    campaign_id = Column(Integer, index=True, nullable=True)
-    session_id = Column(String(36), nullable=True, index=True)
+    
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     ip = Column(String, index=True)
     user_agent = Column(String)
@@ -147,6 +137,7 @@ class VisitModel(Base):
     score = Column(Integer)
     verdict = Column(String, index=True)
     evidence = Column(JSON)
+    
     os = Column(String, default="Unknown")
     device = Column(String, default="Unknown")
     browser = Column(String, default="Unknown")
@@ -160,16 +151,18 @@ class VisitModel(Base):
     asn = Column(String, default="Unknown")
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
+    
     time_on_page = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
+    
     ground_truth = Column(String(10), nullable=True, index=True)
     ground_truth_at = Column(DateTime, nullable=True)
     ground_truth_by = Column(String(64), nullable=True)
     
-    data_quality = Column(String(20), nullable=True) # 🔴 تم إزالة index=True لمنع التكرار
+    data_quality = Column(String(20), nullable=True) 
     counting_type = Column(String(20), nullable=True)
     is_honeypot_triggered = Column(Boolean, default=False)
     clock_drift_ms = Column(Integer, default=0)
@@ -181,12 +174,12 @@ class VisitModel(Base):
     full_payload = Column(JSON, nullable=True)
 
     __table_args__ = (
-        Index("ix_visits_site_zone_verdict", "site_id", "zone_id", "verdict"),
+        Index("ix_visits_campaign_zone_verdict", "campaign_id", "zone_id", "verdict"),
         Index("ix_visits_ip_timestamp", "ip", "timestamp"),
         Index("ix_visits_gt_verdict", "ground_truth", "verdict"),
         Index("ix_visits_campaign_timestamp", "campaign_id", "timestamp"),
         Index("ix_visits_session", "session_id"),
-        Index("ix_visits_data_quality", "data_quality"), # 🔴 الـ Index موجود هنا خلاص
+        Index("ix_visits_data_quality", "data_quality"), 
         Index("ix_visits_counting_type", "counting_type"),
     )
 
