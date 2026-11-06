@@ -5,7 +5,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from database import Base
 
-
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -20,7 +19,6 @@ class UserModel(Base):
     sites = relationship("SiteModel", back_populates="user", cascade="all, delete-orphan")
     campaigns = relationship("CampaignModel", back_populates="user", cascade="all, delete-orphan")
 
-
 class SiteModel(Base):
     __tablename__ = "sites"
     id = Column(Integer, primary_key=True)
@@ -30,7 +28,6 @@ class SiteModel(Base):
     site_key = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("UserModel", back_populates="sites")
-
 
 class TrafficSource(Base):
     __tablename__ = "traffic_sources"
@@ -42,7 +39,6 @@ class TrafficSource(Base):
     is_builtin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-
 class Destination(Base):
     __tablename__ = "destinations"
     id = Column(Integer, primary_key=True)
@@ -53,12 +49,10 @@ class Destination(Base):
     is_builtin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-
 class CampaignModel(Base):
     __tablename__ = "campaigns"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
-
     name = Column(String(200), nullable=False)
     type = Column(String(20), nullable=False, default="landing", index=True)
     traffic_source_slug = Column(String(50), default="custom", index=True)
@@ -85,7 +79,6 @@ class CampaignModel(Base):
         Index("ix_campaigns_user_status", "user_id", "status"),
         Index("ix_campaigns_user_type", "user_id", "type"),
     )
-
 
 class SessionModel(Base):
     __tablename__ = "sessions"
@@ -119,7 +112,6 @@ class SessionModel(Base):
         Index("ix_sessions_user_started", "user_id", "started_at"),
     )
 
-
 class VisitHeartbeatModel(Base):
     __tablename__ = "visit_heartbeats"
     id = Column(Integer, primary_key=True, index=True)
@@ -140,16 +132,11 @@ class VisitHeartbeatModel(Base):
         Index("ix_heartbeats_session_time", "session_id", "received_at"),
     )
 
-
 class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
-    
-    # --- NEW FIELDS FOR P1 ---
-    click_id = Column(String(36), unique=True, index=True, nullable=True) # ID فريد للنقرة لمنع التكرار
-    filter_reason = Column(String(100), nullable=True, index=True)       # سبب الرفض
-    # -------------------------
-
+    click_id = Column(String(36), unique=True, index=True, nullable=True)
+    filter_reason = Column(String(100), nullable=True, index=True)
     site_id = Column(Integer, ForeignKey("sites.id"), index=True, nullable=True)
     campaign_id = Column(Integer, index=True, nullable=True)
     session_id = Column(String(36), nullable=True, index=True)
@@ -181,9 +168,9 @@ class VisitModel(Base):
     ground_truth = Column(String(10), nullable=True, index=True)
     ground_truth_at = Column(DateTime, nullable=True)
     ground_truth_by = Column(String(64), nullable=True)
-
-    data_quality = Column(String(20), nullable=True, index=True)
-    counting_type = Column(String(20), nullable=True, index=True)
+    
+    data_quality = Column(String(20), nullable=True) # 🔴 تم إزالة index=True لمنع التكرار
+    counting_type = Column(String(20), nullable=True)
     is_honeypot_triggered = Column(Boolean, default=False)
     clock_drift_ms = Column(Integer, default=0)
     consent_state = Column(String(20), default="unknown")
@@ -199,10 +186,9 @@ class VisitModel(Base):
         Index("ix_visits_gt_verdict", "ground_truth", "verdict"),
         Index("ix_visits_campaign_timestamp", "campaign_id", "timestamp"),
         Index("ix_visits_session", "session_id"),
-        Index("ix_visits_data_quality", "data_quality"),
+        Index("ix_visits_data_quality", "data_quality"), # 🔴 الـ Index موجود هنا خلاص
         Index("ix_visits_counting_type", "counting_type"),
     )
-
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
@@ -214,7 +200,6 @@ class PasswordResetToken(Base):
     ip = Column(String(45), default="")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
-
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
     id = Column(Integer, primary_key=True)
@@ -223,7 +208,6 @@ class EmailVerificationToken(Base):
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
-
 
 class BanRiskSnapshot(Base):
     __tablename__ = "ban_risk_snapshots"
@@ -244,7 +228,6 @@ class BanRiskSnapshot(Base):
         Index("ix_ban_risk_user_time", "user_id", "timestamp"),
     )
 
-
 class ZoneActionModel(Base):
     __tablename__ = "zone_actions"
     id = Column(Integer, primary_key=True, index=True)
@@ -262,25 +245,16 @@ class ZoneActionModel(Base):
         Index("ix_zone_actions_user_active", "user_id", "action", "reverted_at"),
     )
 
-# =========================================================
-# P1 — DECISION AUDIT (جديد)
-# =========================================================
 class DecisionAuditModel(Base):
     __tablename__ = "decision_audit"
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
-    
-    # نوع القرار: reject_visit | block_ip | pause_campaign
     decision_type = Column(String(50), nullable=False, index=True) 
-    target_id = Column(String(100), nullable=True, index=True) # visit_id أو campaign_id
-    
-    # السبب والنتيجة
+    target_id = Column(String(100), nullable=True, index=True)
     reason = Column(String(200), nullable=False)
     risk_score = Column(Integer, default=0)
-    inputs_json = Column(JSON, nullable=True) # الإدخالات اللي بنى عليها القرار
-    
-    actor = Column(String(100), default="system") # system | admin | rule_engine
-    
+    inputs_json = Column(JSON, nullable=True) 
+    actor = Column(String(100), default="system") 
     __table_args__ = (
         Index("ix_audit_type_time", "decision_type", "timestamp"),
         Index("ix_audit_target", "target_id"),
