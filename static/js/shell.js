@@ -1,11 +1,11 @@
 /**
- * shell.js — OVG Tracker v8 Shell
+ * shell.js — OVG Tracker v9 Shell (Campaign-Centric)
  */
 (function () {
   'use strict';
 
   const S = {
-    user: null, sites: [], currentSite: null, active: null, lang: 'ar',
+    user: null, campaigns: [], active: null, lang: 'ar',
     mounted: false, cmdOpen: false, cmdItems: [], cmdSelected: 0, cmdQuery: '',
     baseTitle: document.title, attentionTimer: null, pulseTimer: null,
     quickActionsEl: null, quickActionsTarget: null,
@@ -34,6 +34,7 @@
     visits: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
     sessions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
     labeling: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+    campaigns: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
     money: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
     analytics: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
     dataquality: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
@@ -44,51 +45,48 @@
     logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
     code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
     chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
-    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
-    pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
     ban: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+    pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
     scale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
-    campaigns: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
   };
 
   const NAV = {
     ar: [
       { group: 'التحليل', items: [
         { id: 'dashboard', label: 'لوحة التحكم', icon: 'dashboard', href: '/dashboard' },
-        { id: 'live',      label: 'Live Monitor', icon: 'live',      href: '/live', needsSite: true },
+        { id: 'live',      label: 'Live Monitor', icon: 'live',      href: '/live' },
         { id: 'radar',     label: 'Radar',        icon: 'radar',     href: '/radar' },
-        { id: 'sessions',  label: 'Sessions',     icon: 'sessions',  href: '/sessions' },
-        { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/visits', needsSite: true },
+        { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/visits' },
         { id: 'labeling',  label: 'المراجعة',     icon: 'labeling',  href: '/labeling', badge: 'labeling' },
+        { id: 'sessions',  label: 'Sessions',     icon: 'sessions',  href: '/sessions' },
       ]},
       { group: 'الحملات', items: [
         { id: 'campaigns', label: 'كل الحملات',     icon: 'campaigns', href: '/campaigns' },
-        { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/smart-reports', needsSite: true },
-        { id: 'analytics', label: 'Zone Analytics',  icon: 'analytics', href: '/zone-analytics', needsSite: true },
+        { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/smart-reports' },
+        { id: 'analytics', label: 'Zone Analytics',  icon: 'analytics', href: '/zone-analytics' },
       ]},
       { group: 'النظام', items: [
         { id: 'dataquality', label: 'جودة البيانات', icon: 'dataquality', href: '/data-quality' },
-        { id: 'tracker',     label: 'كود التتبع',    icon: 'code',        href: '/tracker' },
         { id: 'settings',    label: 'الإعدادات',     icon: 'settings',    href: '/settings' },
       ]},
     ],
     en: [
       { group: 'Analyze', items: [
         { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
-        { id: 'live',      label: 'Live Monitor', icon: 'live', href: '/live', needsSite: true },
+        { id: 'live',      label: 'Live Monitor', icon: 'live', href: '/live' },
         { id: 'radar',     label: 'Radar',     icon: 'radar',     href: '/radar' },
-        { id: 'sessions',  label: 'Sessions',  icon: 'sessions',  href: '/sessions' },
-        { id: 'visits',    label: 'Visits',    icon: 'visits',    href: '/visits', needsSite: true },
+        { id: 'visits',    label: 'Visits',    icon: 'visits',    href: '/visits' },
         { id: 'labeling',  label: 'Labeling',  icon: 'labeling',  href: '/labeling', badge: 'labeling' },
+        { id: 'sessions',  label: 'Sessions',  icon: 'sessions',  href: '/sessions' },
       ]},
       { group: 'Campaigns', items: [
         { id: 'campaigns', label: 'All Campaigns',  icon: 'campaigns', href: '/campaigns' },
-        { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/smart-reports', needsSite: true },
-        { id: 'analytics', label: 'Zone Analytics', icon: 'analytics', href: '/zone-analytics', needsSite: true },
+        { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/smart-reports' },
+        { id: 'analytics', label: 'Zone Analytics', icon: 'analytics', href: '/zone-analytics' },
       ]},
       { group: 'System', items: [
         { id: 'dataquality', label: 'Data Quality', icon: 'dataquality', href: '/data-quality' },
-        { id: 'tracker',     label: 'Tracker Code', icon: 'code',        href: '/tracker' },
         { id: 'settings',    label: 'Settings',     icon: 'settings',    href: '/settings' },
       ]},
     ],
@@ -104,25 +102,21 @@
     nav.forEach(group => {
       itemsHtml += `<div class="sh-nav-group"><div class="sh-nav-label">${esc(group.group)}</div>`;
       group.items.forEach(it => {
-        const needsSite = it.needsSite && S.currentSite;
-        const href = needsSite ? `${it.href}?site=${encodeURIComponent(S.currentSite.site_key)}` : it.href;
         const isActive = S.active === it.id ? 'active' : '';
-        const disabled = it.needsSite && !S.currentSite;
-        const style = disabled ? 'opacity:0.4;pointer-events:none;' : '';
         const badgeHtml = it.badge ? `<span class="sh-nav-badge" data-badge="${esc(it.badge)}" style="display:none;">0</span>` : '';
         const livePulse = it.id === 'live' ? '<span class="sh-nav-live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#F43F5E;margin-right:6px;box-shadow:0 0 6px #F43F5E;animation:sh-live-pulse 1.5s ease-in-out infinite;"></span>' : '';
-        itemsHtml += `<a href="${esc(href)}" class="sh-nav-item ${isActive}" style="${style}" data-nav="${esc(it.id)}">${ICON[it.icon] || ''}<span class="label">${livePulse}${esc(it.label)}</span>${badgeHtml}</a>`;
+        itemsHtml += `<a href="${esc(it.href)}" class="sh-nav-item ${isActive}" data-nav="${esc(it.id)}">${ICON[it.icon] || ''}<span class="label">${livePulse}${esc(it.label)}</span>${badgeHtml}</a>`;
       });
       itemsHtml += `</div>`;
     });
     const initial = (S.user && S.user.username ? S.user.username[0] : '?').toUpperCase();
     const username = S.user ? S.user.username : '—';
-    return `<aside class="sh-sidebar" id="shSidebar"><div class="sh-sidebar-head"><div class="sh-logo">O</div><div class="sh-logo-text"><div class="t1">OVG Tracker</div><div class="t2">v8 · PRO</div></div></div><nav class="sh-nav">${itemsHtml}</nav><div class="sh-sidebar-foot"><a href="/settings" class="sh-user"><div class="sh-avatar">${esc(initial)}</div><div class="sh-user-info"><div class="n">${esc(username)}</div><div class="r">${esc(L.user)}</div></div></a></div><button class="sh-collapse-btn" id="shCollapseBtn" aria-label="${esc(L.collapse)}" title="${esc(L.collapse)}">${ICON.chevron}</button></aside>`;
+    return `<aside class="sh-sidebar" id="shSidebar"><div class="sh-sidebar-head"><div class="sh-logo">O</div><div class="sh-logo-text"><div class="t1">OVG Tracker</div><div class="t2">v9 · PRO</div></div></div><nav class="sh-nav">${itemsHtml}</nav><div class="sh-sidebar-foot"><a href="/settings" class="sh-user"><div class="sh-avatar">${esc(initial)}</div><div class="sh-user-info"><div class="n">${esc(username)}</div><div class="r">${esc(L.user)}</div></div></a></div><button class="sh-collapse-btn" id="shCollapseBtn" aria-label="${esc(L.collapse)}" title="${esc(L.collapse)}">${ICON.chevron}</button></aside>`;
   }
 
   function buildTopbar() {
     const L = T[S.lang];
-    return `<header class="sh-topbar"><div class="sh-breadcrumb" id="shBreadcrumb"></div><div class="sh-topbar-spacer"></div><button class="sh-topbar-btn sh-search-btn" id="shSearchBtn" type="button">${ICON.search}<span>${esc(L.search)}</span><kbd>⌘K</kbd></button><button class="sh-money-pulse zero" id="shMoneyPulse" title="P&L اليوم" type="button"><span class="pulse-dot"></span><span class="sh-mp-value">$0.00</span><span class="sh-mp-trend flat">—</span></button><button class="sh-topbar-btn" id="shThemeBtn" title="Theme" aria-label="Toggle theme" type="button">${ICON.moon}</button></header>`;
+    return `<header class="sh-topbar"><div class="sh-breadcrumb" id="shBreadcrumb"></div><div class="sh-topbar-spacer"></div><button class="sh-topbar-btn sh-search-btn" id="shSearchBtn" type="button">${ICON.search}<span>${esc(L.search)}</span><kbd>⌘K</kbd></button><button class="sh-money-pulse zero" id="shMoneyPulse" title="إجمالي الأرباح" type="button"><span class="pulse-dot"></span><span class="sh-mp-value">$0.00</span><span class="sh-mp-trend flat">—</span></button><button class="sh-topbar-btn" id="shThemeBtn" title="Theme" aria-label="Toggle theme" type="button">${ICON.moon}</button></header>`;
   }
 
   function buildStatusbar() {
@@ -130,7 +124,7 @@
   }
 
   function buildMobileNav() {
-    const nav = (NAV[S.lang] || NAV.ar)[0].items.slice(0, 6);
+    const nav = (NAV[S.lang] || NAV.ar)[0].items.slice(0, 5);
     return `<nav class="sh-mobile-nav">${nav.map(it => { const badge = it.badge ? `<span class="sh-mobile-badge" data-mbadge="${esc(it.badge)}" style="display:none;">0</span>` : ''; return `<a href="${esc(it.href)}" class="sh-mobile-nav-item ${S.active === it.id ? 'active' : ''}">${ICON[it.icon] || ''}<span>${esc(it.label)}</span>${badge}</a>`; }).join('')}</nav>`;
   }
 
@@ -140,8 +134,8 @@
 
   function buildCommands() {
     const nav = (NAV[S.lang] || NAV.ar).flatMap(g => g.items); const cmds = [];
-    nav.forEach(it => { if (it.needsSite && !S.currentSite) return; const href = it.needsSite ? `${it.href}?site=${encodeURIComponent(S.currentSite.site_key)}` : it.href; cmds.push({ group: T[S.lang].nav, label: it.label, icon: it.icon, action: () => { window.location.href = href; } }); });
-    if (S.sites && S.sites.length) { S.sites.forEach(s => { cmds.push({ group: T[S.lang].nav, label: s.name, desc: '🌐', action: () => { window.location.href = '/dashboard?site=' + encodeURIComponent(s.site_key); } }); }); }
+    nav.forEach(it => { cmds.push({ group: T[S.lang].nav, label: it.label, icon: it.icon, action: () => { window.location.href = it.href; } }); });
+    if (S.campaigns && S.campaigns.length) { S.campaigns.slice(0, 5).forEach(c => { cmds.push({ group: 'الحملات', label: c.name, desc: '🎯', action: () => { window.location.href = '/campaigns/' + c.id; } }); }); }
     cmds.push({ group: T[S.lang].user, label: T[S.lang].logout, icon: 'logout', action: async () => { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); window.location.href = '/'; } });
     return cmds;
   }
@@ -208,13 +202,12 @@
 
   async function refreshMoneyPulse() {
     try {
-      const siteParam = S.currentSite ? '&site=' + encodeURIComponent(S.currentSite.site_key) : '';
       const today = localDateStr(); const yest = localDateStr(new Date(Date.now() - 86400000));
       const [todayTotal, todayValid, yestTotal, yestValid] = await Promise.all([
-        api(`/api/visits?from_date=${today}&to_date=${today}&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
-        api(`/api/visits?from_date=${today}&to_date=${today}&verdict=valid&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
-        api(`/api/visits?from_date=${yest}&to_date=${yest}&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
-        api(`/api/visits?from_date=${yest}&to_date=${yest}&verdict=valid&per_page=1${siteParam}`).then(r => r.total || 0).catch(() => 0),
+        api(`/api/visits?from_date=${today}&to_date=${today}&per_page=1`).then(r => r.total || 0).catch(() => 0),
+        api(`/api/visits?from_date=${today}&to_date=${today}&verdict=valid&per_page=1`).then(r => r.total || 0).catch(() => 0),
+        api(`/api/visits?from_date=${yest}&to_date=${yest}&per_page=1`).then(r => r.total || 0).catch(() => 0),
+        api(`/api/visits?from_date=${yest}&to_date=${yest}&verdict=valid&per_page=1`).then(r => r.total || 0).catch(() => 0),
       ]);
       const buyCpm = Number(S.user?.cpm_buy ?? 1.0); const sellCpm = Number(S.user?.cpm_sell ?? 1.5);
       const todayProfit = (todayValid * sellCpm / 1000) - (todayTotal * buyCpm / 1000);
@@ -294,11 +287,11 @@
   }
 
   async function mount(opts = {}) {
-    if (S.mounted) return; S.active = opts.active || 'dashboard'; S.lang = opts.lang || 'ar'; S.currentSite = opts.currentSite || null; S.baseTitle = opts.title || document.title;
+    if (S.mounted) return; S.active = opts.active || 'dashboard'; S.lang = opts.lang || 'ar'; S.baseTitle = opts.title || document.title;
     document.body.classList.add('sh-body');
     if (S.lang === 'ar') { document.body.classList.add('ar'); document.documentElement.setAttribute('dir', 'rtl'); document.documentElement.setAttribute('lang', 'ar'); }
     try { S.user = await api('/api/auth/me'); } catch (e) { throw new Error('فشل تحميل بيانات المستخدم: ' + e.message); }
-    try { S.sites = await api('/api/sites'); } catch (e) { S.sites = []; }
+    try { S.campaigns = await api('/api/campaigns'); } catch (e) { S.campaigns = []; }
     const appRoot = document.getElementById('shAppRoot'); const contentEl = document.getElementById('shContent');
     if (!appRoot) throw new Error('Missing #shAppRoot in HTML'); if (!contentEl) throw new Error('Missing #shContent in HTML');
     const innerContent = contentEl.innerHTML;
@@ -307,7 +300,7 @@
     const cmdWrapper = document.createElement('div'); cmdWrapper.innerHTML = buildCmdPalette(); document.body.appendChild(cmdWrapper.firstElementChild);
     ensureToastContainer(); initTheme(); initCollapse(); bindCmd(); initQuickActions();
     const searchBtn = document.getElementById('shSearchBtn'); if (searchBtn) searchBtn.addEventListener('click', openCmd);
-    const moneyPulse = document.getElementById('shMoneyPulse'); if (moneyPulse) { moneyPulse.addEventListener('click', () => { const today = localDateStr(); const href = S.currentSite ? `/smart-reports?site=${encodeURIComponent(S.currentSite.site_key)}&from_date=${today}&to_date=${today}` : `/smart-reports?from_date=${today}&to_date=${today}`; window.location.href = href; }); }
+    const moneyPulse = document.getElementById('shMoneyPulse'); if (moneyPulse) { moneyPulse.addEventListener('click', () => { window.location.href = '/smart-reports'; }); }
     document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCmd(); } });
     setBreadcrumb(opts.breadcrumb || [{ label: T[S.lang].nav }]);
     refreshMoneyPulse(); refreshAttentionCount(); setInterval(refreshMoneyPulse, 30000); setInterval(refreshAttentionCount, 60000);
