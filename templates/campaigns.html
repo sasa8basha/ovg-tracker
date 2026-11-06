@@ -4,15 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OVG · الحملات</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/shell.css">
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
     body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
     #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
-    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 13px; z-index: 9998; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; z-index: 9998; }
     .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
     @keyframes db-spin { to { transform: rotate(360deg); } }
 
@@ -20,96 +18,59 @@
     .cp-title { font-size: 24px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.02em; margin: 0; }
     .cp-sub { font-size: 12px; color: #7B8496; margin-top: 4px; }
 
-    .cp-toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-    .cp-filter { display: inline-flex; background: #0F1117; border: 1px solid #232734; border-radius: 8px; padding: 3px; }
-    .cp-filter-btn { padding: 6px 14px; border-radius: 5px; background: transparent; border: none; color: #7B8496; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 120ms; }
-    .cp-filter-btn.active { background: #1C1F2E; color: #F8FAFC; }
-    .cp-spacer { flex: 1; }
-    .cp-search { height: 32px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 12px; outline: none; min-width: 200px; }
-    .cp-search:focus { border-color: #7C5CFF; box-shadow: 0 0 0 3px rgba(124,92,255,0.12); }
-
     .cp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
-    .cp-card { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px; cursor: pointer; transition: all 150ms; position: relative; overflow: hidden; text-decoration: none; color: inherit; display: block; }
+    .cp-card { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px; cursor: pointer; transition: all 150ms; position: relative; overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; }
     .cp-card:hover { border-color: #7C5CFF; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
     .cp-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--cp-accent, #7C5CFF); opacity: 0.7; }
-    .cp-card.paused { opacity: 0.6; }
-    .cp-card.paused::before { background: #F59E0B; }
-    .cp-card.archived { opacity: 0.4; }
-    .cp-card.archived::before { background: #4A5263; }
 
     .cp-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-    .cp-card-name-wrap { flex: 1; min-width: 0; }
     .cp-card-name { font-size: 14px; font-weight: 800; color: #F8FAFC; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-    .cp-card-meta { font-size: 10px; color: #4A5263; font-family: 'JetBrains Mono', monospace; margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-
-    .cp-type-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+    .cp-type-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
     .cp-type-landing { background: rgba(59,130,246,0.15); color: #93C5FD; }
     .cp-type-direct  { background: rgba(168,85,247,0.15); color: #C4B5FD; }
     .cp-type-hybrid  { background: rgba(16,185,129,0.15); color: #6EE7B7; }
-
-    .cp-source-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); font-size: 10px; font-weight: 700; color: #CBD5E1; }
-    .cp-source-arrow { color: #4A5263; font-size: 11px; }
 
     .cp-pl { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
     .cp-profit { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
     .cp-profit.pos { color: #10B981; }
     .cp-profit.neg { color: #F43F5E; }
-    .cp-profit.zero { color: #7B8496; }
     .cp-roi { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
     .cp-roi.pos { background: rgba(16,185,129,0.12); color: #10B981; }
     .cp-roi.neg { background: rgba(244,63,94,0.12); color: #F43F5E; }
-    .cp-roi.zero { background: rgba(255,255,255,0.05); color: #7B8496; }
 
     .cp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #1A1D29; }
-    .cp-stat-lbl { font-size: 9px; color: #4A5263; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin-bottom: 2px; }
+    .cp-stat-lbl { font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
     .cp-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; color: #F8FAFC; }
-    .cp-stat-val.bot { color: #F43F5E; }
-    .cp-stat-val.valid { color: #10B981; }
-
+    
     .cp-empty { padding: 60px 20px; text-align: center; color: #7B8496; }
     .cp-empty-icon { font-size: 56px; opacity: 0.4; display: block; margin-bottom: 14px; }
-    .cp-empty-title { font-size: 17px; font-weight: 800; color: #F8FAFC; margin-bottom: 8px; }
-    .cp-empty-sub { font-size: 12px; margin-bottom: 20px; line-height: 1.6; }
-
-    .cp-skel { height: 180px; border-radius: 14px; background: linear-gradient(90deg, #161822 0%, #232734 50%, #161822 100%); background-size: 1000px 100%; animation: cp-shimmer 1.6s infinite linear; }
-    @keyframes cp-shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
-
-    .cp-modal-overlay { position: fixed; inset: 0; background: rgba(8,9,13,0.85); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 900; display: none; align-items: center; justify-content: center; padding: 16px; }
+    
+    .cp-modal-overlay { position: fixed; inset: 0; background: rgba(8,9,13,0.85); backdrop-filter: blur(6px); z-index: 900; display: none; align-items: center; justify-content: center; padding: 16px; }
     .cp-modal-overlay.is-open { display: flex; }
-    .cp-modal { width: 100%; max-width: 600px; background: #161822; border: 1px solid #2E3446; border-radius: 16px; box-shadow: 0 24px 48px rgba(0,0,0,0.6); max-height: 90vh; display: flex; flex-direction: column; animation: cp-modal-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1); overflow: hidden; }
+    .cp-modal { width: 100%; max-width: 500px; background: #161822; border: 1px solid #2E3446; border-radius: 16px; box-shadow: 0 24px 48px rgba(0,0,0,0.6); max-height: 90vh; display: flex; flex-direction: column; animation: cp-modal-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1); overflow: hidden; }
     @keyframes cp-modal-in { from { opacity: 0; transform: scale(0.94) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     .cp-modal-head { padding: 18px 22px; border-bottom: 1px solid #232734; display: flex; align-items: center; justify-content: space-between; }
     .cp-modal-title { font-size: 16px; font-weight: 800; color: #F8FAFC; margin: 0; }
-    .cp-modal-close { width: 28px; height: 28px; border-radius: 6px; background: transparent; border: none; color: #7B8496; cursor: pointer; font-size: 18px; transition: all 120ms; }
-    .cp-modal-close:hover { background: #1C1F2E; color: #F8FAFC; }
+    .cp-modal-close { width: 28px; height: 28px; border-radius: 6px; background: transparent; border: none; color: #7B8496; cursor: pointer; font-size: 18px; }
     .cp-modal-body { padding: 20px 22px; overflow-y: auto; }
     .cp-modal-foot { padding: 14px 22px; border-top: 1px solid #232734; display: flex; gap: 8px; justify-content: flex-end; }
-
+    
     .cp-form-row { margin-bottom: 14px; }
     .cp-form-row label { display: block; font-size: 11px; font-weight: 700; color: #CBD5E1; margin-bottom: 5px; }
-    .cp-form-row input, .cp-form-row select, .cp-form-row textarea { width: 100%; height: 36px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 13px; outline: none; transition: border-color 120ms; box-sizing: border-box; }
-    .cp-form-row textarea { height: 70px; padding: 10px 12px; resize: vertical; }
-    .cp-form-row input:focus, .cp-form-row select:focus, .cp-form-row textarea:focus { border-color: #7C5CFF; box-shadow: 0 0 0 3px rgba(124,92,255,0.12); }
-    .cp-form-row small { display: block; font-size: 10px; color: #4A5263; margin-top: 4px; }
+    .cp-form-row input, .cp-form-row select { width: 100%; height: 36px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 13px; outline: none; box-sizing: border-box; }
+    .cp-form-row input:focus, .cp-form-row select:focus { border-color: #7C5CFF; }
     .cp-form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
+    
     .cp-type-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-    .cp-type-btn { padding: 12px 8px; background: #0F1117; border: 2px solid #232734; border-radius: 10px; cursor: pointer; text-align: center; transition: all 150ms; font-family: inherit; }
-    .cp-type-btn:hover { border-color: #2E3446; background: #1C1F2E; }
+    .cp-type-btn { padding: 12px 8px; background: #0F1117; border: 2px solid #232734; border-radius: 10px; cursor: pointer; text-align: center; transition: all 150ms; }
     .cp-type-btn.active { border-color: #7C5CFF; background: rgba(124,92,255,0.1); }
     .cp-type-btn-icon { font-size: 22px; margin-bottom: 4px; }
     .cp-type-btn-label { font-size: 11px; font-weight: 800; color: #F8FAFC; }
-    .cp-type-btn-desc { font-size: 9px; color: #7B8496; margin-top: 2px; line-height: 1.3; }
-
-    .cp-info-box { padding: 10px 12px; background: rgba(124,92,255,0.08); border: 1px solid rgba(124,92,255,0.25); border-radius: 8px; font-size: 11px; color: #C4B5FD; line-height: 1.6; margin-bottom: 14px; }
   </style>
 </head>
 <body>
 
-  <div class="db-shell-skel" id="bootSkeleton">
-    <div class="spinner"></div>
-    <div>جاري التحميل…</div>
-  </div>
+  <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
 
   <div id="shAppRoot" style="display:none;">
     <main id="shContent">
@@ -118,52 +79,20 @@
           <h1 class="cp-title">🎯 الحملات</h1>
           <p class="cp-sub" id="cpSub">إدارة كاملة لحملات CPM Arbitrage</p>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="sh-btn sh-btn-ghost" id="refreshBtn" type="button">🔄 تحديث</button>
-          <button class="sh-btn sh-btn-primary" id="newBtn" type="button">+ حملة جديدة</button>
-        </div>
-      </div>
-
-      <div class="cp-toolbar">
-        <div class="cp-filter">
-          <button class="cp-filter-btn active" data-filter="all" type="button">الكل</button>
-          <button class="cp-filter-btn" data-filter="active" type="button">نشطة</button>
-          <button class="cp-filter-btn" data-filter="paused" type="button">موقوفة</button>
-          <button class="cp-filter-btn" data-filter="archived" type="button">مؤرشفة</button>
-        </div>
-        <div class="cp-filter">
-          <button class="cp-filter-btn active" data-type="all" type="button">كل الأنواع</button>
-          <button class="cp-filter-btn" data-type="landing" type="button">Landing</button>
-          <button class="cp-filter-btn" data-type="direct" type="button">Direct</button>
-          <button class="cp-filter-btn" data-type="hybrid" type="button">Hybrid</button>
-        </div>
-        <div class="cp-spacer"></div>
-        <input type="text" class="cp-search" id="searchInput" placeholder="🔍 ابحث بالاسم…">
+        <button class="sh-btn sh-btn-primary" id="newBtn" type="button">+ حملة جديدة</button>
       </div>
 
       <div id="cpLoading" class="cp-grid">
-        <div class="cp-skel"></div>
-        <div class="cp-skel"></div>
-        <div class="cp-skel"></div>
+        <div class="cp-card" style="height:180px;background:linear-gradient(90deg,#161822 0%,#232734 50%,#161822 100%);background-size:1000px 100%;animation:cp-shimmer 1.6s infinite linear;"></div>
+        <div class="cp-card" style="height:180px;background:linear-gradient(90deg,#161822 0%,#232734 50%,#161822 100%);background-size:1000px 100%;animation:cp-shimmer 1.6s infinite linear;"></div>
       </div>
 
       <div id="cpContent" class="cp-grid" style="display:none;"></div>
 
       <div id="cpEmpty" class="cp-empty" style="display:none;">
         <span class="cp-empty-icon">🎯</span>
-        <div class="cp-empty-title">مفيش حملات بعد</div>
-        <div class="cp-empty-sub">
-          ابدأ بإضافة أول حملة — landing page، direct link، أو hybrid.<br>
-          لو عندك مواقع موجودة بالفعل، هتلاقيها اتحولت تلقائياً لحملات legacy.
-        </div>
+        <div style="font-size:17px;font-weight:800;color:#F8FAFC;margin-bottom:8px;">مفيش حملات بعد</div>
         <button class="sh-btn sh-btn-primary" onclick="openNewCampaign()" type="button">+ أضف أول حملة</button>
-      </div>
-
-      <div id="cpError" class="cp-empty" style="display:none;">
-        <span class="cp-empty-icon">⚠️</span>
-        <div class="cp-empty-title">فشل التحميل</div>
-        <div class="cp-empty-sub" id="cpErrorMessage">—</div>
-        <button class="sh-btn sh-btn-primary" onclick="loadCampaigns()" type="button">🔄 إعادة المحاولة</button>
       </div>
     </main>
   </div>
@@ -178,88 +107,22 @@
         <div class="cp-form-row">
           <label>نوع الحملة</label>
           <div class="cp-type-picker">
-            <button class="cp-type-btn active" data-type="landing" type="button">
-              <div class="cp-type-btn-icon">🏠</div>
-              <div class="cp-type-btn-label">Landing</div>
-              <div class="cp-type-btn-desc">صفحة هبوط + إعلان</div>
-            </button>
-            <button class="cp-type-btn" data-type="direct" type="button">
-              <div class="cp-type-btn-icon">🔗</div>
-              <div class="cp-type-btn-label">Direct</div>
-              <div class="cp-type-btn-desc">interstitial → redirect</div>
-            </button>
-            <button class="cp-type-btn" data-type="hybrid" type="button">
-              <div class="cp-type-btn-icon">🔀</div>
-              <div class="cp-type-btn-label">Hybrid</div>
-              <div class="cp-type-btn-desc">landing + redirect</div>
-            </button>
+            <button class="cp-type-btn active" data-type="landing" type="button"><div class="cp-type-btn-icon">🏠</div><div class="cp-type-btn-label">Landing</div></button>
+            <button class="cp-type-btn" data-type="direct" type="button"><div class="cp-type-btn-icon">🔗</div><div class="cp-type-btn-label">Direct</div></button>
+            <button class="cp-type-btn" data-type="hybrid" type="button"><div class="cp-type-btn-icon">🔀</div><div class="cp-type-btn-label">Hybrid</div></button>
           </div>
         </div>
-
-        <div class="cp-form-row">
-          <label>اسم الحملة *</label>
-          <input type="text" id="newName" placeholder="مثال: PopAds EG → Adsterra 10245" maxlength="200">
-        </div>
-
-        <div id="sitePickerWrap" class="cp-form-row">
-          <label>الموقع المرتبط *</label>
-          <select id="newSiteId"></select>
-          <small>الموقع بيحدد الـ tracker code اللي هيتحط في الصفحة</small>
-        </div>
-
+        <div class="cp-form-row"><label>اسم الحملة *</label><input type="text" id="newName" placeholder="مثال: PopAds EG → Adsterra 10245" maxlength="200"></div>
         <div class="cp-form-grid-2">
-          <div class="cp-form-row">
-            <label>مصدر الترافيك</label>
-            <select id="newSource"></select>
-          </div>
-          <div class="cp-form-row">
-            <label>CPM الشراء ($)</label>
-            <input type="number" id="newBuyCpm" step="0.01" min="0" max="100" value="1.00">
-          </div>
+          <div class="cp-form-row"><label>مصدر الترافيك</label><select id="newSource"></select></div>
+          <div class="cp-form-row"><label>CPM الشراء ($)</label><input type="number" id="newBuyCpm" step="0.01" min="0" value="1.00"></div>
         </div>
-
         <div class="cp-form-grid-2">
-          <div class="cp-form-row">
-            <label>الوجهة</label>
-            <select id="newDest"></select>
-          </div>
-          <div class="cp-form-row">
-            <label>CPM البيع ($)</label>
-            <input type="number" id="newSellCpm" step="0.01" min="0" max="100" value="2.00">
-          </div>
+          <div class="cp-form-row"><label>الوجهة</label><select id="newDest"></select></div>
+          <div class="cp-form-row"><label>CPM البيع ($)</label><input type="number" id="newSellCpm" step="0.01" min="0" value="2.00"></div>
         </div>
-
-        <div id="destUrlWrap" class="cp-form-row" style="display:none;">
-          <label>رابط الوجهة (Direct Link) *</label>
-          <input type="text" id="newDestUrl" placeholder="https://www.adsterra.com/...">
-          <small>هيتم عمل redirect للزوار البشريين</small>
-        </div>
-
-        <div id="zoneIdWrap" class="cp-form-row">
-          <label>Zone ID (اختياري)</label>
-          <input type="text" id="newZoneId" placeholder="مثال: 10245" maxlength="100">
-        </div>
-
-        <div class="cp-form-grid-2" id="directOptsWrap" style="display:none;">
-          <div class="cp-form-row">
-            <label>تأخير redirect (ms)</label>
-            <input type="number" id="newRedirectDelay" min="100" max="2000" value="500">
-          </div>
-          <div class="cp-form-row">
-            <label>حد الحظر (score)</label>
-            <input type="number" id="newBlockThreshold" min="0" max="100" value="90">
-            <small>لو score ≥ القيمة → block</small>
-          </div>
-        </div>
-
-        <div class="cp-form-row">
-          <label>ملاحظات (اختياري)</label>
-          <textarea id="newNotes" placeholder="تفاصيل إضافية…" maxlength="1000"></textarea>
-        </div>
-
-        <div class="cp-info-box">
-          💡 <b>ملاحظة:</b> بعد الإنشاء، هتاخد كود التتبع من صفحة الحملة. للـ direct links، رابط الـ interstitial هيكون <code>/go/{campaign_key}</code>.
-        </div>
+        <div id="destUrlWrap" class="cp-form-row" style="display:none;"><label>رابط الوجهة (Direct Link) *</label><input type="text" id="newDestUrl" placeholder="https://..."></div>
+        <div id="zoneIdWrap" class="cp-form-row"><label>Zone ID (اختياري)</label><input type="text" id="newZoneId" placeholder="10245"></div>
       </div>
       <div class="cp-modal-foot">
         <button class="sh-btn sh-btn-ghost" onclick="closeNewCampaign()" type="button">إلغاء</button>
@@ -270,285 +133,97 @@
 
   <script src="/static/js/shell.js"></script>
   <script>
-    const CP = {
-      campaigns: [],
-      sites: [],
-      sources: [],
-      destinations: [],
-      filterStatus: 'all',
-      filterType: 'all',
-      searchQuery: '',
-      newCampaignType: 'landing',
-    };
+    const CP = { campaigns: [], sources: [], destinations: [], newCampaignType: 'landing' };
 
-    const esc = Shell.esc;
-    const fmtNum = Shell.fmtNum;
-    const fmtMoney = (n) => {
-      const v = Number(n || 0);
-      if (Math.abs(v) < 0.005) return '$0.00';
-      return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2);
-    };
-
-    function typeLabel(t) {
-      return { landing: '🏠 Landing', direct: '🔗 Direct', hybrid: '🔀 Hybrid' }[t] || t;
-    }
-
-    function typeClass(t) {
-      return 'cp-type-' + (t || 'landing');
-    }
-
-    function renderCard(c) {
-      const st = c.stats || {};
-      const pl = st.pl || { profit: 0, roi: 0 };
-      const profitClass = pl.profit > 0.01 ? 'pos' : pl.profit < -0.01 ? 'neg' : 'zero';
-      const roiClass = pl.roi > 0.5 ? 'pos' : pl.roi < -0.5 ? 'neg' : 'zero';
-      const statusClass = c.status === 'paused' ? 'paused' : c.status === 'archived' ? 'archived' : '';
-      const typeAccent = c.type === 'direct' ? '#A855F7' : c.type === 'hybrid' ? '#10B981' : '#7C5CFF';
-
-      return `
-        <a href="/campaigns/${c.id}" class="cp-card ${statusClass}" style="--cp-accent:${typeAccent};">
-          <div class="cp-card-head">
-            <div class="cp-card-name-wrap">
-              <div class="cp-card-name">${esc(c.name)}</div>
-              <div class="cp-card-meta">
-                <span class="cp-type-badge ${typeClass(c.type)}">${typeLabel(c.type)}</span>
-                <span class="cp-source-pill">${esc(c.traffic_source_slug)}</span>
-                <span class="cp-source-arrow">→</span>
-                <span class="cp-source-pill">${esc(c.destination_slug)}</span>
-              </div>
-            </div>
-          </div>
-          <div class="cp-pl">
-            <span class="cp-profit ${profitClass}">${fmtMoney(pl.profit)}</span>
-            <span class="cp-roi ${roiClass}">${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%</span>
-          </div>
-          <div class="cp-stats">
-            <div>
-              <div class="cp-stat-lbl">إجمالي</div>
-              <div class="cp-stat-val">${fmtNum(st.total || 0)}</div>
-            </div>
-            <div>
-              <div class="cp-stat-lbl">Valid</div>
-              <div class="cp-stat-val valid">${fmtNum(st.valid || 0)}</div>
-            </div>
-            <div>
-              <div class="cp-stat-lbl">Bot %</div>
-              <div class="cp-stat-val bot">${Number(st.bot_rate || 0).toFixed(1)}%</div>
-            </div>
-          </div>
-        </a>`;
-    }
-
-    function applyFilters() {
-      let filtered = CP.campaigns.slice();
-      if (CP.filterStatus !== 'all') {
-        filtered = filtered.filter(c => c.status === CP.filterStatus);
-      }
-      if (CP.filterType !== 'all') {
-        filtered = filtered.filter(c => c.type === CP.filterType);
-      }
-      if (CP.searchQuery) {
-        const q = CP.searchQuery.toLowerCase();
-        filtered = filtered.filter(c => (c.name || '').toLowerCase().includes(q));
-      }
-      return filtered;
-    }
+    function fmtMoney(n) { const v = Number(n || 0); if (Math.abs(v) < 0.005) return '$0.00'; return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2); }
 
     function renderList() {
-      const list = applyFilters();
-      const content = document.getElementById('cpContent');
-      const empty = document.getElementById('cpEmpty');
-      const loading = document.getElementById('cpLoading');
-      const error = document.getElementById('cpError');
+      const content = document.getElementById('cpContent'); const loading = document.getElementById('cpLoading'); const empty = document.getElementById('cpEmpty');
       loading.style.display = 'none';
-      error.style.display = 'none';
+      if (CP.campaigns.length === 0) { content.style.display = 'none'; empty.style.display = ''; return; }
+      content.style.display = ''; empty.style.display = 'none';
 
-      if (CP.campaigns.length === 0) {
-        content.style.display = 'none';
-        empty.style.display = '';
-        return;
-      }
-      if (list.length === 0) {
-        content.innerHTML = `<div class="cp-empty" style="grid-column:1/-1;"><span class="cp-empty-icon">🔍</span><div class="cp-empty-title">مفيش نتائج</div><div class="cp-empty-sub">جرّب تغيّر الفلاتر</div></div>`;
-        content.style.display = '';
-        empty.style.display = 'none';
-        return;
-      }
-      content.innerHTML = list.map(renderCard).join('');
-      content.style.display = '';
-      empty.style.display = 'none';
+      content.innerHTML = CP.campaigns.map(c => {
+        const st = c.stats || {}; const pl = st.pl || { profit: 0, roi: 0 };
+        const profitClass = pl.profit > 0.01 ? 'pos' : pl.profit < -0.01 ? 'neg' : 'pos';
+        const roiClass = pl.roi > 0.5 ? 'pos' : pl.roi < -0.5 ? 'neg' : 'pos';
+        const typeAccent = c.type === 'direct' ? '#A855F7' : c.type === 'hybrid' ? '#10B981' : '#7C5CFF';
+        return `
+          <a href="/campaigns/${c.id}" class="cp-card" style="--cp-accent:${typeAccent};">
+            <div class="cp-card-head">
+              <div>
+                <div class="cp-card-name">${Shell.esc(c.name)}</div>
+                <div style="font-size:10px;color:#4A5263;margin-top:4px;"><span class="cp-type-badge cp-type-${c.type}">${c.type}</span></div>
+              </div>
+            </div>
+            <div class="cp-pl"><span class="cp-profit ${profitClass}">${fmtMoney(pl.profit)}</span><span class="cp-roi ${roiClass}">${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%</span></div>
+            <div class="cp-stats">
+              <div><div class="cp-stat-lbl">إجمالي</div><div class="cp-stat-val">${Shell.fmtNum(st.total || 0)}</div></div>
+              <div><div class="cp-stat-lbl">Valid</div><div class="cp-stat-val" style="color:#10B981">${Shell.fmtNum(st.valid || 0)}</div></div>
+              <div><div class="cp-stat-lbl">Bot %</div><div class="cp-stat-val" style="color:#F43F5E">${Number(st.bot_rate || 0).toFixed(1)}%</div></div>
+            </div>
+          </a>`;
+      }).join('');
     }
 
     async function loadCampaigns() {
-      document.getElementById('cpLoading').style.display = '';
-      document.getElementById('cpContent').style.display = 'none';
-      document.getElementById('cpEmpty').style.display = 'none';
-      document.getElementById('cpError').style.display = 'none';
-      try {
-        CP.campaigns = await Shell.api('/api/campaigns');
-        document.getElementById('cpSub').textContent = `${CP.campaigns.length} حملة`;
-        renderList();
-      } catch (e) {
-        document.getElementById('cpLoading').style.display = 'none';
-        document.getElementById('cpError').style.display = '';
-        document.getElementById('cpErrorMessage').textContent = e.message;
-      }
+      try { CP.campaigns = await Shell.api('/api/campaigns'); document.getElementById('cpSub').textContent = `${CP.campaigns.length} حملة`; renderList(); }
+      catch (e) { document.getElementById('cpLoading').style.display = 'none'; Shell.toast('فشل التحميل: ' + e.message, 'error'); }
     }
 
     function updateTypeButtons(type) {
       CP.newCampaignType = type;
-      document.querySelectorAll('.cp-type-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.type === type);
-      });
-      const isDirect = type === 'direct';
-      const isLanding = type === 'landing';
-      document.getElementById('sitePickerWrap').style.display = isDirect ? 'none' : '';
-      document.getElementById('destUrlWrap').style.display = isDirect ? '' : 'none';
-      document.getElementById('directOptsWrap').style.display = isDirect ? '' : 'none';
-      document.getElementById('zoneIdWrap').style.display = isLanding ? '' : 'none';
+      document.querySelectorAll('.cp-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+      document.getElementById('destUrlWrap').style.display = type === 'direct' ? '' : 'none';
     }
 
     async function openNewCampaign() {
-      document.getElementById('newName').value = '';
-      document.getElementById('newBuyCpm').value = '1.00';
-      document.getElementById('newSellCpm').value = '2.00';
-      document.getElementById('newDestUrl').value = '';
-      document.getElementById('newZoneId').value = '';
-      document.getElementById('newNotes').value = '';
-      document.getElementById('newRedirectDelay').value = '500';
-      document.getElementById('newBlockThreshold').value = '90';
-
-      // Populate selects
       try {
-        if (CP.sites.length === 0) {
-          CP.sites = await Shell.api('/api/sites');
-        }
-        const siteSel = document.getElementById('newSiteId');
-        siteSel.innerHTML = '<option value="0">— اختار موقع —</option>' +
-          CP.sites.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
-
-        if (CP.sources.length === 0) {
-          CP.sources = await Shell.api('/api/traffic-sources');
-        }
-        const srcSel = document.getElementById('newSource');
-        srcSel.innerHTML = CP.sources.map(s =>
-          `<option value="${esc(s.slug)}">${esc(s.name)}${s.is_builtin ? ' ⭐' : ''}</option>`
-        ).join('');
-
-        if (CP.destinations.length === 0) {
-          CP.destinations = await Shell.api('/api/destinations');
-        }
-        const dstSel = document.getElementById('newDest');
-        dstSel.innerHTML = CP.destinations.map(d =>
-          `<option value="${esc(d.slug)}">${esc(d.name)}${d.is_builtin ? ' ⭐' : ''}</option>`
-        ).join('');
-      } catch (e) {
-        Shell.toast('فشل تحميل البيانات: ' + e.message, 'error');
-        return;
-      }
-
-      updateTypeButtons('landing');
-      document.getElementById('newCampaignModal').classList.add('is-open');
-      setTimeout(() => document.getElementById('newName').focus(), 100);
+        if (CP.sources.length === 0) CP.sources = await Shell.api('/api/traffic-sources');
+        if (CP.destinations.length === 0) CP.destinations = await Shell.api('/api/destinations');
+        
+        document.getElementById('newSource').innerHTML = CP.sources.map(s => `<option value="${Shell.esc(s.slug)}">${Shell.esc(s.name)}</option>`).join('');
+        document.getElementById('newDest').innerHTML = CP.destinations.map(d => `<option value="${Shell.esc(d.slug)}">${Shell.esc(d.name)}</option>`).join('');
+        
+        document.getElementById('newCampaignModal').classList.add('is-open');
+      } catch (e) { Shell.toast('فشل تحميل القوائم', 'error'); }
     }
 
-    function closeNewCampaign() {
-      document.getElementById('newCampaignModal').classList.remove('is-open');
-    }
+    function closeNewCampaign() { document.getElementById('newCampaignModal').classList.remove('is-open'); }
 
     async function createCampaign() {
-      const name = document.getElementById('newName').value.trim();
-      if (!name) { Shell.toast('اسم الحملة مطلوب', 'error'); return; }
-
       const body = {
-        name,
+        name: document.getElementById('newName').value.trim(),
         type: CP.newCampaignType,
         traffic_source_slug: document.getElementById('newSource').value,
         buy_cpm: parseFloat(document.getElementById('newBuyCpm').value) || 0,
         destination_slug: document.getElementById('newDest').value,
         sell_cpm: parseFloat(document.getElementById('newSellCpm').value) || 0,
-        site_id: parseInt(document.getElementById('newSiteId').value) || 0,
-        redirect_delay_ms: parseInt(document.getElementById('newRedirectDelay').value) || 500,
-        bot_block_threshold: parseInt(document.getElementById('newBlockThreshold').value) || 90,
         destination_url: document.getElementById('newDestUrl').value.trim(),
         destination_zone_id: document.getElementById('newZoneId').value.trim(),
-        notes: document.getElementById('newNotes').value.trim(),
       };
-
-      if (body.type !== 'direct' && !body.site_id) {
-        Shell.toast('حملات Landing/Hybrid محتاجة موقع', 'error'); return;
-      }
-      if (body.type === 'direct' && !body.destination_url) {
-        Shell.toast('حملات Direct محتاجة رابط وجهة', 'error'); return;
-      }
-
-      const btn = document.getElementById('createCampaignBtn');
-      btn.disabled = true;
-      btn.textContent = '⏳ جاري…';
+      if (!body.name) { Shell.toast('اسم الحملة مطلوب', 'error'); return; }
+      if (body.type === 'direct' && !body.destination_url) { Shell.toast('حملات Direct محتاجة رابط وجهة', 'error'); return; }
+      
+      const btn = document.getElementById('createCampaignBtn'); btn.disabled = true;
       try {
-        const res = await Shell.api('/api/campaigns', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-        closeNewCampaign();
-        Shell.toast('تم إنشاء الحملة ✅', 'success');
+        const res = await Shell.api('/api/campaigns', { method: 'POST', body: JSON.stringify(body) });
+        closeNewCampaign(); Shell.toast('تم إنشاء الحملة ✅', 'success');
         window.location.href = '/campaigns/' + res.id;
-      } catch (e) {
-        Shell.toast('فشل: ' + e.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'إنشاء الحملة';
-      }
+      } catch (e) { Shell.toast('فشل: ' + e.message, 'error'); }
+      finally { btn.disabled = false; }
     }
 
     (async function boot() {
       try {
-        await Shell.mount({
-          active: 'campaigns',
-          lang: 'ar',
-          breadcrumb: [{ label: 'الحملات' }],
-        });
-        document.getElementById('bootSkeleton').style.display = 'none';
-        document.getElementById('shAppRoot').style.display = '';
-
-        document.getElementById('refreshBtn').addEventListener('click', loadCampaigns);
+        await Shell.mount({ active: 'campaigns', lang: 'ar', breadcrumb: [{ label: 'الحملات' }] });
+        document.getElementById('bootSkeleton').style.display = 'none'; document.getElementById('shAppRoot').style.display = '';
         document.getElementById('newBtn').addEventListener('click', openNewCampaign);
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-          CP.searchQuery = e.target.value.trim();
-          renderList();
-        });
-        document.querySelectorAll('[data-filter]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            CP.filterStatus = btn.dataset.filter;
-            renderList();
-          });
-        });
-        document.querySelectorAll('[data-type]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            CP.filterType = btn.dataset.type;
-            renderList();
-          });
-        });
-        document.querySelectorAll('.cp-type-btn').forEach(btn => {
-          btn.addEventListener('click', () => updateTypeButtons(btn.dataset.type));
-        });
-        document.getElementById('newCampaignModal').addEventListener('click', (e) => {
-          if (e.target.id === 'newCampaignModal') closeNewCampaign();
-        });
-
+        document.querySelectorAll('.cp-type-btn').forEach(btn => btn.addEventListener('click', () => updateTypeButtons(btn.dataset.type)));
+        document.getElementById('newCampaignModal').addEventListener('click', (e) => { if (e.target.id === 'newCampaignModal') closeNewCampaign(); });
         await loadCampaigns();
-      } catch (e) {
-        console.error('[Campaigns Boot]', e);
-        const skel = document.getElementById('bootSkeleton');
-        if (skel) {
-          skel.innerHTML = `<div style="color:#F43F5E;font-weight:700;">فشل التحميل</div><div style="font-size:12px;margin-top:8px;">${Shell.esc(e.message || '')}</div>`;
-        }
-      }
+      } catch (e) { document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`; }
     })();
   </script>
 </body>
-</html>
+                                                                           </html>
