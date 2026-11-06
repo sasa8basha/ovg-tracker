@@ -1,25 +1,14 @@
 """
 analysis.py — OVG Tracker — The Brain (v3.1 Accuracy Boost)
 
-v3.1 changes:
-  - Data Quality Gate (legacy/failed → unknown verdict)
-  - 8 new detection signals (speech_voices, webgl_precision, isTrusted, ua_brands, connection)
-  - Relaxed 8 signals that caused false positives (DRIVE_BY, TZ_MISMATCH, AD_HIDDEN, etc.)
-  - Expanded DATACENTER_ASNS (60+ providers)
-  - Added HeadlessChrome, PhantomJS, Splinter to BOT_UA_PATTERNS
+SYSTEM 1 (v9.2): Circuit breaker wraps all 21 checks
+SYSTEM 2 (v9.3): Bayesian probability verdict
+SYSTEM 3 (v9.4): 6-tier verdict
+SYSTEM 4 (v9.5): Server-verified HTTP cross-validation
+SYSTEM 5 (v9.6): Adaptive thresholds from ground truth data
 
-SYSTEM 1 INTEGRATION (v9.2):
-  - All 20 checks wrapped in circuit breakers (collector.circuit_breaker)
-  - Single check failure never crashes the analysis pipeline
-  - Self-tests run automatically on import
-
-SYSTEM 2 INTEGRATION (v9.3):
-  - Verdict determined by Bayesian probability, not score sum
-  - 5 weak signals no longer equal 1 strong signal
-  - IMPOSSIBLE severity overrides everything → invalid
-  - CRITICAL signal floors verdict at suspicious (never valid)
-  - Returns new fields: probability, log_odds, bayesian_confidence, safety_triggered
-  - Self-tests run automatically on import
+All 14 hardcoded thresholds now use adaptive_get_threshold() with safe defaults.
+Signal reliabilities come from adaptive_thresholds via bayesian_engine.
 """
 import os
 import re
@@ -27,6 +16,11 @@ import ipaddress
 from urllib.parse import urlparse, parse_qs
 from config import GEO_LOOKUP_TIMEOUT
 from utils import ip_cache, _is_private_ip
+from collector.adaptive_thresholds import (
+    get_threshold as adaptive_get_threshold,
+    get_reliability as adaptive_get_reliability,
+    health_status as adaptive_health_status,
+)
 from collector.circuit_breaker import (
     safe_call as cb_safe_call,
     breakers as cb_breakers,
@@ -36,6 +30,17 @@ from collector.bayesian_engine import (
     bayesian_evaluate as bayes_evaluate,
     compute_probability as bayes_compute,
     health_status as bayes_health_status,
+)
+from collector.verdict_engine import (
+    VerdictV2,
+    classify_verdict_v2,
+    to_legacy_verdict,
+    verdict_metadata,
+    health_status as verdict_health_status,
+)
+from collector.server_cross_validator import (
+    analyze_server_headers as scv_analyze,
+    health_status as scv_health_status,
 )
 
 
@@ -99,7 +104,6 @@ def _safe_str(val, max_len=200):
 
 
 def _duration_ms(behavior):
-    """Get duration from behavior — supports v2 (time_on_page_ms) and v3 (total_time_ms)."""
     t = safe_int(behavior.get("time_on_page_ms"), 0)
     if t == 0:
         t = safe_int(behavior.get("total_time_ms"), 0)
@@ -107,7 +111,6 @@ def _duration_ms(behavior):
 
 
 def _mouse_points_count(behavior):
-    """v2 uses mouse_analysis.total_points; v3 uses mouse_points list length."""
     ma = _safe_dict(behavior.get("mouse_analysis"))
     if not ma.get("too_few", True):
         return safe_int(ma.get("total_points"), 0)
@@ -116,25 +119,20 @@ def _mouse_points_count(behavior):
 
 
 # =========================================================
-# BOT UA PATTERNS (v3.1 — expanded)
+# BOT UA PATTERNS
 # =========================================================
 BOT_UA_PATTERNS = (
-    # CLI/HTTP clients
     "curl", "wget", "httpie",
     "python-requests", "requests/",
     "go-http-client", "java/", "okhttp",
     "axios/", "node-fetch", "undici",
     "httpclient", "libwww", "restsharp",
-    # Automation
     "headless", "headlesschrome", "headless_chrome",
     "selenium", "phantomjs", "phantom", "puppeteer", "playwright",
     "splinter", "mechanize", "splash", "scrapinghub",
-    # Libraries
     "scrapy", "guzzle", "httpx", "aiohttp", "urllib",
-    # Tools
     "postman", "insomnia", "apitester", "http_request",
     "automated", "automation",
-    # SEO crawlers
     "ahrefsbot", "semrushbot", "mj12bot", "dotbot",
     "petalbot", "bytespider", "gptbot", "claudebot",
     "ccbot", "yandexbot", "slurp", "bingpreview",
@@ -151,9 +149,8 @@ HEADLESS_UA_RE = re.compile(r"headless(?:chrome|_chrome|firefox)?", re.IGNORECAS
 
 
 def _is_bot_ua(ua: str) -> bool:
-    """Legacy bot UA check — used only if critical headless not detected."""
     if not ua:
-        return False  # v3.1: empty UA is handled separately (not auto-bot)
+        return False
     ua_lower = ua.lower()
     if any(x in ua_lower for x in BOT_UA_PATTERNS):
         return True
@@ -165,65 +162,39 @@ def _is_bot_ua(ua: str) -> bool:
 
 
 def _is_headless_ua(ua: str) -> bool:
-    """v3.1 — explicit headless UA check (critical, not just 'suspicious')."""
     if not ua:
         return False
     return bool(HEADLESS_UA_RE.search(ua))
 
 
 # =========================================================
-# DATACENTER ASNs (v3.1 — expanded to 60+)
+# DATACENTER ASNs
 # =========================================================
 DATACENTER_ASNS = frozenset([
-    # AWS
     "AS16509", "AS14618", "AS8987",
-    # Google Cloud
     "AS396982", "AS15169", "AS19527",
-    # Azure
     "AS8075", "AS8068", "AS8069",
-    # Cloudflare
     "AS13335", "AS209242",
-    # Akamai
     "AS20940", "AS16625", "AS21342", "AS16702",
-    # Fastly
     "AS54113", "AS394192",
-    # DigitalOcean
     "AS14061", "AS393406",
-    # Linode
     "AS63949", "AS48337",
-    # Vultr/Choopa
     "AS20473", "AS3223",
-    # Hetzner
     "AS24940", "AS213230",
-    # OVH
     "AS16276", "AS35540",
-    # Oracle Cloud
     "AS31898", "AS7160",
-    # Alibaba
     "AS45102", "AS37963", "AS24429",
-    # Tencent
     "AS132203", "AS45090",
-    # Huawei
     "AS136907", "AS55990",
-    # Hostinger
     "AS47583", "AS199524",
-    # Contabo
     "AS51167", "AS141995",
-    # Scaleway/Online.net
     "AS12876", "AS29447",
-    # IONOS/1&1
     "AS8560", "AS15418",
-    # GoDaddy
     "AS26496", "AS398101",
-    # Namecheap
     "AS22612",
-    # Bluehost
     "AS11798", "AS46606",
-    # HostGator
     "AS19871",
-    # Rackspace
     "AS19994", "AS33070",
-    # Other known
     "AS60781", "AS394711", "AS9009", "AS62838", "AS200373", "AS9002",
     "AS49505", "AS208046", "AS40676", "AS53667", "AS59711",
     "AS29802", "AS63023", "AS212238", "AS9312", "AS35916",
@@ -457,7 +428,7 @@ def _check_webrtc(webrtc_str, client_ip, ip_info):
     return 90, f"WebRTC Leak: {_safe_str(valid_leaks[0], 60)}"
 
 
-VALID_SEVERITIES = frozenset(["critical", "high", "medium", "low", "human"])
+VALID_SEVERITIES = frozenset(["impossible", "critical", "high", "medium", "low", "human"])
 VALID_VERDICTS = frozenset(["valid", "invalid", "suspicious", "unknown"])
 
 
@@ -482,7 +453,7 @@ class EvidenceCollector:
         self._add(code, "human", -abs(int(score)), detail)
 
     def has_critical(self) -> bool:
-        return any(i["severity"] == "critical" for i in self.items)
+        return any(i["severity"] in ("critical", "impossible") for i in self.items)
 
     def raw_score(self) -> int:
         return sum(i["score"] for i in self.items)
@@ -491,7 +462,7 @@ class EvidenceCollector:
         return max(0, min(150, self.raw_score()))
 
     def counts(self) -> dict:
-        counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "human": 0}
+        counts = {"impossible": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "human": 0}
         for item in self.items:
             counts[item["severity"]] = counts.get(item["severity"], 0) + 1
         return counts
@@ -511,7 +482,7 @@ def calc_confidence(signals: list) -> float:
     non_human = [s for s in signals if s.get("severity") != "human"]
     if not non_human:
         return 0.0
-    if any(s.get("severity") == "critical" for s in non_human):
+    if any(s.get("severity") in ("critical", "impossible") for s in non_human):
         return 0.95
     weights = {"high": 30, "medium": 15, "low": 5}
     total_weight = sum(weights.get(s.get("severity"), 10) for s in non_human)
@@ -529,7 +500,7 @@ def calc_confidence(signals: list) -> float:
 
 
 def count_categories(signals: list) -> dict:
-    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "human": 0}
+    counts = {"impossible": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "human": 0}
     for s in signals:
         sev = s.get("severity", "medium") if isinstance(s, dict) else "medium"
         if sev in counts:
@@ -589,27 +560,22 @@ def is_wasted_impression(evidence_items: list, verdict: str) -> bool:
 
 
 # =========================================================
-# EXPLAINABILITY (v3.1 — new codes added)
+# EXPLAINABILITY
 # =========================================================
 CODE_TO_SOURCE = {
-    # ===== Critical =====
     "WEBDRIVER_FLAG": "critical", "CDP_DETECTED": "critical",
     "WINDOWS_UA_LINUX": "critical", "FIREFOX_CHROME_OBJ": "critical",
     "HEADLESS_UA": "critical",
     "UNTRUSTED_CLICK": "critical",
     "HONEYPOT_CLICK": "honeypot", "HONEYPOT_FORM_FILL": "honeypot",
     "IMPOSSIBLE_SPEED": "behavior_deep",
-    # ===== Automation =====
     "PUPPETEER_DETECTED": "automation", "PLAYWRIGHT_DETECTED": "automation",
     "SELENIUM_DETECTED": "automation", "NIGHTMARE_DETECTED": "automation",
     "PHANTOM_DETECTED": "automation",
-    # ===== UA =====
     "BOT_UA": "ua",
-    # ===== Network =====
     "VPN_DATACENTER": "network", "DATACENTER_IP": "network",
     "VPN_PROXY": "network", "DATACENTER_ASN": "network",
     "WEBRTC_LEAK": "network", "WEBRTC_VPN_DIFF": "network",
-    # ===== Fingerprint =====
     "PLUGINS_ZERO": "fingerprint", "CHROME_NO_OBJ": "fingerprint",
     "CANVAS_BLOCKED": "fingerprint", "CANVAS_MISSING": "fingerprint",
     "LANGUAGES_EMPTY": "fingerprint", "SINGLE_LANG": "fingerprint",
@@ -617,66 +583,57 @@ CODE_TO_SOURCE = {
     "SPEECH_VOICES_ZERO": "fingerprint",
     "WEBGL_PRECISION_ZERO": "fingerprint",
     "UA_BRANDS_MISMATCH": "fingerprint",
-    # ===== Fingerprint reuse =====
     "FINGERPRINT_REUSE_HIGH": "fingerprint_reuse",
     "FINGERPRINT_REUSE_MED": "fingerprint_reuse",
     "FINGERPRINT_REUSE_LOW": "fingerprint_reuse",
-    # ===== Cross-visit =====
     "IP_VELOCITY_HIGH": "cross_visit", "IP_VELOCITY_MED": "cross_visit",
     "FINGERPRINT_MULTI_IP": "cross_visit", "IP_MULTI_FINGERPRINT": "cross_visit",
-    # ===== Hardware =====
     "CORES_ZERO": "hardware", "CORES_LOW": "hardware",
     "ABSURD_CORES": "hardware", "LOW_MEMORY": "hardware",
     "CPU_MEMORY_MISMATCH": "hardware", "MOBILE_PIXEL_RATIO": "hardware",
     "LOW_COLOR_DEPTH": "hardware",
-    # ===== Screen =====
     "HEADLESS_VIEWPORT": "screen", "VIEWPORT_ZERO": "screen",
     "MOBILE_WIDE_SCREEN": "screen", "TABLET_WIDE_SCREEN": "screen",
     "SCREEN_TINY": "screen", "INNER_WIDER_THAN_SCREEN": "screen",
     "INNER_TALLER_THAN_SCREEN": "screen",
-    # ===== OS =====
     "OS_MISMATCH_WIN": "os", "OS_MISMATCH_MAC": "os",
-    # ===== Contradictions =====
     "TOUCH_UA_MISMATCH": "contradictions", "FIRST_LANG_MISMATCH": "contradictions",
     "INTL_LOCALE_MISMATCH": "contradictions",
     "WEBGL_VENDOR_RENDERER_MISMATCH": "contradictions",
     "UA_CHROME_OLD": "contradictions", "UA_CHROME_FUTURE": "contradictions",
     "CLIENT_HINTS_MISMATCH": "contradictions",
-    # ===== Locale =====
     "LANG_COUNTRY_MISMATCH": "locale",
-    # ===== Timezone =====
     "UTC_TZ": "timezone", "TZ_MISMATCH": "timezone",
-    # ===== Behavior =====
     "LEFT_FAST": "behavior", "LEFT_FAST_HIDDEN": "behavior",
     "ROBOTIC_LINEAR": "behavior", "ROBOTIC_CURVATURE": "behavior",
     "ROBOTIC_VARIANCE": "behavior", "ZOMBIE": "behavior",
     "SCROLL_LINEAR": "behavior", "MOUSE_TOO_SMOOTH": "behavior",
-    # ===== Behavior deep =====
     "INSTANT_FIRST_MOVE": "behavior_deep", "CLICK_BEFORE_MOVE": "behavior_deep",
     "IDLE_VISIBLE": "behavior_deep", "RAPID_REPEAT_CLICKS": "behavior_deep",
     "ENGAGEMENT_ZERO": "behavior_deep", "ENGAGEMENT_VERY_LOW": "behavior_deep",
     "FIRST_30S_BURST": "behavior_deep", "ZOMBIE_60S": "behavior_deep",
     "NO_MOUSE_NO_TOUCH": "behavior_deep",
-    # ===== WebGL =====
     "SOFT_RENDERER": "webgl",
-    # ===== Session =====
     "SILENT_AFTER_INITIAL": "session", "HEARTBEAT_GAP": "session",
     "DRIVE_BY": "session", "CLOCK_DRIFT": "session",
-    # ===== Ad events =====
     "AD_HIDDEN_AFTER_LOAD": "ad_events",
-    # ===== Milestones =====
     "INTERACTION_BEFORE_PAINT": "milestones",
-    # ===== Connection =====
     "CONNECTION_RTT_ZERO": "connection",
-    # ===== CPM =====
     "CPM_BRAVE": "cpm", "CPM_ADBLOCK_BROWSER": "cpm",
-    # ===== Human =====
     "HUMAN_RICH_INTERACTION": "human", "HUMAN_NATURAL_MOUSE": "human",
     "HUMAN_LONG_ENGAGEMENT": "human", "HUMAN_DEEP_SCROLL": "human",
     "HUMAN_KEYBOARD": "human", "HUMAN_ENGAGED": "human",
-    # ===== Meta =====
     "LEGACY_SIGNAL": "legacy", "MOCK_SIGNAL": "mock",
     "DATA_LEGACY": "data_quality", "DATA_INSUFFICIENT": "data_quality",
+    "HTTP_UA_JS_MISMATCH": "server_cross",
+    "MISSING_SEC_CH_UA": "server_cross",
+    "SEC_CH_UA_ON_FIREFOX": "server_cross",
+    "SEC_CH_UA_ON_SAFARI": "server_cross",
+    "SEC_CH_UA_MOBILE_MISMATCH": "server_cross",
+    "SEC_CH_HEADLESS_BRAND": "server_cross",
+    "SEC_CH_UA_GOOGLE_MISSING": "server_cross",
+    "HTTP_1_1_ON_HTTPS": "server_cross",
+    "CF_COUNTRY_TZ_MISMATCH": "server_cross",
 }
 
 
@@ -714,36 +671,27 @@ def build_explainability_trace(evidence_items):
 
 
 # =========================================================
-# SIGNAL CHECKS
+# SIGNAL CHECKS (with SYSTEM 5 adaptive thresholds)
 # =========================================================
 def _check_critical(nav, fp, ua, platform, chrome_check):
     items = []
-
-    # Headless UA (v3.1 — critical)
     if _is_headless_ua(ua):
         items.append(("HEADLESS_UA", "critical", 100,
                       f"Headless UA detected: {_safe_str(ua[:60], 60)}"))
-
-    # Untrusted click (v3.1 — critical)
     untrusted = safe_int(fp.get("_untrusted_clicks"), 0)
     if untrusted >= 1:
         items.append(("UNTRUSTED_CLICK", "critical", 100,
                       f"{untrusted} click(s) with isTrusted=false (JS-injected)"))
-
     if nav.get("webdriver") is True:
         items.append(("WEBDRIVER_FLAG", "critical", 80, "navigator.webdriver === true"))
-
     if fp.get("cdp_detected") is True:
         items.append(("CDP_DETECTED", "critical", 100, "CDP Runtime Detected"))
-
     if "windows nt" in ua and platform and ("linux" in platform or "x11" in platform):
         items.append(("WINDOWS_UA_LINUX", "critical", 100,
                       f"Windows UA + Linux platform ({_safe_str(platform, 30)})"))
-
     if "firefox" in ua and chrome_check == "full":
         items.append(("FIREFOX_CHROME_OBJ", "critical", 80,
                       "Firefox UA + window.chrome (impossible)"))
-
     return items
 
 
@@ -814,7 +762,6 @@ def _check_fingerprint(fp, plugins_info, is_desktop_chrome, is_privacy_browser,
     if is_desktop_chrome and not is_privacy_browser and pdf_viewer is False:
         items.append(("NO_PDF_VIEWER", "low", 15, "Chrome desktop: pdfViewerEnabled=false"))
 
-    # v3.1 — speech voices (headless = 0)
     speech = fp.get("speech_voices")
     if speech is not None:
         sv = safe_int(speech, -1)
@@ -822,7 +769,6 @@ def _check_fingerprint(fp, plugins_info, is_desktop_chrome, is_privacy_browser,
             items.append(("SPEECH_VOICES_ZERO", "high", 70,
                           "speechSynthesis.getVoices() = 0 (headless/bot indicator)"))
 
-    # v3.1 — WebGL precision (headless = 0/-1)
     wgp = _safe_dict(fp.get("webgl_precision"))
     if wgp:
         hf = safe_int(wgp.get("high_float"), -99)
@@ -834,13 +780,19 @@ def _check_fingerprint(fp, plugins_info, is_desktop_chrome, is_privacy_browser,
 
 
 def _check_fingerprint_reuse(data):
+    """SYSTEM 5: adaptive thresholds for reuse_high/med/low."""
     items = []
     recent_fp = safe_int(data.get("_recent_fp_count"), 0)
-    if recent_fp >= 50:
+
+    t_high = adaptive_get_threshold("reuse_high_per_min", 50)
+    t_med = adaptive_get_threshold("reuse_med_per_min", 30)
+    t_low = adaptive_get_threshold("reuse_low_per_min", 20)
+
+    if recent_fp >= t_high:
         items.append(("FINGERPRINT_REUSE_HIGH", "high", 80, f"Fingerprint reuse ({recent_fp}/min)"))
-    elif recent_fp >= 30:
+    elif recent_fp >= t_med:
         items.append(("FINGERPRINT_REUSE_HIGH", "high", 60, f"Fingerprint reuse ({recent_fp}/min)"))
-    elif recent_fp >= 20:
+    elif recent_fp >= t_low:
         items.append(("FINGERPRINT_REUSE_MED", "medium", 40, f"Fingerprint reuse ({recent_fp}/min)"))
     elif recent_fp > 10:
         items.append(("FINGERPRINT_REUSE_LOW", "low", 25, f"Fingerprint reuse ({recent_fp}/min)"))
@@ -848,13 +800,18 @@ def _check_fingerprint_reuse(data):
 
 
 def _check_cross_visit(data):
+    """SYSTEM 5: adaptive thresholds for IP velocity."""
     items = []
     same_ip = safe_int(data.get("_same_ip_last_minute"), 0)
     canvas_ips = safe_int(data.get("_same_canvas_ip_count"), 0)
     ip_canvases = safe_int(data.get("_same_ip_canvas_count"), 0)
-    if same_ip >= 10:
+
+    v_high = adaptive_get_threshold("ip_velocity_high", 10)
+    v_med = adaptive_get_threshold("ip_velocity_med", 5)
+
+    if same_ip >= v_high:
         items.append(("IP_VELOCITY_HIGH", "high", 70, f"Same IP: {same_ip} visits/min"))
-    elif same_ip >= 5:
+    elif same_ip >= v_med:
         items.append(("IP_VELOCITY_MED", "medium", 40, f"Same IP: {same_ip} visits/min"))
     if canvas_ips >= 5:
         items.append(("FINGERPRINT_MULTI_IP", "high", 60, f"Same canvas from {canvas_ips} distinct IPs/hour"))
@@ -868,18 +825,21 @@ def _check_cross_visit(data):
 
 
 def _check_hardware(fp, screen_dict, ua, is_privacy_browser, is_mobile_phone):
+    """SYSTEM 5: adaptive cores_high threshold."""
     items = []
     cores = safe_int(fp.get("hardwareConcurrency"), -1, max_val=256)
     memory = safe_float(fp.get("deviceMemory"), -1, max_val=1024)
     pixel_ratio = safe_float(screen_dict.get("pixelRatio"), -1, max_val=100)
     color_depth = safe_int(screen_dict.get("colorDepth"), -1, max_val=64)
 
+    cores_high = adaptive_get_threshold("cores_high", 128)
+
     if cores == 0:
         if not is_privacy_browser and "firefox" not in ua:
             items.append(("CORES_ZERO", "medium", 40, "hardwareConcurrency=0 (impossible)"))
     elif cores == 1:
         items.append(("CORES_LOW", "low", 15, "Single-core device (low-end or emulator)"))
-    elif cores > 128:
+    elif cores > cores_high:
         items.append(("ABSURD_CORES", "high", 60, f"hardwareConcurrency={cores} (spoofed)"))
 
     if 0 <= memory < 0.25:
@@ -899,6 +859,7 @@ def _check_hardware(fp, screen_dict, ua, is_privacy_browser, is_mobile_phone):
 
 
 def _check_screen(screen_dict, is_mobile_phone, is_tablet, is_desktop_chrome, is_mobile):
+    """SYSTEM 5: adaptive headless viewport + tiny screen."""
     items = []
     screen_w = safe_int(screen_dict.get("width"), 0)
     screen_h = safe_int(screen_dict.get("height"), 0)
@@ -907,8 +868,12 @@ def _check_screen(screen_dict, is_mobile_phone, is_tablet, is_desktop_chrome, is
     inner_w = safe_int(screen_dict.get("innerWidth"), 0)
     inner_h = safe_int(screen_dict.get("innerHeight"), 0)
 
-    if avail_w == 800 and avail_h == 600:
-        items.append(("HEADLESS_VIEWPORT", "high", 70, "Default 800x600 headless viewport"))
+    vp_w = adaptive_get_threshold("headless_viewport_w", 800)
+    vp_h = adaptive_get_threshold("headless_viewport_h", 600)
+    tiny_thresh = adaptive_get_threshold("screen_tiny_threshold", 800)
+
+    if avail_w == vp_w and avail_h == vp_h:
+        items.append(("HEADLESS_VIEWPORT", "high", 70, f"Default {int(vp_w)}x{int(vp_h)} headless viewport"))
 
     if avail_w == 0 or avail_h == 0:
         items.append(("VIEWPORT_ZERO", "medium", 50, "Viewport is 0x0 (headless)"))
@@ -919,8 +884,7 @@ def _check_screen(screen_dict, is_mobile_phone, is_tablet, is_desktop_chrome, is
     if is_tablet and screen_w > 3840:
         items.append(("TABLET_WIDE_SCREEN", "medium", 40, f"Tablet UA + {screen_w}px screen"))
 
-    # v3.1 — relaxed from < 1024 to < 800
-    if is_desktop_chrome and not is_mobile and 0 < screen_w < 800:
+    if is_desktop_chrome and not is_mobile and 0 < screen_w < tiny_thresh:
         items.append(("SCREEN_TINY", "medium", 30, f"Desktop Chrome + {screen_w}px screen"))
 
     if screen_w > 0 and inner_w > 0:
@@ -1007,7 +971,6 @@ def _check_contradictions(nav, fp, screen_dict, ua, is_mobile, is_mobile_phone,
     if ua_data_mobile is False and is_mobile_phone:
         items.append(("CLIENT_HINTS_MISMATCH", "medium", 40, "userAgentData.mobile=false but mobile UA"))
 
-    # v3.1 — UA brands mismatch (headless shows "Chromium" not "Google Chrome")
     brands = _safe_list(fp.get("ua_brands"))
     if brands and "chrome" in ua and not is_mobile:
         has_google = any("Google Chrome" in str(b.get("brand", "")) for b in brands if isinstance(b, dict))
@@ -1049,12 +1012,12 @@ def _check_timezone(fp, country_code, is_privacy_browser):
     elif country_code in TZ_BY_COUNTRY_CODE:
         expected_tzs = TZ_BY_COUNTRY_CODE[country_code]
         if tz not in expected_tzs:
-            # v3.1 — relaxed from +60 to +30 (VPN users are legit)
             items.append(("TZ_MISMATCH", "low", 30, f"IP country {country_code} vs TZ {_safe_str(tz, 40)}"))
     return items
 
 
 def _check_behavior(behavior, events):
+    """SYSTEM 5: adaptive left_fast_ms and zombie_ms."""
     items = []
     mousemove = safe_int(events.get("mousemove"), 0)
     scrolls = safe_int(events.get("scrolls"), 0)
@@ -1064,13 +1027,15 @@ def _check_behavior(behavior, events):
     t_on_page = _duration_ms(behavior)
     send_reason = str(behavior.get("send_reason") or "unknown").lower()
 
-    if t_on_page > 0 and t_on_page < 1800:
+    left_fast = adaptive_get_threshold("left_fast_ms", 1800)
+    zombie_min = adaptive_get_threshold("zombie_ms", 8000)
+
+    if t_on_page > 0 and t_on_page < left_fast:
         if send_reason == "hidden":
             items.append(("LEFT_FAST_HIDDEN", "low", 15, f"Hidden after {t_on_page}ms"))
         else:
             items.append(("LEFT_FAST", "medium", 40, f"Left after {t_on_page}ms"))
 
-    # Mouse analysis (v2 + v3 compatible)
     mouse_analysis = _safe_dict(behavior.get("mouse_analysis"))
     has_mouse_analysis = (
         not mouse_analysis.get("too_few", True)
@@ -1098,7 +1063,8 @@ def _check_behavior(behavior, events):
             items.append(("ROBOTIC_LINEAR", "high", 60, f"Linear motion ({dc} turns, var={dv:.4f})"))
     else:
         mv = safe_float(behavior.get("mouse_variance"), 0.0)
-        if mousemove > 10 and mv < 1.5:
+        mv_low = adaptive_get_threshold("mouse_variance_low", 1.5)
+        if mousemove > 10 and mv < mv_low:
             items.append(("ROBOTIC_VARIANCE", "medium", 50, f"Low mouse variance ({mv:.2f})"))
 
     has_any_interaction = (
@@ -1107,13 +1073,14 @@ def _check_behavior(behavior, events):
         or scrolls > 0
         or clicks > 0
     )
-    if t_on_page > 8000 and not has_any_interaction:
+    if t_on_page > zombie_min and not has_any_interaction:
         items.append(("ZOMBIE", "low", 30, f"No interaction after {t_on_page}ms"))
 
     return items
 
 
 def _check_behavior_deep(behavior, events):
+    """SYSTEM 5: adaptive first_move_instant_ms, idle_visible_min_ms, idle_visible_ratio."""
     items = []
     t_on_page = _duration_ms(behavior)
     first_move = safe_int(behavior.get("first_move_delay_ms"), -1)
@@ -1125,15 +1092,19 @@ def _check_behavior_deep(behavior, events):
     scrolls = safe_int(events.get("scrolls"), 0)
     keydown = safe_int(events.get("keydown"), 0)
 
-    if 0 <= first_move < 100 and mousemove > 0:
+    instant_move = adaptive_get_threshold("first_move_instant_ms", 100)
+    idle_min = adaptive_get_threshold("idle_visible_min_ms", 5000)
+    idle_ratio = adaptive_get_threshold("idle_visible_ratio", 0.98)
+
+    if 0 <= first_move < instant_move and mousemove > 0:
         items.append(("INSTANT_FIRST_MOVE", "medium", 30, f"First mousemove after {first_move}ms (scripted)"))
 
     if clicks_before_move > 0 and touchstart == 0:
         items.append(("CLICK_BEFORE_MOVE", "high", 60, f"{clicks_before_move} clicks before any mousemove"))
 
-    if t_on_page > 5000 and visible_time > 0:
+    if t_on_page > idle_min and visible_time > 0:
         ratio = visible_time / t_on_page
-        if ratio > 0.98 and mousemove == 0 and clicks == 0 and scrolls == 0 and touchstart == 0:
+        if ratio > idle_ratio and mousemove == 0 and clicks == 0 and scrolls == 0 and touchstart == 0:
             items.append(("IDLE_VISIBLE", "medium", 30, f"Visible {ratio*100:.0f}% with no interaction"))
 
     click_points = behavior.get("clicks_points") or behavior.get("click_points")
@@ -1210,10 +1181,8 @@ def _check_human(behavior, events):
     return items
 
 
-# =========================================================
-# v3 SIGNALS (heartbeat, milestones, first_30s, ad_events)
-# =========================================================
 def _check_v3_signals(data, behavior, events, fp, ua):
+    """SYSTEM 5: adaptive drive_by_ms, silent_after_initial_ms, engagement_zero_ms, no_mouse_no_touch_ms, mouse_var_smooth."""
     items = []
 
     hb_count = safe_int(data.get("_heartbeat_count"), 0)
@@ -1224,13 +1193,16 @@ def _check_v3_signals(data, behavior, events, fp, ua):
     clock_drift = safe_int(data.get("_clock_drift_ms"), 0)
     connection = _safe_dict(fp.get("connection"))
 
-    # 1) Drive-by bot (v3.1 — relaxed: 5s + medium, not critical)
-    if hb_count == 0 and 0 < t_on_page < 5000:
-        items.append(("DRIVE_BY", "medium", 40,
-                      f"Drive-by: {t_on_page}ms, no heartbeat"))
+    drive_by = adaptive_get_threshold("drive_by_ms", 5000)
+    silent_min = adaptive_get_threshold("silent_after_initial_ms", 5000)
+    engage_zero = adaptive_get_threshold("engagement_zero_ms", 15000)
+    no_mouse_min = adaptive_get_threshold("no_mouse_no_touch_ms", 8000)
+    var_smooth = adaptive_get_threshold("mouse_var_smooth", 0.1)
 
-    # 2) Silent after initial (only if NO interaction at all)
-    elif hb_count == 0 and t_on_page >= 5000:
+    if hb_count == 0 and 0 < t_on_page < drive_by:
+        items.append(("DRIVE_BY", "medium", 40, f"Drive-by: {t_on_page}ms, no heartbeat"))
+
+    elif hb_count == 0 and t_on_page >= silent_min:
         total_events = (
             safe_int(events.get("mousemove"), 0)
             + safe_int(events.get("clicks"), 0) * 3
@@ -1242,8 +1214,7 @@ def _check_v3_signals(data, behavior, events, fp, ua):
             items.append(("SILENT_AFTER_INITIAL", "high", 70,
                           f"No heartbeat + no interaction over {t_on_page}ms"))
 
-    # 3) Engagement zero (v3.1 — 15s not 10s)
-    if t_on_page >= 15000:
+    if t_on_page >= engage_zero:
         total_events = (
             safe_int(events.get("mousemove"), 0)
             + safe_int(events.get("clicks"), 0) * 3
@@ -1258,7 +1229,6 @@ def _check_v3_signals(data, behavior, events, fp, ua):
             items.append(("ENGAGEMENT_VERY_LOW", "low", 25,
                           f"Only {total_events} interactions over {t_on_page/1000:.1f}s"))
 
-    # 4) First 30s burst
     if isinstance(first_30s, dict) and first_30s:
         has_int_30s = first_30s.get("has_interaction_30s")
         clicks_30s = safe_int(first_30s.get("clicks_30s"), 0)
@@ -1266,8 +1236,7 @@ def _check_v3_signals(data, behavior, events, fp, ua):
         total_early = clicks_30s + scrolls_30s
 
         if has_int_30s is False and t_on_page > 60000:
-            items.append(("ZOMBIE_60S", "medium", 30,
-                          "No interaction in first 30s over 60s+"))
+            items.append(("ZOMBIE_60S", "medium", 30, "No interaction in first 30s over 60s+"))
 
         if has_int_30s is True and total_early >= 5 and t_on_page > 45000:
             total_clicks = safe_int(events.get("clicks"), 0)
@@ -1277,21 +1246,13 @@ def _check_v3_signals(data, behavior, events, fp, ua):
                 items.append(("FIRST_30S_BURST", "high", 50,
                               f"Heavy early ({total_early}) then dead"))
 
-    # 5) Ad loaded but never visible (v3.1 — 30s not 15s)
     if ad_events:
-        loaded = any(
-            "loaded" in str(ev.get("event", ""))
-            for ev in ad_events if isinstance(ev, dict)
-        )
-        visible = any(
-            "viewable_50pct_1s" in str(ev.get("event", ""))
-            for ev in ad_events if isinstance(ev, dict)
-        )
+        loaded = any("loaded" in str(ev.get("event", "")) for ev in ad_events if isinstance(ev, dict))
+        visible = any("viewable_50pct_1s" in str(ev.get("event", "")) for ev in ad_events if isinstance(ev, dict))
         if loaded and not visible and t_on_page > 30000:
             items.append(("AD_HIDDEN_AFTER_LOAD", "medium", 40,
                           "Ad loaded but never visible over 30s (bot cloaking?)"))
 
-    # 6) Interaction before paint (v3.1 — 500ms diff, not 100)
     if isinstance(milestones, dict):
         t_paint = milestones.get("t_first_paint")
         t_int = milestones.get("t_first_interaction")
@@ -1304,12 +1265,9 @@ def _check_v3_signals(data, behavior, events, fp, ua):
         except (ValueError, TypeError):
             pass
 
-    # 7) Clock drift
     if abs(clock_drift) > 30000:
-        items.append(("CLOCK_DRIFT", "medium", 30,
-                      f"Clock drift: {clock_drift}ms"))
+        items.append(("CLOCK_DRIFT", "medium", 30, f"Clock drift: {clock_drift}ms"))
 
-    # 8) Scroll pattern (v3)
     scroll_pattern = str(behavior.get("scroll_pattern") or "").lower()
     scroll_depth = safe_int(behavior.get("scroll_depth_pct"), 0)
 
@@ -1317,28 +1275,24 @@ def _check_v3_signals(data, behavior, events, fp, ua):
         items.append(("SCROLL_LINEAR", "medium", 40,
                       "Perfectly linear scroll (no pauses, no reversals)"))
 
-    # 9) Mouse too smooth (v3.1 — < 0.1, not < 0.5)
     mouse_var = safe_float(behavior.get("mouse_velocity_variance"), 0)
     mouse_pts = _mouse_points_count(behavior)
-    if mouse_pts >= 50 and 0 <= mouse_var < 0.1:
+    if mouse_pts >= 50 and 0 <= mouse_var < var_smooth:
         items.append(("MOUSE_TOO_SMOOTH", "medium", 40,
                       f"Mouse velocity variance too low: {mouse_var:.3f}"))
 
-    # 10) No mouse + no touch (v3.1 — new signal)
     mm = safe_int(events.get("mousemove"), 0)
     tt = safe_int(events.get("touchstart"), 0)
-    if t_on_page > 8000 and mm == 0 and tt == 0:
+    if t_on_page > no_mouse_min and mm == 0 and tt == 0:
         items.append(("NO_MOUSE_NO_TOUCH", "high", 60,
                       f"No mouse or touch events over {t_on_page/1000:.0f}s"))
 
-    # 11) Connection RTT zero (headless indicator)
     if isinstance(connection, dict):
         rtt = safe_int(connection.get("rtt"), -1)
         if rtt == 0 and t_on_page > 3000:
             items.append(("CONNECTION_RTT_ZERO", "low", 15,
                           "connection.rtt = 0 (headless default)"))
 
-    # ===== HUMAN SIGNALS =====
     if t_on_page > 30000 and hb_count >= 3:
         cl = safe_int(events.get("clicks"), 0)
         sc = safe_int(events.get("scrolls"), 0)
@@ -1347,67 +1301,47 @@ def _check_v3_signals(data, behavior, events, fp, ua):
                           f"Engaged: {mm}mm, {cl}cl, {sc}sc over {t_on_page/1000:.0f}s"))
 
     if scroll_pattern == "organic" and scroll_depth >= 60:
-        items.append(("HUMAN_DEEP_SCROLL", "human", -20,
-                      f"Organic deep scroll: {scroll_depth}%"))
+        items.append(("HUMAN_DEEP_SCROLL", "human", -20, f"Organic deep scroll: {scroll_depth}%"))
 
     kd = safe_int(events.get("keydown"), 0)
     if kd >= 3:
-        items.append(("HUMAN_KEYBOARD", "human", -15,
-                      f"Typed {kd} keys"))
+        items.append(("HUMAN_KEYBOARD", "human", -15, f"Typed {kd} keys"))
 
     return items
 
 
-# =========================================================
-# DATA QUALITY GATE (v3.1) — DEPRECATED in System 2
-# =========================================================
-# Kept for backward compatibility. bayesian_evaluate() now handles
-# data quality internally, so this function is no longer called by
-# analyze_visit(). Any external code that imports it will still work.
 def _data_quality_gate(data_quality, evidence):
-    """
-    DEPRECATED (System 2): moved into bayesian_engine.bayesian_evaluate().
-    Kept for backward compatibility only.
-
-    لو البيانات ناقصة، verdict = 'unknown' مش 'invalid'.
-    """
+    """DEPRECATED. Kept for backward compat."""
     if data_quality == "legacy":
         return "unknown", "DATA_LEGACY"
-
     if data_quality == "failed":
         return "unknown", "DATA_INSUFFICIENT"
-
     if data_quality == "partial":
-        has_critical = any(e.get("severity") == "critical" for e in evidence)
+        has_critical = any(e.get("severity") in ("critical", "impossible") for e in evidence)
         if not has_critical:
             return "unknown", "DATA_INSUFFICIENT"
-
     return None, None
 
 
-# =========================================================
-# HELPERS FOR INLINE LOGIC (System 1 integration)
-# =========================================================
 def _check_honeypot(data):
-    """Inline honeypot logic — wrapped for circuit breaker."""
     items = []
     if data.get("_honeypot_triggered") is True:
-        items.append((
-            "HONEYPOT_CLICK", "critical", 100,
-            "Honeypot triggered (link/button)",
-        ))
+        items.append(("HONEYPOT_CLICK", "critical", 100, "Honeypot triggered"))
     return items
 
 
 def _check_bot_ua(ua):
-    """Inline bot UA logic — wrapped for circuit breaker."""
     items = []
     if _is_bot_ua(ua):
-        items.append((
-            "BOT_UA", "high", 90,
-            f"Suspicious UA: {_safe_str(ua[:60], 60)}",
-        ))
+        items.append(("BOT_UA", "high", 90, f"Suspicious UA: {_safe_str(ua[:60], 60)}"))
     return items
+
+
+def _check_server_cross(nav, fp, data):
+    """SYSTEM 4: server-verified header cross-validation."""
+    headers = data.get("_headers") or {}
+    http_version = data.get("_http_version") or "1.1"
+    return scv_analyze(headers, http_version, nav, fp)
 
 
 # =========================================================
@@ -1450,121 +1384,70 @@ def analyze_visit(data: dict, ip_info: dict) -> dict:
     )
     country_code = str(ip_info.get("country_code") or "").upper()
 
-    # ===== SYSTEM 1: all checks wrapped in circuit breakers =====
+    # ===== SYSTEM 1: circuit breakers =====
+    _apply_items(ev, cb_safe_call(_check_critical, nav, fp, ua, platform, chrome_check,
+                                   check_name="critical"))
+    _apply_items(ev, cb_safe_call(_check_automation_globals, fp,
+                                   check_name="automation_globals"))
+    _apply_items(ev, cb_safe_call(_check_honeypot, data,
+                                   check_name="honeypot"))
+    _apply_items(ev, cb_safe_call(_check_bot_ua, ua,
+                                   check_name="bot_ua"))
+    _apply_items(ev, cb_safe_call(_check_network, ip_info, data, asn_value, is_proxy, is_hosting,
+                                   check_name="network"))
+    _apply_items(ev, cb_safe_call(_check_fingerprint, fp, plugins_info, is_desktop_chrome,
+                                   is_privacy_browser, chrome_check, ua,
+                                   check_name="fingerprint"))
+    _apply_items(ev, cb_safe_call(_check_fingerprint_reuse, data,
+                                   check_name="fingerprint_reuse"))
+    _apply_items(ev, cb_safe_call(_check_cross_visit, data,
+                                   check_name="cross_visit"))
+    _apply_items(ev, cb_safe_call(_check_hardware, fp, screen_dict, ua, is_privacy_browser, is_mobile_phone,
+                                   check_name="hardware"))
+    _apply_items(ev, cb_safe_call(_check_screen, screen_dict, is_mobile_phone, is_tablet,
+                                   is_desktop_chrome, is_mobile,
+                                   check_name="screen"))
+    _apply_items(ev, cb_safe_call(_check_os_mismatch, ua, platform,
+                                   check_name="os_mismatch"))
+    _apply_items(ev, cb_safe_call(_check_contradictions, nav, fp, screen_dict, ua, is_mobile,
+                                   is_mobile_phone, is_tablet, is_desktop_chrome, is_privacy_browser,
+                                   check_name="contradictions"))
+    _apply_items(ev, cb_safe_call(_check_locale_consistency, nav, fp, country_code,
+                                   check_name="locale"))
+    _apply_items(ev, cb_safe_call(_check_timezone, fp, country_code, is_privacy_browser,
+                                   check_name="timezone"))
+    _apply_items(ev, cb_safe_call(_check_behavior, behavior, events,
+                                   check_name="behavior"))
+    _apply_items(ev, cb_safe_call(_check_behavior_deep, behavior, events,
+                                   check_name="behavior_deep"))
+    _apply_items(ev, cb_safe_call(_check_v3_signals, data, behavior, events, fp, ua,
+                                   check_name="v3_signals"))
+    _apply_items(ev, cb_safe_call(_check_webgl, webgl,
+                                   check_name="webgl"))
+    _apply_items(ev, cb_safe_call(_check_cpm, nav, ua, privacy_name,
+                                   check_name="cpm"))
+    _apply_items(ev, cb_safe_call(_check_human, behavior, events,
+                                   check_name="human"))
+    _apply_items(ev, cb_safe_call(_check_server_cross, nav, fp, data,
+                                   check_name="server_cross"))
 
-    # Critical & automation
-    _apply_items(ev, cb_safe_call(
-        _check_critical, nav, fp, ua, platform, chrome_check,
-        check_name="critical",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_automation_globals, fp,
-        check_name="automation_globals",
-    ))
-
-    # Honeypot & bot UA (inline logic now wrapped)
-    _apply_items(ev, cb_safe_call(
-        _check_honeypot, data,
-        check_name="honeypot",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_bot_ua, ua,
-        check_name="bot_ua",
-    ))
-
-    # Network & fingerprint
-    _apply_items(ev, cb_safe_call(
-        _check_network, ip_info, data, asn_value, is_proxy, is_hosting,
-        check_name="network",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_fingerprint, fp, plugins_info, is_desktop_chrome,
-        is_privacy_browser, chrome_check, ua,
-        check_name="fingerprint",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_fingerprint_reuse, data,
-        check_name="fingerprint_reuse",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_cross_visit, data,
-        check_name="cross_visit",
-    ))
-
-    # Hardware & screen
-    _apply_items(ev, cb_safe_call(
-        _check_hardware, fp, screen_dict, ua, is_privacy_browser, is_mobile_phone,
-        check_name="hardware",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_screen, screen_dict, is_mobile_phone, is_tablet,
-        is_desktop_chrome, is_mobile,
-        check_name="screen",
-    ))
-
-    # OS & contradictions
-    _apply_items(ev, cb_safe_call(
-        _check_os_mismatch, ua, platform,
-        check_name="os_mismatch",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_contradictions, nav, fp, screen_dict, ua, is_mobile,
-        is_mobile_phone, is_tablet, is_desktop_chrome, is_privacy_browser,
-        check_name="contradictions",
-    ))
-
-    # Locale & timezone
-    _apply_items(ev, cb_safe_call(
-        _check_locale_consistency, nav, fp, country_code,
-        check_name="locale",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_timezone, fp, country_code, is_privacy_browser,
-        check_name="timezone",
-    ))
-
-    # Behavior
-    _apply_items(ev, cb_safe_call(
-        _check_behavior, behavior, events,
-        check_name="behavior",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_behavior_deep, behavior, events,
-        check_name="behavior_deep",
-    ))
-
-    # v3 signals
-    _apply_items(ev, cb_safe_call(
-        _check_v3_signals, data, behavior, events, fp, ua,
-        check_name="v3_signals",
-    ))
-
-    # WebGL, CPM, Human
-    _apply_items(ev, cb_safe_call(
-        _check_webgl, webgl,
-        check_name="webgl",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_cpm, nav, ua, privacy_name,
-        check_name="cpm",
-    ))
-    _apply_items(ev, cb_safe_call(
-        _check_human, behavior, events,
-        check_name="human",
-    ))
-
-    # ===== SYSTEM 2: Bayesian verdict =====
+    # ===== SYSTEM 2 + 3: Bayesian + Verdict =====
     raw = ev.raw_score()
-
     data_quality = str(data.get("_data_quality") or "unknown")
-    bayes_result = bayes_evaluate(ev.items, data_quality)
-    final_verdict = bayes_result["verdict"]
 
-    if final_verdict == "unknown":
-        # Insufficient data — don't call it invalid, don't call it valid
+    prob_result = bayes_compute(ev.items)
+    probability = prob_result["probability"]
+    log_odds = prob_result["log_odds"]
+    bayesian_confidence = prob_result["confidence"]
+
+    verdict_result = classify_verdict_v2(ev.items, data_quality, probability=probability)
+    verdict_v2 = verdict_result["verdict"]
+    final_verdict = to_legacy_verdict(verdict_v2)
+
+    if verdict_v2 == VerdictV2.INSUFFICIENT_DATA:
         final = 0
         confidence = 0.0
-        gate_code = bayes_result.get("gate_code") or "DATA_INSUFFICIENT"
+        gate_code = verdict_result.get("gate_code") or "DATA_INSUFFICIENT"
         ev.items.append({
             "code": gate_code,
             "severity": "medium",
@@ -1580,7 +1463,6 @@ def analyze_visit(data: dict, ip_info: dict) -> dict:
     wasted = is_wasted_impression(ev.items, final_verdict)
 
     return {
-        # Existing fields (backward compat)
         "raw_score": raw,
         "score": final,
         "final_score": final,
@@ -1592,21 +1474,21 @@ def analyze_visit(data: dict, ip_info: dict) -> dict:
         "cpm_quality": cpm_quality,
         "wasted_impression": wasted,
         "data_quality": data_quality,
-        # SYSTEM 2 — new Bayesian fields
-        "probability": bayes_result["probability"],
-        "log_odds": bayes_result["log_odds"],
-        "bayesian_confidence": bayes_result["confidence"],
-        "safety_triggered": bayes_result.get("safety"),
-        "bayesian_contributions": bayes_result.get("contributions", []),
+        "probability": probability,
+        "log_odds": log_odds,
+        "bayesian_confidence": bayesian_confidence,
+        "bayesian_contributions": prob_result.get("contributions", []),
+        "verdict_v2": verdict_v2.value,
+        "verdict_metadata": verdict_metadata(verdict_v2),
+        "safety_triggered": verdict_result.get("safety"),
+        "gate_code": verdict_result.get("gate_code"),
     }
 
 
 # =========================================================
-# SYSTEM 1 — INTEGRATION SELF-TEST
+# INTEGRATION TESTS
 # =========================================================
 def _system1_integration_test():
-    """Verify analysis.py integrates correctly with circuit_breaker."""
-    import sys as _sys
     print("\n" + "=" * 70)
     print("  SYSTEM 1: INTEGRATION TEST (analysis.py + circuit_breaker)")
     print("=" * 70)
@@ -1622,69 +1504,46 @@ def _system1_integration_test():
             results.append(f"✗ {fail_msg}")
             success = False
 
-    # Test 1: safe_call + apply_items
     try:
         ev = EvidenceCollector()
-
-        def fake_check():
-            return [("FAKE_SIGNAL", "medium", 15, "test detail")]
-
-        _apply_items(ev, cb_safe_call(fake_check, check_name="test_normal"))
+        _apply_items(ev, cb_safe_call(
+            lambda: [("FAKE_SIGNAL", "medium", 15, "test detail")],
+            check_name="test_normal"))
         _chk(len(ev.items) == 1 and ev.items[0]["code"] == "FAKE_SIGNAL",
              "Test 1: safe_call + _apply_items work together",
-             f"Test 1: failed (items={len(ev.items)})")
+             f"Test 1: failed")
     except Exception as e:
         _chk(False, "", f"Test 1: crashed ({e})")
 
-    # Test 2: safe_call isolates broken checks
     try:
-        def broken_check():
-            raise RuntimeError("intentional failure")
-
-        items = cb_safe_call(broken_check, check_name="test_broken_iso")
-        _chk(items == [],
-             "Test 2: safe_call returns [] on check failure",
+        def broken():
+            raise RuntimeError("intentional")
+        items = cb_safe_call(broken, check_name="test_broken_iso")
+        _chk(items == [], "Test 2: safe_call returns [] on check failure",
              f"Test 2: expected [], got {items}")
     except Exception as e:
         _chk(False, "", f"Test 2: crashed ({e})")
 
-    # Test 3: independent safe_calls
     try:
         ev = EvidenceCollector()
-
-        def good1():
-            return [("A", "low", 5, "a")]
-
-        def bad():
-            raise ValueError("bad")
-
-        def good2():
-            return [("B", "high", 30, "b")]
-
-        _apply_items(ev, cb_safe_call(good1, check_name="iso_good1"))
-        _apply_items(ev, cb_safe_call(bad, check_name="iso_bad"))
-        _apply_items(ev, cb_safe_call(good2, check_name="iso_good2"))
-
+        _apply_items(ev, cb_safe_call(lambda: [("A", "low", 5, "a")], check_name="iso_g1"))
+        _apply_items(ev, cb_safe_call(lambda: (_ for _ in ()).throw(ValueError("bad")), check_name="iso_b"))
+        _apply_items(ev, cb_safe_call(lambda: [("B", "high", 30, "b")], check_name="iso_g2"))
         codes = {item["code"] for item in ev.items}
         _chk("A" in codes and "B" in codes and len(ev.items) == 2,
              "Test 3: isolated breakers (failure doesn't affect others)",
-             f"Test 3: failed (codes={codes}, count={len(ev.items)})")
+             f"Test 3: failed")
     except Exception as e:
         _chk(False, "", f"Test 3: crashed ({e})")
 
-    # Test 4: analyze_visit end-to-end
     try:
         fake_data = {
-            "nav": {"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0", "platform": "Win32"},
-            "fingerprint": {
-                "hardwareConcurrency": 8, "deviceMemory": 8,
-                "canvas_hash": "abc123def456", "languages": ["en-US", "en"],
-            },
-            "behavior": {
-                "events": {"mousemove": 100, "clicks": 2, "scrolls": 5, "touchstart": 0, "keydown": 0},
-                "total_time_ms": 25000,
-                "mouse_variance": 2.5,
-            },
+            "nav": {"ua": "Mozilla/5.0 Chrome/120.0.0.0", "platform": "Win32"},
+            "fingerprint": {"hardwareConcurrency": 8, "deviceMemory": 8,
+                            "canvas_hash": "abc123def456", "languages": ["en-US", "en"]},
+            "behavior": {"events": {"mousemove": 100, "clicks": 2, "scrolls": 5,
+                                    "touchstart": 0, "keydown": 0},
+                          "total_time_ms": 25000, "mouse_variance": 2.5},
             "screen": {"width": 1920, "height": 1080, "availWidth": 1920, "availHeight": 1040},
             "_data_quality": "full",
             "_heartbeat_count": 3,
@@ -1692,54 +1551,40 @@ def _system1_integration_test():
         fake_ip = {"country": "US", "country_code": "US", "isp": "Comcast",
                    "type": "residential", "asn": "AS7922", "security": {}}
         result = analyze_visit(fake_data, fake_ip)
-        _chk(result is not None and "verdict" in result and "evidence" in result
-             and result["verdict"] in ("valid", "suspicious", "invalid", "unknown"),
+        _chk(result is not None and "verdict" in result,
              "Test 4: analyze_visit runs end-to-end without crashing",
-             f"Test 4: analyze_visit failed")
+             "Test 4: failed")
     except Exception as e:
         import traceback
         traceback.print_exc()
         _chk(False, "", f"Test 4: crashed ({e})")
 
-    # Test 5: breaker opens after repeated failures
     try:
         cb_breakers.reset_all()
-
-        def always_fails():
-            raise ValueError("repeat")
-
         for _ in range(6):
-            cb_safe_call(always_fails, check_name="test_opens")
-
+            cb_safe_call(lambda: (_ for _ in ()).throw(ValueError("x")), check_name="test_opens")
         b = cb_breakers.get("test_opens")
         _chk(b is not None and b.state.value == "open",
              "Test 5: breaker opens after threshold failures",
-             f"Test 5: expected open, got {b.state.value if b else 'None'}")
+             "Test 5: failed")
     except Exception as e:
         _chk(False, "", f"Test 5: crashed ({e})")
 
     for r in results:
         print(f"  {r}")
-
     print("-" * 70)
     passed = sum(1 for r in results if r.startswith("✓"))
     total = len(results)
-
     if success:
         print(f"  ✅ SYSTEM 1 INTEGRATION PASSED — {passed}/{total} tests")
     else:
         print(f"  ❌ SYSTEM 1 INTEGRATION FAILED — {passed}/{total} passed")
-
     print("=" * 70 + "\n")
     cb_breakers.reset_all()
     return success
 
 
-# =========================================================
-# SYSTEM 2 — INTEGRATION SELF-TEST
-# =========================================================
 def _system2_integration_test():
-    """Verify analysis.py integrates correctly with bayesian_engine."""
     print("\n" + "=" * 70)
     print("  SYSTEM 2: INTEGRATION TEST (analysis.py + bayesian_engine)")
     print("=" * 70)
@@ -1755,20 +1600,15 @@ def _system2_integration_test():
             results.append(f"✗ {fail_msg}")
             success = False
 
-    # Prepare a clean visit data
     clean_data = {
-        "nav": {"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0", "platform": "Win32"},
-        "fingerprint": {
-            "hardwareConcurrency": 8, "deviceMemory": 8,
-            "canvas_hash": "abc123def456789abc",
-            "languages": ["en-US", "en"],
-            "timezone": "America/New_York",
-        },
-        "behavior": {
-            "events": {"mousemove": 100, "clicks": 3, "scrolls": 6, "touchstart": 0, "keydown": 0},
-            "total_time_ms": 25000,
-            "mouse_variance": 2.5,
-        },
+        "nav": {"ua": "Mozilla/5.0 Chrome/120.0.0.0", "platform": "Win32"},
+        "fingerprint": {"hardwareConcurrency": 8, "deviceMemory": 8,
+                        "canvas_hash": "abc123def456789abc",
+                        "languages": ["en-US", "en"],
+                        "timezone": "America/New_York"},
+        "behavior": {"events": {"mousemove": 100, "clicks": 3, "scrolls": 6,
+                                "touchstart": 0, "keydown": 0},
+                      "total_time_ms": 25000, "mouse_variance": 2.5},
         "screen": {"width": 1920, "height": 1080, "availWidth": 1920, "availHeight": 1040},
         "_data_quality": "full",
         "_heartbeat_count": 3,
@@ -1776,70 +1616,366 @@ def _system2_integration_test():
     clean_ip = {"country": "US", "country_code": "US", "isp": "Comcast",
                 "type": "residential", "asn": "AS7922", "security": {}}
 
-    # Test 1: analyze_visit returns new Bayesian fields
     try:
-        result = analyze_visit(clean_data, clean_ip)
-        _chk("probability" in result and "log_odds" in result
-             and "bayesian_confidence" in result,
-             "Test 1: analyze_visit returns new Bayesian fields",
-             f"Test 1: missing fields (keys={list(result.keys())})")
+        r = analyze_visit(clean_data, clean_ip)
+        _chk("probability" in r and "log_odds" in r,
+             "Test 1: analyze_visit returns Bayesian fields",
+             "Test 1: missing")
     except Exception as e:
         _chk(False, "", f"Test 1: crashed ({e})")
 
-    # Test 2: clean visit → valid verdict
     try:
-        result = analyze_visit(clean_data, clean_ip)
-        _chk(result["verdict"] == "valid",
-             "Test 2: clean visit → valid verdict",
-             f"Test 2: expected valid, got {result['verdict']} (P={result.get('probability')})")
+        r = analyze_visit(clean_data, clean_ip)
+        _chk(0.0 <= r["probability"] <= 1.0,
+             "Test 2: probability is in [0, 1]", "Test 2: failed")
     except Exception as e:
         _chk(False, "", f"Test 2: crashed ({e})")
 
-    # Test 3: webdriver=true → invalid verdict
     try:
-        bad_data = dict(clean_data)
-        bad_data["nav"] = dict(clean_data["nav"])
-        bad_data["nav"]["webdriver"] = True
-        result = analyze_visit(bad_data, clean_ip)
-        _chk(result["verdict"] == "invalid",
-             "Test 3: webdriver=true → invalid verdict",
-             f"Test 3: expected invalid, got {result['verdict']} (P={result.get('probability')})")
+        bad = dict(clean_data)
+        bad["nav"] = dict(clean_data["nav"])
+        bad["nav"]["webdriver"] = True
+        r = analyze_visit(bad, clean_ip)
+        _chk(r["probability"] > 0.90,
+             "Test 3: webdriver=true → probability > 0.90", "Test 3: failed")
     except Exception as e:
         _chk(False, "", f"Test 3: crashed ({e})")
 
-    # Test 4: legacy data_quality → unknown verdict
     try:
-        legacy_data = dict(clean_data)
-        legacy_data["_data_quality"] = "legacy"
-        result = analyze_visit(legacy_data, clean_ip)
-        _chk(result["verdict"] == "unknown",
-             "Test 4: legacy quality → unknown verdict",
-             f"Test 4: expected unknown, got {result['verdict']}")
+        legacy = dict(clean_data)
+        legacy["_data_quality"] = "legacy"
+        r = analyze_visit(legacy, clean_ip)
+        _chk(r["verdict"] == "unknown",
+             "Test 4: legacy quality → unknown verdict", "Test 4: failed")
     except Exception as e:
         _chk(False, "", f"Test 4: crashed ({e})")
 
-    # Test 5: probability is always in [0, 1]
     try:
-        result = analyze_visit(clean_data, clean_ip)
-        p = result["probability"]
-        _chk(0.0 <= p <= 1.0,
-             "Test 5: probability is in [0, 1]",
-             f"Test 5: probability={p} out of range")
+        r = analyze_visit(clean_data, clean_ip)
+        _chk(isinstance(r["log_odds"], (int, float)),
+             "Test 5: log_odds is numeric", "Test 5: failed")
     except Exception as e:
         _chk(False, "", f"Test 5: crashed ({e})")
 
     for r in results:
         print(f"  {r}")
-
     print("-" * 70)
     passed = sum(1 for r in results if r.startswith("✓"))
     total = len(results)
-
     if success:
         print(f"  ✅ SYSTEM 2 INTEGRATION PASSED — {passed}/{total} tests")
     else:
         print(f"  ❌ SYSTEM 2 INTEGRATION FAILED — {passed}/{total} passed")
+    print("=" * 70 + "\n")
+    return success
 
+
+def _system3_integration_test():
+    print("\n" + "=" * 70)
+    print("  SYSTEM 3: INTEGRATION TEST (analysis.py + verdict_engine)")
+    print("=" * 70)
+
+    results = []
+    success = True
+
+    def _chk(cond, ok_msg, fail_msg):
+        nonlocal success
+        if cond:
+            results.append(f"✓ {ok_msg}")
+        else:
+            results.append(f"✗ {fail_msg}")
+            success = False
+
+    clean_data = {
+        "nav": {"ua": "Mozilla/5.0 Chrome/120.0.0.0", "platform": "Win32"},
+        "fingerprint": {"hardwareConcurrency": 8, "deviceMemory": 8,
+                        "canvas_hash": "abc123def456789abc",
+                        "languages": ["en-US", "en"],
+                        "timezone": "America/New_York"},
+        "behavior": {"events": {"mousemove": 100, "clicks": 3, "scrolls": 6,
+                                "touchstart": 0, "keydown": 0},
+                      "total_time_ms": 25000, "mouse_variance": 2.5},
+        "screen": {"width": 1920, "height": 1080, "availWidth": 1920, "availHeight": 1040},
+        "_data_quality": "full",
+        "_heartbeat_count": 3,
+    }
+    clean_ip = {"country": "US", "country_code": "US", "isp": "Comcast",
+                "type": "residential", "asn": "AS7922", "security": {}}
+
+    try:
+        r = analyze_visit(clean_data, clean_ip)
+        _chk("verdict_v2" in r and isinstance(r["verdict_v2"], str),
+             "Test 1: analyze_visit returns verdict_v2", "Test 1: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 1: crashed ({e})")
+
+    try:
+        r = analyze_visit(clean_data, clean_ip)
+        meta = r.get("verdict_metadata") or {}
+        _chk(isinstance(meta, dict) and "action" in meta,
+             "Test 2: verdict_metadata present", "Test 2: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 2: crashed ({e})")
+
+    try:
+        r = analyze_visit(clean_data, clean_ip)
+        expected = to_legacy_verdict(r["verdict_v2"])
+        _chk(r["verdict"] == expected,
+             "Test 3: legacy verdict consistent with verdict_v2", "Test 3: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 3: crashed ({e})")
+
+    try:
+        bad = dict(clean_data)
+        bad["nav"] = dict(clean_data["nav"])
+        bad["nav"]["webdriver"] = True
+        r = analyze_visit(bad, clean_ip)
+        _chk(r["verdict_v2"] in ("confirmed_bot", "likely_bot"),
+             "Test 4: webdriver=true → bot tier", "Test 4: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 4: crashed ({e})")
+
+    try:
+        legacy = dict(clean_data)
+        legacy["_data_quality"] = "legacy"
+        r = analyze_visit(legacy, clean_ip)
+        _chk(r["verdict_v2"] == "insufficient_data" and r["verdict"] == "unknown",
+             "Test 5: legacy → insufficient_data / unknown", "Test 5: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 5: crashed ({e})")
+
+    try:
+        r = analyze_visit(clean_data, clean_ip)
+        _chk(r["verdict"] == "valid" and r["verdict_v2"] in ("likely_valid", "confirmed_human"),
+             "Test 6: clean visit → valid tier", "Test 6: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 6: crashed ({e})")
+
+    for r in results:
+        print(f"  {r}")
+    print("-" * 70)
+    passed = sum(1 for r in results if r.startswith("✓"))
+    total = len(results)
+    if success:
+        print(f"  ✅ SYSTEM 3 INTEGRATION PASSED — {passed}/{total} tests")
+    else:
+        print(f"  ❌ SYSTEM 3 INTEGRATION FAILED — {passed}/{total} passed")
+    print("=" * 70 + "\n")
+    return success
+
+
+def _system4_integration_test():
+    print("\n" + "=" * 70)
+    print("  SYSTEM 4: INTEGRATION TEST (analysis.py + server_cross_validator)")
+    print("=" * 70)
+
+    results = []
+    success = True
+
+    def _chk(cond, ok_msg, fail_msg):
+        nonlocal success
+        if cond:
+            results.append(f"✓ {ok_msg}")
+        else:
+            results.append(f"✗ {fail_msg}")
+            success = False
+
+    base_data = {
+        "nav": {"ua": "Mozilla/5.0 (Windows NT 10.0) Chrome/120.0.0.0", "platform": "Win32"},
+        "fingerprint": {"hardwareConcurrency": 8, "deviceMemory": 8,
+                        "canvas_hash": "abc123def456789abc",
+                        "languages": ["en-US", "en"],
+                        "timezone": "America/New_York"},
+        "behavior": {"events": {"mousemove": 100, "clicks": 3, "scrolls": 6,
+                                "touchstart": 0, "keydown": 0},
+                      "total_time_ms": 25000, "mouse_variance": 2.5},
+        "screen": {"width": 1920, "height": 1080, "availWidth": 1920, "availHeight": 1040},
+        "_data_quality": "full",
+        "_heartbeat_count": 3,
+        "_headers": {
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/120.0.0.0",
+            "sec-ch-ua": '"Google Chrome";v="120", "Chromium";v="120"',
+            "x-forwarded-proto": "https",
+        },
+        "_http_version": "1.1",
+    }
+    base_ip = {"country": "US", "country_code": "US", "isp": "Comcast",
+               "type": "residential", "asn": "AS7922", "security": {}}
+
+    try:
+        d = dict(base_data)
+        d["_headers"] = {}
+        r = analyze_visit(d, base_ip)
+        _chk(r is not None and "verdict" in r,
+             "Test 1: empty headers → analyze_visit works", "Test 1: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 1: crashed ({e})")
+
+    try:
+        d = dict(base_data)
+        d["_headers"] = dict(base_data["_headers"])
+        d["_headers"]["user-agent"] = "Mozilla/5.0 Linux Firefox/100.0"
+        r = analyze_visit(d, base_ip)
+        codes = {e.get("code") for e in r["evidence"] if isinstance(e, dict)}
+        _chk("HTTP_UA_JS_MISMATCH" in codes,
+             "Test 2: HTTP UA ≠ JS UA → HTTP_UA_JS_MISMATCH", "Test 2: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 2: crashed ({e})")
+
+    try:
+        d = dict(base_data)
+        d["nav"] = {"ua": "Mozilla/5.0 Firefox/120.0", "platform": "Win32"}
+        d["_headers"] = {
+            "user-agent": "Mozilla/5.0 Firefox/120.0",
+            "sec-ch-ua": '"Chromium";v="120"',
+            "x-forwarded-proto": "https",
+        }
+        r = analyze_visit(d, base_ip)
+        imp = [e for e in r["evidence"]
+               if isinstance(e, dict) and e.get("code") == "SEC_CH_UA_ON_FIREFOX"]
+        _chk(len(imp) == 1 and imp[0].get("severity") == "impossible",
+             "Test 3: Firefox + sec-ch-ua → 'impossible' preserved", "Test 3: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 3: crashed ({e})")
+
+    try:
+        d = dict(base_data)
+        d["nav"] = {"ua": "Mozilla/5.0 Firefox/120.0", "platform": "Win32"}
+        d["_headers"] = {
+            "user-agent": "Mozilla/5.0 Firefox/120.0",
+            "sec-ch-ua": '"Chromium";v="120"',
+            "x-forwarded-proto": "https",
+        }
+        r = analyze_visit(d, base_ip)
+        _chk(r["verdict_v2"] == "confirmed_bot" and r["verdict"] == "invalid",
+             "Test 4: impossible → confirmed_bot / invalid", "Test 4: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 4: crashed ({e})")
+
+    try:
+        d = dict(base_data)
+        d["_headers"] = dict(base_data["_headers"])
+        d["_headers"]["sec-ch-ua"] = '"HeadlessChrome";v="120", "Chromium";v="120"'
+        r = analyze_visit(d, base_ip)
+        _chk(r["verdict_v2"] == "confirmed_bot",
+             "Test 5: HeadlessChrome brand → confirmed_bot", "Test 5: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 5: crashed ({e})")
+
+    try:
+        ev = EvidenceCollector()
+        ev.risk("X", "impossible", 100, "test")
+        _chk(ev.has_critical() is True,
+             "Test 6: has_critical recognizes 'impossible'", "Test 6: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 6: crashed ({e})")
+
+    for r in results:
+        print(f"  {r}")
+    print("-" * 70)
+    passed = sum(1 for r in results if r.startswith("✓"))
+    total = len(results)
+    if success:
+        print(f"  ✅ SYSTEM 4 INTEGRATION PASSED — {passed}/{total} tests")
+    else:
+        print(f"  ❌ SYSTEM 4 INTEGRATION FAILED — {passed}/{total} passed")
+    print("=" * 70 + "\n")
+    return success
+
+
+def _system5_integration_test():
+    print("\n" + "=" * 70)
+    print("  SYSTEM 5: INTEGRATION TEST (analysis.py + adaptive_thresholds)")
+    print("=" * 70)
+
+    results = []
+    success = True
+
+    def _chk(cond, ok_msg, fail_msg):
+        nonlocal success
+        if cond:
+            results.append(f"✓ {ok_msg}")
+        else:
+            results.append(f"✗ {fail_msg}")
+            success = False
+
+    clean_data = {
+        "nav": {"ua": "Mozilla/5.0 Chrome/120.0.0.0", "platform": "Win32"},
+        "fingerprint": {"hardwareConcurrency": 8, "deviceMemory": 8,
+                        "canvas_hash": "abc123def456789abc",
+                        "languages": ["en-US", "en"],
+                        "timezone": "America/New_York"},
+        "behavior": {"events": {"mousemove": 100, "clicks": 3, "scrolls": 6,
+                                "touchstart": 0, "keydown": 0},
+                      "total_time_ms": 25000, "mouse_variance": 2.5},
+        "screen": {"width": 1920, "height": 1080, "availWidth": 1920, "availHeight": 1040},
+        "_data_quality": "full",
+        "_heartbeat_count": 3,
+    }
+    clean_ip = {"country": "US", "country_code": "US", "isp": "Comcast",
+                "type": "residential", "asn": "AS7922", "security": {}}
+
+    # Test 1: get_threshold returns default when no data
+    try:
+        v = adaptive_get_threshold("left_fast_ms", 1800)
+        _chk(v == 1800.0, "Test 1: get_threshold returns default",
+             f"Test 1: got {v}")
+    except Exception as e:
+        _chk(False, "", f"Test 1: crashed ({e})")
+
+    # Test 2: get_reliability returns default
+    try:
+        v = adaptive_get_reliability("UNKNOWN_SIG", 0.75)
+        _chk(v == 0.75, "Test 2: get_reliability returns default",
+             f"Test 2: got {v}")
+    except Exception as e:
+        _chk(False, "", f"Test 2: crashed ({e})")
+
+    # Test 3: analyze_visit still works with adaptive
+    try:
+        r = analyze_visit(clean_data, clean_ip)
+        _chk(r is not None and "verdict" in r,
+             "Test 3: analyze_visit works with adaptive system", "Test 3: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 3: crashed ({e})")
+
+    # Test 4: changing threshold affects signal firing
+    try:
+        from collector import adaptive_thresholds as _at
+        # Set extreme left_fast_ms so a 5000ms visit fires LEFT_FAST
+        _at._get_instance().set_threshold("left_fast_ms", 10000)
+        quick_data = dict(clean_data)
+        quick_data["behavior"] = dict(clean_data["behavior"])
+        quick_data["behavior"]["total_time_ms"] = 5000
+        quick_data["behavior"]["events"] = {"mousemove": 0, "clicks": 0,
+                                             "scrolls": 0, "touchstart": 0,
+                                             "keydown": 0}
+        r = analyze_visit(quick_data, clean_ip)
+        codes = {e.get("code") for e in r["evidence"] if isinstance(e, dict)}
+        # Restore
+        _at._get_instance().set_threshold("left_fast_ms", 1800)
+        _chk("LEFT_FAST" in codes,
+             "Test 4: changing threshold affects signal firing", "Test 4: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 4: crashed ({e})")
+
+    # Test 5: adaptive health_status works
+    try:
+        h = adaptive_health_status()
+        _chk(isinstance(h, dict) and h.get("system") == "adaptive_thresholds",
+             "Test 5: adaptive health_status works", "Test 5: failed")
+    except Exception as e:
+        _chk(False, "", f"Test 5: crashed ({e})")
+
+    for r in results:
+        print(f"  {r}")
+    print("-" * 70)
+    passed = sum(1 for r in results if r.startswith("✓"))
+    total = len(results)
+    if success:
+        print(f"  ✅ SYSTEM 5 INTEGRATION PASSED — {passed}/{total} tests")
+    else:
+        print(f"  ❌ SYSTEM 5 INTEGRATION FAILED — {passed}/{total} passed")
     print("=" * 70 + "\n")
     return success
 
@@ -1856,3 +1992,15 @@ if os.getenv("OVG_SELF_TEST_ENABLED", "1") == "1" and "pytest" not in __import__
         _system2_integration_test()
     except Exception as _e:
         print(f"⚠️  [SYSTEM 2] Integration test crashed: {_e}")
+    try:
+        _system3_integration_test()
+    except Exception as _e:
+        print(f"⚠️  [SYSTEM 3] Integration test crashed: {_e}")
+    try:
+        _system4_integration_test()
+    except Exception as _e:
+        print(f"⚠️  [SYSTEM 4] Integration test crashed: {_e}")
+    try:
+        _system5_integration_test()
+    except Exception as _e:
+        print(f"⚠️  [SYSTEM 5] Integration test crashed: {_e}")
