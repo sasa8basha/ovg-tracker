@@ -1,16 +1,15 @@
 """
-routers/collector_v3.py — Collector v3 (Separating Site & Campaign Tracking)
+routers/collector_v3.py — Collector v3 (Campaign-Only)
 """
 import json
 from datetime import datetime, timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 
 from config import COLLECTOR_V3_ENABLED, MAX_SESSIONS_PER_IP_HOUR
 from database import get_db, SessionLocal
-from models import SessionModel, VisitHeartbeatModel, VisitModel, SiteModel, CampaignModel
+from models import SessionModel, VisitHeartbeatModel, VisitModel, CampaignModel
 from schemas import HandshakePayload, HeartbeatPayload, FinalPayload
 from utils import get_client_ip, handshake_limiter, heartbeat_limiter, final_limiter, stats_cache
 from analysis import get_ip_info, parse_ua, extract_zone_id
@@ -21,38 +20,13 @@ router = APIRouter()
 
 def _validate_session_id(session_id: str) -> str:
     s = (session_id or "").strip()
-    if not s or len(s) < 8 or len(s) > 64:
-        raise HTTPException(400, "session_id غير صالح")
+    if not s or len(s) < 8 or len(s) > 64: raise HTTPException(400, "session_id غير صالح")
     return s
 
-def _resolve_target(site_key: str, campaign_key: str, db: Session):
-    user_id = None
-    site_id = None
-    campaign_id = None
-
-    # 1. Try campaign_key first (Highest priority)
-    if campaign_key:
-        c = db.query(CampaignModel).filter(CampaignModel.campaign_key == campaign_key).first()
-        if c:
-            campaign_id = c.id
-            user_id = c.user_id
-            site_id = c.site_id
-            return user_id, site_id, campaign_id
-
-    # 2. Fallback to site_key (No auto-assigning to campaigns)
-    if site_key:
-        s = db.query(SiteModel).filter(SiteModel.site_key == site_key).first()
-        if s:
-            site_id = s.id
-            user_id = s.user_id
-            # ❌ REMOVED: Auto-assigning to the first campaign.
-            # Site visits stay as site visits unless campaign_key is explicitly passed.
-
-    return user_id, site_id, campaign_id
-
-def _extract_fp_brief(fp: dict) -> dict:
-    if not isinstance(fp, dict): return {}
-    return {"canvas": str(fp.get("canvas_hash") or "")[:20], "tz": str(fp.get("timezone") or "")[:50], "lang": str(fp.get("language") or "")[:10], "ua_short": str((fp.get("ua") or ""))[:100]}
+def _resolve_campaign(campaign_key: str, db: Session):
+    if not campaign_key: return None
+    c = db.query(CampaignModel).filter(CampaignModel.campaign_key == campaign_key).first()
+    return c
 
 def _compute_fp_hash(fp: dict) -> str:
     import hashlib
@@ -73,9 +47,10 @@ async def collect_handshake(payload: HandshakePayload, request: Request, db: Ses
     existing = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
     if existing: return {"ok": True, "session_id": existing.session_id, "server_time": int(datetime.utcnow().timestamp() * 1000), "duplicate": True}
 
-    _check_flood(session_id, client_ip, db)
-    user_id, site_id, campaign_id = _resolve_target(payload.site_key, payload.campaign_key, db)
+    campaign = _resolve_campaign(payload.campaign_key, db)
+    if not campaign: raise HTTPException(400, "invalid_campaign_key")
 
+    _check_flood(session_id, client_ip, db)
     try: ip_info = await get_ip_info(client_ip)
     except Exception: ip_info = {}
     if not isinstance(ip_info, dict): ip_info = {}
@@ -84,13 +59,13 @@ async def collect_handshake(payload: HandshakePayload, request: Request, db: Ses
     cc = str(ip_info.get("country_code") or "").upper().strip()
     
     session = SessionModel(
-        session_id=session_id, user_id=user_id, site_id=site_id, campaign_id=campaign_id,
+        session_id=session_id, user_id=campaign.user_id, campaign_id=campaign.id,
         ip=client_ip, country_code=cc[:2] if cc in ("LO", "XX", "") else cc,
         user_agent=ua[:500], url=str(payload.url or "")[:2000],
         started_at=datetime.utcnow(), data_quality="pending", clock_drift_ms=0,
         consent_state=str(payload.consent_state or "unknown")[:20],
         visitor_fp_hash=_compute_fp_hash(payload.fp or {}),
-        meta={"fp_brief": _extract_fp_brief(payload.fp or {})},
+        meta={"fp_brief": {}},
     )
     db.add(session); db.commit(); db.refresh(session)
     return {"ok": True, "session_id": session.session_id, "server_time": int(datetime.utcnow().timestamp() * 1000), "duplicate": False}
@@ -128,16 +103,14 @@ def _process_final_background(session_id: str, payload_dict: dict, client_ip: st
 
         payload = FinalPayload(**payload_dict)
         ua = str((payload.nav or {}).get("ua") or "")
-        
         try: os_name, device, browser = parse_ua(ua)
         except Exception: os_name, device, browser = "Unknown", "Unknown", "Unknown"
 
         zone_id = extract_zone_id(payload.url or "")
         if not zone_id or zone_id == "unknown":
-            if session.campaign_id:
-                c = db.query(CampaignModel).get(session.campaign_id)
-                if c and c.destination_zone_id: zone_id = str(c.destination_zone_id).strip()[:100]
-                elif c and c.destination_url: zone_id = extract_zone_id_from_url(c.destination_url) or "unknown"
+            c = db.query(CampaignModel).get(session.campaign_id)
+            if c and c.destination_zone_id: zone_id = str(c.destination_zone_id).strip()[:100]
+            elif c and c.destination_url: zone_id = extract_zone_id_from_url(c.destination_url) or "unknown"
         if not zone_id: zone_id = "unknown"
 
         try: ip_info = __import__('asyncio').run(get_ip_info(client_ip)) 
@@ -145,14 +118,12 @@ def _process_final_background(session_id: str, payload_dict: dict, client_ip: st
 
         recent_fp_count = 0; same_ip_last_minute = 0; same_canvas_ip_count = 0; same_ip_canvas_count = 0
         try:
-            cutoff_1m = datetime.utcnow() - timedelta(minutes=1)
-            cutoff_1h = datetime.utcnow() - timedelta(hours=1)
+            cutoff_1m = datetime.utcnow() - timedelta(minutes=1); cutoff_1h = datetime.utcnow() - timedelta(hours=1)
             same_ip_last_minute = db.query(VisitModel).filter(VisitModel.ip == client_ip, VisitModel.timestamp > cutoff_1m).count()
             canvas_raw = str((payload.fingerprint or {}).get("canvas_hash") or "")
             if len(canvas_raw) >= 15 and canvas_raw not in ("blocked", "Unknown"):
                 recent_fp_count = db.query(VisitModel).filter(VisitModel.canvas_hash == canvas_raw[:15] + "...", VisitModel.timestamp > cutoff_1m).count()
                 same_canvas_ip_count = int(db.query(func.count(distinct(VisitModel.ip))).filter(VisitModel.canvas_hash == canvas_raw[:15] + "...", VisitModel.timestamp > cutoff_1h).scalar() or 0)
-                same_ip_canvas_count = int(db.query(func.count(distinct(VisitModel.canvas_hash))).filter(VisitModel.ip == client_ip, VisitModel.timestamp > cutoff_1h).scalar() or 0)
         except Exception as e: print(f"[BG] Cross-visit fail: {e}")
 
         heartbeats = db.query(VisitHeartbeatModel).filter(VisitHeartbeatModel.session_id == session_id).order_by(VisitHeartbeatModel.seq.asc()).all()
@@ -178,7 +149,7 @@ def _process_final_background(session_id: str, payload_dict: dict, client_ip: st
         cc = str(ip_info.get("country_code") or "").upper().strip()
 
         visit = VisitModel(
-            site_id=session.site_id, campaign_id=session.campaign_id, session_id=session_id, timestamp=datetime.utcnow(),
+            campaign_id=session.campaign_id, session_id=session_id, timestamp=datetime.utcnow(),
             ip=client_ip, user_agent=ua, zone_id=zone_id, click_id=payload.click_id or None, filter_reason=result.get("filter_reason"),
             score=result.get("score", 0), verdict=result.get("verdict", "suspicious"), evidence=result.get("evidence", []),
             os=os_name, device=device, browser=browser, country=ip_info.get("country", "Unknown"), country_code=cc[:2] if cc in ("LO", "XX", "") else cc,
@@ -192,10 +163,8 @@ def _process_final_background(session_id: str, payload_dict: dict, client_ip: st
             db.add(visit); db.commit(); db.refresh(visit)
             session.visit_id = visit.id; session.verdict = visit.verdict; session.score = visit.score
             session.ended_at = datetime.utcnow(); db.commit()
-            if session.site_id: stats_cache.invalidate(f"stats:site:{session.site_id}")
             if session.user_id: stats_cache.invalidate(f"stats:user:{session.user_id}:all")
-        except Exception as e:
-            db.rollback(); print(f"[BG] Failed to save visit: {e}")
+        except Exception as e: db.rollback(); print(f"[BG] Failed to save visit: {e}")
     except Exception as e: print(f"[BG] Fatal error: {e}")
     finally: db.close()
 
@@ -204,9 +173,7 @@ async def collect_final(request: Request, background_tasks: BackgroundTasks, db:
     if not COLLECTOR_V3_ENABLED: raise HTTPException(404, "Collector v3 disabled")
     client_ip = get_client_ip(request)
     try:
-        raw_bytes = await request.body()
-        payload_dict = json.loads(raw_bytes.decode("utf-8", errors="replace"))
-        payload = FinalPayload(**payload_dict) 
+        raw_bytes = await request.body(); payload_dict = json.loads(raw_bytes.decode("utf-8", errors="replace")); payload = FinalPayload(**payload_dict) 
     except Exception as e: raise HTTPException(400, f"Invalid payload: {e}")
 
     session_id = _validate_session_id(payload.session_id)
