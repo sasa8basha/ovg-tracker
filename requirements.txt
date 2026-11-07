@@ -1,0 +1,26 @@
+# ============================================
+# ovg-tracker — Pinned Dependencies
+# ============================================
+fastapi>=0.109.0,<1.0
+uvicorn[standard]>=0.27.0,<1.0
+sqlalchemy>=2.0.25,<3.0
+pydantic>=2.5.0,<3.0
+pydantic-settings>=2.1.0,<3.0
+python-dotenv>=1.0.0
+jinja2>=3.1.0
+httpx>=0.26.0
+user-agents>=2.2.0
+
+# Migrations (P1 — replaces manual ALTER TABLE)
+alembic>=1.13.0,<2.0
+
+# Cache & rate-limit (P6)
+redis>=5.0.0,<6.0
+
+# Testing (P7)
+pytest>=8.0.0,<9.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+
+# Dev tooling
+ruff>=0.4.0
