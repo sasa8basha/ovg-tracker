@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · الحملات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    .cp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .cp-title { font-size: 24px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.02em; margin: 0; }
+    .cp-sub { font-size: 12px; color: #7B8496; margin-top: 4px; }
+
+    .cp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+    .cp-card { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px; cursor: pointer; transition: all 150ms; position: relative; overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; }
+    .cp-card:hover { border-color: #7C5CFF; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+    .cp-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--cp-accent, #7C5CFF); opacity: 0.7; }
+
+    .cp-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .cp-card-name { font-size: 14px; font-weight: 800; color: #F8FAFC; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .cp-type-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .cp-type-landing { background: rgba(59,130,246,0.15); color: #93C5FD; }
+    .cp-type-direct  { background: rgba(168,85,247,0.15); color: #C4B5FD; }
+    .cp-type-hybrid  { background: rgba(16,185,129,0.15); color: #6EE7B7; }
+
+    .cp-pl { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+    .cp-profit { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
+    .cp-profit.pos { color: #10B981; }
+    .cp-profit.neg { color: #F43F5E; }
+    .cp-roi { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+    .cp-roi.pos { background: rgba(16,185,129,0.12); color: #10B981; }
+    .cp-roi.neg { background: rgba(244,63,94,0.12); color: #F43F5E; }
+
+    .cp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #1A1D29; }
+    .cp-stat-lbl { font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+    .cp-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; color: #F8FAFC; }
+    
+    .cp-empty { padding: 60px 20px; text-align: center; color: #7B8496; }
+    .cp-empty-icon { font-size: 56px; opacity: 0.4; display: block; margin-bottom: 14px; }
+    
+    .cp-modal-overlay { position: fixed; inset: 0; background: rgba(8,9,13,0.85); backdrop-filter: blur(6px); z-index: 900; display: none; align-items: center; justify-content: center; padding: 16px; }
+    .cp-modal-overlay.is-open { display: flex; }
+    .cp-modal { width: 100%; max-width: 500px; background: #161822; border: 1px solid #2E3446; border-radius: 16px; box-shadow: 0 24px 48px rgba(0,0,0,0.6); max-height: 90vh; display: flex; flex-direction: column; animation: cp-modal-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1); overflow: hidden; }
+    @keyframes cp-modal-in { from { opacity: 0; transform: scale(0.94) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .cp-modal-head { padding: 18px 22px; border-bottom: 1px solid #232734; display: flex; align-items: center; justify-content: space-between; }
+    .cp-modal-title { font-size: 16px; font-weight: 800; color: #F8FAFC; margin: 0; }
+    .cp-modal-close { width: 28px; height: 28px; border-radius: 6px; background: transparent; border: none; color: #7B8496; cursor: pointer; font-size: 18px; }
+    .cp-modal-body { padding: 20px 22px; overflow-y: auto; }
+    .cp-modal-foot { padding: 14px 22px; border-top: 1px solid #232734; display: flex; gap: 8px; justify-content: flex-end; }
+    
+    .cp-form-row { margin-bottom: 14px; }
+    .cp-form-row label { display: block; font-size: 11px; font-weight: 700; color: #CBD5E1; margin-bottom: 5px; }
+    .cp-form-row input, .cp-form-row select { width: 100%; height: 36px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 13px; outline: none; box-sizing: border-box; }
+    .cp-form-row input:focus, .cp-form-row select:focus { border-color: #7C5CFF; }
+    .cp-form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    
+    .cp-type-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .cp-type-btn { padding: 12px 8px; background: #0F1117; border: 2px solid #232734; border-radius: 10px; cursor: pointer; text-align: center; transition: all 150ms; }
+    .cp-type-btn.active { border-color: #7C5CFF; background: rgba(124,92,255,0.1); }
+    .cp-type-btn-icon { font-size: 22px; margin-bottom: 4px; }
+    .cp-type-btn-label { font-size: 11px; font-weight: 800; color: #F8FAFC; }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+      <div class="cp-header">
+        <div>
+          <h1 class="cp-title">🎯 الحملات</h1>
+          <p class="cp-sub" id="cpSub">إدارة كاملة لحملات CPM Arbitrage</p>
+        </div>
+        <button class="sh-btn sh-btn-primary" id="newBtn" type="button">+ حملة جديدة</button>
+      </div>
+
+      <div id="cpLoading" class="cp-grid">
+        <div class="cp-card" style="height:180px;background:linear-gradient(90deg,#161822 0%,#232734 50%,#161822 100%);background-size:1000px 100%;animation:cp-shimmer 1.6s infinite linear;"></div>
+        <div class="cp-card" style="height:180px;background:linear-gradient(90deg,#161822 0%,#232734 50%,#161822 100%);background-size:1000px 100%;animation:cp-shimmer 1.6s infinite linear;"></div>
+      </div>
+
+      <div id="cpContent" class="cp-grid" style="display:none;"></div>
+
+      <div id="cpEmpty" class="cp-empty" style="display:none;">
+        <span class="cp-empty-icon">🎯</span>
+        <div style="font-size:17px;font-weight:800;color:#F8FAFC;margin-bottom:8px;">مفيش حملات بعد</div>
+        <button class="sh-btn sh-btn-primary" onclick="openNewCampaign()" type="button">+ أضف أول حملة</button>
+      </div>
+    </main>
+  </div>
+
+  <div class="cp-modal-overlay" id="newCampaignModal">
+    <div class="cp-modal">
+      <div class="cp-modal-head">
+        <h3 class="cp-modal-title">🎯 حملة جديدة</h3>
+        <button class="cp-modal-close" onclick="closeNewCampaign()" type="button">✕</button>
+      </div>
+      <div class="cp-modal-body">
+        <div class="cp-form-row">
+          <label>نوع الحملة</label>
+          <div class="cp-type-picker">
+            <button class="cp-type-btn active" data-type="landing" type="button"><div class="cp-type-btn-icon">🏠</div><div class="cp-type-btn-label">Landing</div></button>
+            <button class="cp-type-btn" data-type="direct" type="button"><div class="cp-type-btn-icon">🔗</div><div class="cp-type-btn-label">Direct</div></button>
+            <button class="cp-type-btn" data-type="hybrid" type="button"><div class="cp-type-btn-icon">🔀</div><div class="cp-type-btn-label">Hybrid</div></button>
+          </div>
+        </div>
+        <div class="cp-form-row"><label>اسم الحملة *</label><input type="text" id="newName" placeholder="مثال: PopAds EG → Adsterra 10245" maxlength="200"></div>
+        <div class="cp-form-grid-2">
+          <div class="cp-form-row"><label>مصدر الترافيك</label><select id="newSource"></select></div>
+          <div class="cp-form-row"><label>CPM الشراء ($)</label><input type="number" id="newBuyCpm" step="0.01" min="0" value="1.00"></div>
+        </div>
+        <div class="cp-form-grid-2">
+          <div class="cp-form-row"><label>الوجهة</label><select id="newDest"></select></div>
+          <div class="cp-form-row"><label>CPM البيع ($)</label><input type="number" id="newSellCpm" step="0.01" min="0" value="2.00"></div>
+        </div>
+        <div id="destUrlWrap" class="cp-form-row" style="display:none;"><label>رابط الوجهة (Direct Link) *</label><input type="text" id="newDestUrl" placeholder="https://..."></div>
+        <div id="zoneIdWrap" class="cp-form-row"><label>Zone ID (اختياري)</label><input type="text" id="newZoneId" placeholder="10245"></div>
+      </div>
+      <div class="cp-modal-foot">
+        <button class="sh-btn sh-btn-ghost" onclick="closeNewCampaign()" type="button">إلغاء</button>
+        <button class="sh-btn sh-btn-primary" id="createCampaignBtn" onclick="createCampaign()" type="button">إنشاء الحملة</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const CP = { campaigns: [], sources: [], destinations: [], newCampaignType: 'landing' };
+
+    function fmtMoney(n) { const v = Number(n || 0); if (Math.abs(v) < 0.005) return '$0.00'; return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2); }
+
+    function renderList() {
+      const content = document.getElementById('cpContent'); const loading = document.getElementById('cpLoading'); const empty = document.getElementById('cpEmpty');
+      loading.style.display = 'none';
+      if (CP.campaigns.length === 0) { content.style.display = 'none'; empty.style.display = ''; return; }
+      content.style.display = ''; empty.style.display = 'none';
+
+      content.innerHTML = CP.campaigns.map(c => {
+        const st = c.stats || {}; const pl = st.pl || { profit: 0, roi: 0 };
+        const profitClass = pl.profit > 0.01 ? 'pos' : pl.profit < -0.01 ? 'neg' : 'pos';
+        const roiClass = pl.roi > 0.5 ? 'pos' : pl.roi < -0.5 ? 'neg' : 'pos';
+        const typeAccent = c.type === 'direct' ? '#A855F7' : c.type === 'hybrid' ? '#10B981' : '#7C5CFF';
+        return `
+          <a href="/campaigns/${c.id}" class="cp-card" style="--cp-accent:${typeAccent};">
+            <div class="cp-card-head">
+              <div>
+                <div class="cp-card-name">${Shell.esc(c.name)}</div>
+                <div style="font-size:10px;color:#4A5263;margin-top:4px;"><span class="cp-type-badge cp-type-${c.type}">${c.type}</span></div>
+              </div>
+            </div>
+            <div class="cp-pl"><span class="cp-profit ${profitClass}">${fmtMoney(pl.profit)}</span><span class="cp-roi ${roiClass}">${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%</span></div>
+            <div class="cp-stats">
+              <div><div class="cp-stat-lbl">إجمالي</div><div class="cp-stat-val">${Shell.fmtNum(st.total || 0)}</div></div>
+              <div><div class="cp-stat-lbl">Valid</div><div class="cp-stat-val" style="color:#10B981">${Shell.fmtNum(st.valid || 0)}</div></div>
+              <div><div class="cp-stat-lbl">Bot %</div><div class="cp-stat-val" style="color:#F43F5E">${Number(st.bot_rate || 0).toFixed(1)}%</div></div>
+            </div>
+          </a>`;
+      }).join('');
+    }
+
+    async function loadCampaigns() {
+      try { CP.campaigns = await Shell.api('/api/campaigns'); document.getElementById('cpSub').textContent = `${CP.campaigns.length} حملة`; renderList(); }
+      catch (e) { document.getElementById('cpLoading').style.display = 'none'; Shell.toast('فشل التحميل: ' + e.message, 'error'); }
+    }
+
+    function updateTypeButtons(type) {
+      CP.newCampaignType = type;
+      document.querySelectorAll('.cp-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+      document.getElementById('destUrlWrap').style.display = type === 'direct' ? '' : 'none';
+    }
+
+    async function openNewCampaign() {
+      try {
+        if (CP.sources.length === 0) CP.sources = await Shell.api('/api/traffic-sources');
+        if (CP.destinations.length === 0) CP.destinations = await Shell.api('/api/destinations');
+        
+        document.getElementById('newSource').innerHTML = CP.sources.map(s => `<option value="${Shell.esc(s.slug)}">${Shell.esc(s.name)}</option>`).join('');
+        document.getElementById('newDest').innerHTML = CP.destinations.map(d => `<option value="${Shell.esc(d.slug)}">${Shell.esc(d.name)}</option>`).join('');
+        
+        document.getElementById('newCampaignModal').classList.add('is-open');
+      } catch (e) { Shell.toast('فشل تحميل القوائم', 'error'); }
+    }
+
+    function closeNewCampaign() { document.getElementById('newCampaignModal').classList.remove('is-open'); }
+
+    async function createCampaign() {
+      const body = {
+        name: document.getElementById('newName').value.trim(),
+        type: CP.newCampaignType,
+        traffic_source_slug: document.getElementById('newSource').value,
+        buy_cpm: parseFloat(document.getElementById('newBuyCpm').value) || 0,
+        destination_slug: document.getElementById('newDest').value,
+        sell_cpm: parseFloat(document.getElementById('newSellCpm').value) || 0,
+        destination_url: document.getElementById('newDestUrl').value.trim(),
+        destination_zone_id: document.getElementById('newZoneId').value.trim(),
+      };
+      if (!body.name) { Shell.toast('اسم الحملة مطلوب', 'error'); return; }
+      if (body.type === 'direct' && !body.destination_url) { Shell.toast('حملات Direct محتاجة رابط وجهة', 'error'); return; }
+      
+      const btn = document.getElementById('createCampaignBtn'); btn.disabled = true;
+      try {
+        const res = await Shell.api('/api/campaigns', { method: 'POST', body: JSON.stringify(body) });
+        closeNewCampaign(); Shell.toast('تم إنشاء الحملة ✅', 'success');
+        window.location.href = '/campaigns/' + res.id;
+      } catch (e) { Shell.toast('فشل: ' + e.message, 'error'); }
+      finally { btn.disabled = false; }
+    }
+
+    (async function boot() {
+      try {
+        await Shell.mount({ active: 'campaigns', lang: 'ar', breadcrumb: [{ label: 'الحملات' }] });
+        document.getElementById('bootSkeleton').style.display = 'none'; document.getElementById('shAppRoot').style.display = '';
+        document.getElementById('newBtn').addEventListener('click', openNewCampaign);
+        document.querySelectorAll('.cp-type-btn').forEach(btn => btn.addEventListener('click', () => updateTypeButtons(btn.dataset.type)));
+        document.getElementById('newCampaignModal').addEventListener('click', (e) => { if (e.target.id === 'newCampaignModal') closeNewCampaign(); });
+        await loadCampaigns();
+      } catch (e) { document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`; }
+    })();
+  </script>
+</body>
+                                                                           </html>

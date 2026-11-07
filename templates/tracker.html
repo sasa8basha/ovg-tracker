@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · كود التتبع</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 13px; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    .tr-header { margin-bottom: 20px; }
+    .tr-title { font-size: 22px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.02em; margin: 0 0 4px 0; }
+    .tr-sub { font-size: 12px; color: #7B8496; }
+
+    .tr-version-tabs { display: flex; gap: 8px; margin-bottom: 16px; background: #0F1117; border: 1px solid #232734; border-radius: 12px; padding: 4px; max-width: 400px; }
+    .tr-version-btn { flex: 1; padding: 10px 16px; border-radius: 8px; background: transparent; border: none; color: #7B8496; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 150ms; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .tr-version-btn:hover { color: #CBD5E1; }
+    .tr-version-btn.active { background: linear-gradient(135deg, #7C5CFF 0%, #9B80FF 100%); color: white; box-shadow: 0 0 24px rgba(124,92,255,0.4); }
+    .tr-version-btn .v-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.2); font-family: 'JetBrains Mono', monospace; }
+
+    .tr-card { background: #0F1117; border: 1px solid #232734; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .tr-card-title { font-size: 12px; font-weight: 800; color: #F8FAFC; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; }
+    .tr-card-title .badge-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(124,92,255,0.15); color: #9B80FF; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+
+    .tr-site-select { background: #0F1117; border: 1px solid #232734; border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+    .tr-site-select label { display: block; font-size: 10px; font-weight: 700; color: #4A5263; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .tr-site-select select { width: 100%; height: 36px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 13px; outline: none; cursor: pointer; }
+    .tr-site-select select:focus { border-color: #7C5CFF; box-shadow: 0 0 0 3px rgba(124,92,255,0.12); }
+
+    .tr-key-row { display: flex; gap: 8px; }
+    .tr-key-input { flex: 1; height: 38px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #9B80FF; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; outline: none; }
+    .tr-copy-btn { height: 38px; padding: 0 16px; background: #7C5CFF; color: white; border: none; border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 120ms; white-space: nowrap; }
+    .tr-copy-btn:hover { background: #9B80FF; box-shadow: 0 0 24px rgba(124,92,255,0.4); }
+    .tr-copy-btn:active { transform: scale(0.97); }
+    .tr-copy-btn.copied { background: #10B981; }
+    .tr-copy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .tr-code-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+    .tr-code-actions .label { font-size: 11px; color: #7B8496; font-family: 'JetBrains Mono', monospace; }
+    .tr-code-actions .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .tr-code-wrap { background: #08090D; border: 1px solid #232734; border-radius: 8px; padding: 14px; max-height: 320px; overflow: auto; }
+    .tr-code-wrap pre { margin: 0; color: #10B981; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+    .tr-part-label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(124,92,255,0.15); border: 1px solid rgba(124,92,255,0.3); border-radius: 6px; color: #9B80FF; font-size: 11px; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px; }
+
+    .tr-instructions { background: #161822; border-radius: 8px; padding: 14px; margin-top: 12px; }
+    .tr-instructions ol { margin: 0; padding-right: 20px; color: #CBD5E1; font-size: 12px; line-height: 1.9; }
+    .tr-instructions li { margin-bottom: 4px; }
+    .tr-instructions code { background: rgba(124,92,255,0.15); color: #9B80FF; padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+    .tr-note { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #FCD34D; line-height: 1.7; }
+    .tr-info { background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.25); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #67E8F9; line-height: 1.7; }
+    .tr-success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #6EE7B7; line-height: 1.7; }
+
+    .tr-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
+    .tr-feature { padding: 10px 12px; background: #161822; border-radius: 8px; border-right: 3px solid #7C5CFF; }
+    .tr-feature-title { font-size: 11px; font-weight: 800; color: #F8FAFC; margin-bottom: 3px; }
+    .tr-feature-desc { font-size: 10px; color: #7B8496; line-height: 1.5; }
+
+    .tr-danger { background: rgba(244,63,94,0.06); border: 1px solid rgba(244,63,94,0.25); border-radius: 12px; padding: 14px; margin-top: 16px; }
+    .tr-danger-title { font-size: 12px; font-weight: 800; color: #F43F5E; margin: 0 0 6px 0; }
+    .tr-danger-desc { font-size: 11px; color: #FDA4AF; margin: 0 0 12px 0; line-height: 1.6; }
+    .tr-btn-warn { height: 32px; padding: 0 14px; background: rgba(245,158,11,0.15); color: #F59E0B; border: 1px solid rgba(245,158,11,0.35); border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 120ms; }
+    .tr-btn-warn:hover { background: #F59E0B; color: white; }
+    .tr-btn-warn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .tr-empty { padding: 60px 20px; text-align: center; color: #7B8496; }
+    .tr-empty-icon { font-size: 48px; opacity: 0.4; display: block; margin-bottom: 12px; }
+    .tr-empty-title { font-size: 16px; font-weight: 800; color: #F8FAFC; margin-bottom: 6px; }
+
+    .tr-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: #7B8496; font-family: 'JetBrains Mono', monospace; }
+    .tr-stats strong { color: #F8FAFC; }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري التحميل…</div>
+  </div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+      <div class="tr-header">
+        <h1 class="tr-title">🔧 كود التتبع</h1>
+        <p class="tr-sub">انسخ الكود ده وحطه في موقعك عشان يبدأ يبعت الزيارات للـ OVG</p>
+      </div>
+
+      <div class="tr-site-select">
+        <label for="siteSelect">اختر الموقع</label>
+        <select id="siteSelect">
+          <option value="">— جاري التحميل —</option>
+        </select>
+      </div>
+
+      <div class="tr-version-tabs" id="versionTabs" style="display:none;">
+        <button class="tr-version-btn active" data-version="v3" type="button">
+          🚀 v3 <span class="v-badge">جديد</span>
+        </button>
+        <button class="tr-version-btn" data-version="v2" type="button">
+          📷 v2 <span class="v-badge">قديم</span>
+        </button>
+      </div>
+
+      <div id="trackerContent" style="display:none;">
+
+        <div id="v3Content">
+          <div class="tr-card">
+            <div class="tr-card-title">
+              <span class="badge-num">✨</span>
+              ليه v3 أحسن؟
+            </div>
+            <div class="tr-features">
+              <div class="tr-feature">
+                <div class="tr-feature-title">💓 Heartbeats</div>
+                <div class="tr-feature-desc">نبضة كل 10 ثواني — نعرف الزيارة قعدت قد إيه</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">📊 40+ حقل</div>
+                <div class="tr-feature-desc">scroll depth, mouse velocity, keyboard, idle</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">🍯 Honeypots</div>
+                <div class="tr-feature-desc">فخاخ خفية — البشر مش شايفينها، البوتات بتقع فيها</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">🎯 Ad Tracking</div>
+                <div class="tr-feature-desc">نعرف الإعلان ظهر ولا لأ، وكام نسبة ظهور</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">💾 Offline Queue</div>
+                <div class="tr-feature-desc">لو النت قطع، البيانات بتتحفظ وتبعت لاحقاً</div>
+              </div>
+              <div class="tr-feature">
+                <div class="tr-feature-title">🛡️ Anti-Detection</div>
+                <div class="tr-feature-desc">مفيش globals، jitter، endpoints خفية</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">1</span> Site Key</div>
+            <div class="tr-key-row">
+              <input type="text" id="siteKeyInput" class="tr-key-input" readonly>
+              <button class="tr-copy-btn" id="copyKeyBtn" type="button">نسخ</button>
+            </div>
+          </div>
+
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">2</span> كود التتبع — <strong>جزئين</strong></div>
+            <div class="tr-info">
+              💡 <b>ليه جزئين؟</b> الكود كبير، ومتصفحك ممكن يقطع النسخ لو نسخت كله مرة واحدة.
+              <b>انسخ الجزء 1، بعدين الجزء 2، وحطهم ورا بعض في نفس المكان.</b>
+              أو استخدم زرار "تحميل الملف" وجيب الكود كملف كامل.
+            </div>
+            <div class="tr-stats" id="codeStats"></div>
+
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <div class="tr-part-label">📄 الجزء 1</div>
+              <div class="actions">
+                <button class="tr-copy-btn" id="copyPart1Btn" type="button">نسخ الجزء 1</button>
+              </div>
+            </div>
+            <div class="tr-code-wrap" style="max-height: 240px;">
+              <pre id="part1Code">جاري التحميل…</pre>
+            </div>
+
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <div class="tr-part-label">📄 الجزء 2</div>
+              <div class="actions">
+                <button class="tr-copy-btn" id="copyPart2Btn" type="button">نسخ الجزء 2</button>
+              </div>
+            </div>
+            <div class="tr-code-wrap" style="max-height: 240px;">
+              <pre id="part2Code">جاري التحميل…</pre>
+            </div>
+
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <div class="tr-part-label" style="background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); color: #6EE7B7;">📦 الملف كامل</div>
+              <div class="actions">
+                <button class="tr-copy-btn" id="downloadBtn" type="button" style="background: #10B981;">⬇ تحميل الملف</button>
+                <button class="tr-copy-btn" id="copyFullBtn" type="button">نسخ الكل مرة واحدة</button>
+              </div>
+            </div>
+            <div class="tr-success">
+              ✅ <b>مهم:</b> الحل الأسهل — استخدم <b>"تحميل الملف"</b>، هتلاقي ملف <code>.txt</code> فيه الكود كامل. افتحه، انسخ اللي فيه، وحطه في موقعك.
+            </div>
+          </div>
+
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">3</span> خطوات التركيب</div>
+            <div class="tr-instructions">
+              <ol>
+                <li>انسخ الجزئين (أو حمّل الملف) وحطهم ورا بعض</li>
+                <li>افتح موقعك واختار الصفحات اللي عايز تتبعها</li>
+                <li>حط الكود في <code>&lt;head&gt;</code> أو قبل <code>&lt;/body&gt;</code> مباشرة</li>
+                <li>لو بتستخدم ووردبريس: استخدم إضافة "Insert Headers and Footers"</li>
+                <li>تأكد إن روابطك فيها <code>?zoneId=XXX</code> عشان نعرف الزون</li>
+              </ol>
+            </div>
+            <div class="tr-note">
+              ⚠️ <b>مهم:</b> الكود لازم يتحمّل على كل صفحة عايز تتبعها.
+            </div>
+          </div>
+
+          <div class="tr-danger">
+            <h3 class="tr-danger-title">⚠️ تجديد المفتاح</h3>
+            <p class="tr-danger-desc">لو المفتاح اتسرّب، اعمله rotate. الكود القديم هيبطّل يشتغل فوراً.</p>
+            <button class="tr-btn-warn" id="rotateBtn" type="button">🔄 تجديد المفتاح</button>
+          </div>
+        </div>
+
+        <div id="v2Content" style="display:none;">
+          <div class="tr-card">
+            <div class="tr-card-title"><span class="badge-num">1</span> كود التتبع v2</div>
+            <div class="tr-note">
+              ⚠️ <b>ملاحظة:</b> v2 بيبعت البيانات مرة واحدة بعد 2 ثانية. معظم الزيارات بتتجمد على <code>time_on_page = 2000ms</code>.
+              الأفضل تستخدم v3.
+            </div>
+            <div class="tr-code-actions" style="margin-top: 14px;">
+              <span class="label">v2 — Legacy</span>
+              <div class="actions">
+                <button class="tr-copy-btn" id="copyV2Btn" type="button">نسخ الكود</button>
+              </div>
+            </div>
+            <div class="tr-code-wrap">
+              <pre id="v2Code">جاري التحميل…</pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div id="trackerEmpty" class="tr-empty" style="display:none;">
+        <span class="tr-empty-icon">🌐</span>
+        <div class="tr-empty-title">مفيش مواقع بعد</div>
+        <div style="font-size:12px;margin-bottom:16px;">أضف موقع الأول عشان تقدر تاخد كود التتبع</div>
+        <a href="/dashboard" style="display:inline-block;padding:8px 16px;background:#7C5CFF;color:white;text-decoration:none;border-radius:6px;font-size:12px;font-weight:700;font-family:inherit;">+ أضف موقع</a>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const TR = {
+      sites: [],
+      currentSite: null,
+      currentVersion: 'v3',
+      v3Data: null,
+      v2Code: '',
+    };
+
+    async function boot() {
+      try {
+        await Shell.mount({
+          active: 'tracker',
+          lang: 'ar',
+          breadcrumb: [{ label: 'كود التتبع' }],
+        });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+
+        TR.sites = Shell.state.sites || [];
+        const select = document.getElementById('siteSelect');
+
+        if (!TR.sites.length) {
+          select.innerHTML = '<option value="">مفيش مواقع</option>';
+          document.getElementById('trackerEmpty').style.display = '';
+          return;
+        }
+
+        document.getElementById('versionTabs').style.display = 'flex';
+
+        select.innerHTML = TR.sites.map(s =>
+          `<option value="${Shell.esc(s.site_key)}">${Shell.esc(s.name)}${s.domain ? ' · ' + Shell.esc(s.domain) : ''}</option>`
+        ).join('');
+
+        const params = new URLSearchParams(location.search);
+        const paramSiteKey = params.get('site');
+        const selectedKey = paramSiteKey && TR.sites.find(s => s.site_key === paramSiteKey)
+          ? paramSiteKey
+          : TR.sites[0].site_key;
+        select.value = selectedKey;
+        await loadTracker(selectedKey, TR.currentVersion);
+
+        select.addEventListener('change', () => loadTracker(select.value, TR.currentVersion));
+
+        document.querySelectorAll('.tr-version-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.tr-version-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            TR.currentVersion = btn.dataset.version;
+            const site = TR.sites.find(s => s.site_key === select.value);
+            if (site) loadTracker(site.site_key, TR.currentVersion);
+          });
+        });
+
+        document.getElementById('copyKeyBtn').addEventListener('click', () => {
+          copyText(document.getElementById('siteKeyInput').value, document.getElementById('copyKeyBtn'));
+        });
+        document.getElementById('copyPart1Btn').addEventListener('click', () => {
+          if (TR.v3Data) copyText(TR.v3Data.part1, document.getElementById('copyPart1Btn'));
+        });
+        document.getElementById('copyPart2Btn').addEventListener('click', () => {
+          if (TR.v3Data) copyText(TR.v3Data.part2, document.getElementById('copyPart2Btn'));
+        });
+        document.getElementById('copyFullBtn').addEventListener('click', () => {
+          if (TR.v3Data) copyText(TR.v3Data.full, document.getElementById('copyFullBtn'));
+        });
+        document.getElementById('downloadBtn').addEventListener('click', downloadCode);
+        document.getElementById('copyV2Btn').addEventListener('click', () => {
+          if (TR.v2Code) copyText(TR.v2Code, document.getElementById('copyV2Btn'));
+        });
+        document.getElementById('rotateBtn').addEventListener('click', rotateKey);
+      } catch (e) {
+        console.error('[Tracker Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color:#F43F5E;font-weight:700;margin-bottom:8px;">فشل التحميل</div>
+            <div style="font-size:12px;color:#7B8496;max-width:340px;text-align:center;line-height:1.6;">${Shell.esc(e.message || 'خطأ')}</div>
+            <button onclick="location.reload()" style="margin-top:16px;padding:8px 16px;background:#7C5CFF;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;">🔄 إعادة</button>
+          `;
+        }
+      }
+    }
+
+    async function loadTracker(siteKey, version) {
+      if (!siteKey) return;
+      const site = TR.sites.find(s => s.site_key === siteKey);
+      if (!site) return;
+      TR.currentSite = site;
+      document.getElementById('trackerContent').style.display = '';
+      document.getElementById('trackerEmpty').style.display = 'none';
+      document.getElementById('siteKeyInput').value = site.site_key;
+
+      document.getElementById('v3Content').style.display = version === 'v3' ? '' : 'none';
+      document.getElementById('v2Content').style.display = version === 'v2' ? '' : 'none';
+
+      if (version === 'v3') {
+        try {
+          const data = await Shell.api(`/api/sites/${site.id}/tracker-code-v3`);
+          TR.v3Data = data;
+          document.getElementById('part1Code').textContent = data.part1 || '';
+          document.getElementById('part2Code').textContent = data.part2 || '';
+          document.getElementById('codeStats').innerHTML =
+            `📏 <strong>${data.lines || 0}</strong> سطر · ` +
+            `💾 <strong>${Math.round((data.size_bytes || 0) / 1024)} KB</strong> · ` +
+            `🔑 Campaign: <strong>${data.campaign_key || ''}</strong>`;
+        } catch (err) {
+          document.getElementById('part1Code').textContent = 'فشل التحميل: ' + err.message;
+          document.getElementById('part2Code').textContent = '';
+        }
+      } else {
+        try {
+          const data = await Shell.api(`/api/sites/${site.id}/tracker-code`);
+          TR.v2Code = data.code || '';
+          document.getElementById('v2Code').textContent = TR.v2Code || 'فشل التحميل';
+        } catch (err) {
+          document.getElementById('v2Code').textContent = 'فشل التحميل: ' + err.message;
+        }
+      }
+    }
+
+    function downloadCode() {
+      if (!TR.v3Data || !TR.v3Data.full) {
+        Shell.toast('مفيش كود متاح', 'error');
+        return;
+      }
+      const filename = `ovg-tracker-v3-${(TR.currentSite?.site_key || 'unknown').substring(0, 8)}.txt`;
+      try {
+        const blob = new Blob([TR.v3Data.full], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        Shell.toast('تم تحميل الملف ✅', 'success');
+      } catch (e) {
+        Shell.toast('فشل التحميل: ' + e.message, 'error');
+      }
+    }
+
+    async function rotateKey() {
+      if (!TR.currentSite) return;
+      if (!confirm('تجديد المفتاح هيبطّل الكود القديم. متأكد؟')) return;
+      const btn = document.getElementById('rotateBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ جاري…';
+      try {
+        const data = await Shell.api(`/api/sites/${TR.currentSite.id}/rotate-key`, { method: 'POST' });
+        Shell.toast('تم تجديد المفتاح ✅', 'success');
+        TR.currentSite.site_key = data.site_key;
+        await loadTracker(data.site_key, TR.currentVersion);
+      } catch (err) {
+        Shell.toast('فشل: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 تجديد المفتاح';
+      }
+    }
+
+    function copyText(text, btn) {
+      if (!text) return;
+      const orig = btn.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓ تم النسخ';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+      }).catch(() => Shell.toast('فشل النسخ', 'error'));
+    }
+
+    boot();
+  </script>
+</body>
+</html>

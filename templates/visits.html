@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · الزيارات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    .dv-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .dv-title { font-size: 22px; font-weight: 900; color: #F8FAFC; margin: 0; }
+    .dv-filters { background: #0F1117; border: 1px solid #232734; border-radius: 12px; padding: 12px; margin-bottom: 16px; display: grid; grid-template-columns: repeat(6, 1fr) auto; gap: 8px; align-items: end; }
+    @media (max-width: 900px) { .dv-filters { grid-template-columns: 1fr 1fr; } }
+    .dv-input { width: 100%; height: 32px; padding: 0 10px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 12px; outline: none; box-sizing: border-box; }
+    .dv-input:focus { border-color: #7C5CFF; }
+    
+    .dv-table-wrap { background: #0F1117; border: 1px solid #232734; border-radius: 12px; overflow-x: auto; }
+    .dv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .dv-thead { background: rgba(0,0,0,0.3); position: sticky; top: 0; }
+    .dv-thead th { padding: 10px 8px; text-align: right; font-size: 10px; font-weight: 700; color: #4A5263; border-bottom: 1px solid #1A1D29; white-space: nowrap; }
+    .dv-row { border-bottom: 1px solid #1A1D29; cursor: pointer; transition: background 100ms; }
+    .dv-row:hover { background: #161822; }
+    .dv-row td { padding: 8px; }
+    .dv-zone { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; background: #161822; padding: 2px 6px; border-radius: 4px; color: #9B80FF; }
+    .dv-verdict { display: inline-flex; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800; }
+    .dv-verdict.valid { background: rgba(16,185,129,0.12); color: #10B981; }
+    .dv-verdict.invalid { background: rgba(244,63,94,0.12); color: #F43F5E; }
+    .dv-verdict.suspicious { background: rgba(245,158,11,0.12); color: #F59E0B; }
+    
+    .dv-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+      <div class="dv-header">
+        <div><h1 class="dv-title">الزيارات</h1></div>
+        <button class="sh-btn sh-btn-ghost" id="exportBtn">📥 تصدير CSV</button>
+      </div>
+
+      <div class="dv-filters">
+        <div><label class="sh-label">الحملة</label><select id="fCampaign" class="dv-input"><option value="">كل الحملات</option></select></div>
+        <div><label class="sh-label">الحكم</label><select id="fVerdict" class="dv-input"><option value="">الكل</option><option value="valid">سليم</option><option value="invalid">بوت</option></select></div>
+        <div><label class="sh-label">من تاريخ</label><input type="date" id="fFrom" class="dv-input"></div>
+        <div><label class="sh-label">إلى تاريخ</label><input type="date" id="fTo" class="dv-input"></div>
+        <div><label class="sh-label">الزون (Zone)</label><input type="text" id="fZone" class="dv-input" placeholder="10245"></div>
+        <div><label class="sh-label">Website ID (PopAds)</label><input type="text" id="fWebsite" class="dv-input" placeholder="123456"></div>
+        <button class="sh-btn sh-btn-primary" id="applyBtn" style="height:32px;">تطبيق</button>
+      </div>
+
+      <div class="dv-table-wrap">
+        <table class="dv-table">
+          <thead class="dv-thead">
+            <tr>
+              <th>#ID</th><th>الوقت</th><th>IP / الدولة</th><th>الحملة</th><th>الزون / الموقع</th><th>التكلفة</th><th>الإيراد</th><th>الربح</th><th>Score</th><th>الحكم</th>
+            </tr>
+          </thead>
+          <tbody id="dvTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="dv-pagination">
+        <div id="pageInfo" style="font-size:12px;color:#7B8496;">—</div>
+        <div style="display:flex;gap:6px;">
+          <button class="sh-btn sh-btn-ghost" id="prevBtn">السابق</button>
+          <span id="pageNum" style="padding:6px;font-family:monospace;font-size:12px;color:#F8FAFC;">1 / 1</span>
+          <button class="sh-btn sh-btn-ghost" id="nextBtn">التالي</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const DV = { page: 1, perPage: 25, total: 0, pages: 1, campaigns: [] };
+
+    function fmtNum(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    async function loadCampaignOptions() {
+      try {
+        DV.campaigns = await Shell.api('/api/campaigns');
+        const sel = document.getElementById('fCampaign');
+        DV.campaigns.forEach(c => { const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; sel.appendChild(opt); });
+      } catch (e) {}
+    }
+
+    async function loadVisits(page = 1) {
+      DV.page = page;
+      const params = new URLSearchParams();
+      if (document.getElementById('fCampaign').value) params.set('campaign_id', document.getElementById('fCampaign').value);
+      if (document.getElementById('fVerdict').value) params.set('verdict', document.getElementById('fVerdict').value);
+      if (document.getElementById('fFrom').value) params.set('from_date', document.getElementById('fFrom').value);
+      if (document.getElementById('fTo').value) params.set('to_date', document.getElementById('fTo').value);
+      if (document.getElementById('fZone').value) params.set('zone', document.getElementById('fZone').value);
+      if (document.getElementById('fWebsite').value) params.set('website_id', document.getElementById('fWebsite').value);
+      params.set('page', DV.page);
+      params.set('per_page', DV.perPage);
+
+      try {
+        const data = await Shell.api('/api/visits?' + params.toString());
+        DV.total = data.total; DV.pages = data.pages;
+        
+        document.getElementById('dvTbody').innerHTML = (data.items || []).map(v => {
+          const camp = DV.campaigns.find(c => c.id === v.campaign_id);
+          const campName = camp ? camp.name : '—';
+          const verdictCls = v.verdict === 'valid' ? 'valid' : v.verdict === 'invalid' ? 'invalid' : 'suspicious';
+          const scoreColor = v.score > 80 ? '#F43F5E' : v.score > 40 ? '#F59E0B' : '#10B981';
+          
+          const bid = Number(v.bid || 0);
+          const rev = Number(v.revenue || 0);
+          const profit = rev - bid;
+          const profitColor = profit > 0 ? '#10B981' : profit < 0 ? '#F43F5E' : '#7B8496';
+          
+          return `
+            <tr class="dv-row" onclick="window.location.href='/visits/${v.id}'">
+              <td style="color:#9B80FF;font-family:monospace;">#${v.id}</td>
+              <td style="font-size:10px;color:#7B8496;">${Shell.esc(v.time)}</td>
+              <td><span style="font-family:monospace;">${Shell.esc(v.ip)}</span> <span style="color:#4A5263;font-size:10px;">${Shell.esc(v.country_code || v.country || '—')}</span></td>
+              <td style="font-size:11px;">${Shell.esc(campName)}</td>
+              <td>
+                <span class="dv-zone">${Shell.esc(v.zone || '—')}</span>
+                ${v.website_id ? `<br><span style="font-size:9px;color:#4A5263;">Web: ${Shell.esc(v.website_id)}</span>` : ''}
+              </td>
+              <td style="font-family:monospace;font-size:11px;color:#FDA4AF;">$${bid.toFixed(6)}</td>
+              <td style="font-family:monospace;font-size:11px;color:#6EE7B7;">$${rev.toFixed(6)}</td>
+              <td style="font-family:monospace;font-size:11px;font-weight:800;color:${profitColor};">${profit >= 0 ? '+' : ''}$${profit.toFixed(6)}</td>
+              <td style="font-family:monospace;color:${scoreColor};font-weight:800;">${v.score}</td>
+              <td><span class="dv-verdict ${verdictCls}">${(v.verdict || '').toUpperCase()}</span></td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="10" style="text-align:center;padding:40px;color:#7B8496;">مفيش زيارات</td></tr>`;
+
+        document.getElementById('pageInfo').innerHTML = `عرض ${(DV.page-1)*DV.perPage + 1}–${Math.min(DV.page*DV.perPage, DV.total)} من ${fmtNum(DV.total)}`;
+        document.getElementById('pageNum').textContent = `${DV.page} / ${DV.pages || 1}`;
+        document.getElementById('prevBtn').disabled = DV.page <= 1;
+        document.getElementById('nextBtn').disabled = DV.page >= DV.pages;
+      } catch (e) { Shell.toast('فشل التحميل', 'error'); }
+    }
+
+    (async function boot() {
+      try {
+        await Shell.mount({ active: 'visits', lang: 'ar', breadcrumb: [{ label: 'الزيارات' }] });
+        document.getElementById('bootSkeleton').style.display = 'none'; document.getElementById('shAppRoot').style.display = '';
+        
+        await loadCampaignOptions();
+        // Prefill from URL
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('campaign_id')) document.getElementById('fCampaign').value = params.get('campaign_id');
+        
+        document.getElementById('applyBtn').onclick = () => loadVisits(1);
+        document.getElementById('prevBtn').onclick = () => loadVisits(DV.page - 1);
+        document.getElementById('nextBtn').onclick = () => loadVisits(DV.page + 1);
+        
+        loadVisits(1);
+      } catch (e) { document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`; }
+    })();
+  </script>
+</body>
+  </html>

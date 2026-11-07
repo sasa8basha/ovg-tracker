@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · Live Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 13px; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    /* ============ HEADER ============ */
+    .lv-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .lv-title { font-size: 22px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.02em; margin: 0; display: flex; align-items: center; gap: 12px; }
+    .lv-rec-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 6px;
+      background: rgba(244,63,94,0.15); border: 1px solid rgba(244,63,94,0.35);
+      font-size: 10px; font-weight: 900; color: #F43F5E;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .lv-rec-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #F43F5E;
+      animation: lv-rec-pulse 1.5s ease-in-out infinite;
+      box-shadow: 0 0 8px #F43F5E;
+    }
+    @keyframes lv-rec-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+    .lv-sub { font-size: 12px; color: #7B8496; margin-top: 4px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .lv-timer {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+      color: #9B80FF; padding: 2px 8px; border-radius: 4px;
+      background: rgba(124,92,255,0.12);
+    }
+    .lv-header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .lv-btn {
+      height: 30px; padding: 0 12px;
+      border-radius: 6px; font-family: inherit; font-size: 11px; font-weight: 700;
+      cursor: pointer; border: 1px solid #232734;
+      background: #0F1117; color: #CBD5E1;
+      transition: all 120ms; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .lv-btn:hover { background: #1C1F2E; color: #F8FAFC; border-color: #2E3446; }
+    .lv-btn.active { background: rgba(124,92,255,0.15); border-color: rgba(124,92,255,0.35); color: #9B80FF; }
+    .lv-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ============ KPI STRIP ============ */
+    .lv-kpis {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 900px) { .lv-kpis { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .lv-kpis { grid-template-columns: 1fr 1fr; gap: 8px; } }
+    .lv-kpi {
+      background: #0F1117; border: 1px solid #232734; border-radius: 12px;
+      padding: 12px 14px; position: relative; overflow: hidden;
+    }
+    .lv-kpi::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 2px; background: var(--kpi-color, #7C5CFF); opacity: 0.6;
+    }
+    .lv-kpi-label {
+      font-size: 9px; font-weight: 700; color: #4A5263;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .lv-kpi-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px; font-weight: 900; line-height: 1;
+      color: #F8FAFC; letter-spacing: -0.02em;
+      font-feature-settings: "tnum";
+    }
+    .lv-kpi-sub { font-size: 10px; color: #7B8496; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+    .lv-live-dot {
+      display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+      background: #10B981; margin-left: 3px;
+      animation: lv-rec-pulse 1.5s ease-in-out infinite;
+    }
+
+    /* ============ LAYOUT ============ */
+    .lv-body {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 12px;
+      height: calc(100vh - var(--sh-topbar-h, 52px) - var(--sh-statusbar-h, 28px) - 220px);
+      min-height: 400px;
+    }
+    @media (max-width: 1000px) {
+      .lv-body {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .lv-feed-wrap, .lv-side-wrap { max-height: 60vh; }
+    }
+
+    /* ============ FEED ============ */
+    .lv-feed-wrap {
+      background: #0F1117; border: 1px solid #232734;
+      border-radius: 12px; display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .lv-feed-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-bottom: 1px solid #1A1D29;
+      background: #0A0C12;
+    }
+    .lv-feed-title { font-size: 12px; font-weight: 800; color: #F8FAFC; display: flex; align-items: center; gap: 8px; }
+    .lv-feed-count {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+      color: #7B8496;
+    }
+    .lv-feed-filters { display: flex; gap: 4px; }
+    .lv-feed-filter {
+      padding: 3px 8px; border-radius: 4px;
+      background: transparent; border: 1px solid #232734;
+      color: #7B8496; font-family: inherit; font-size: 10px; font-weight: 700;
+      cursor: pointer; transition: all 120ms;
+    }
+    .lv-feed-filter.active {
+      background: rgba(124,92,255,0.15);
+      border-color: rgba(124,92,255,0.35);
+      color: #9B80FF;
+    }
+    .lv-feed {
+      flex: 1; overflow-y: auto;
+      padding: 6px;
+    }
+    .lv-feed::-webkit-scrollbar { width: 6px; }
+    .lv-feed::-webkit-scrollbar-track { background: transparent; }
+    .lv-feed::-webkit-scrollbar-thumb { background: #232734; border-radius: 3px; }
+
+    .lv-feed-empty {
+      padding: 40px 20px; text-align: center;
+      color: #4A5263; font-size: 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+    }
+    .lv-feed-empty-icon { font-size: 32px; opacity: 0.4; }
+
+    .lv-item {
+      display: grid;
+      grid-template-columns: 60px 24px 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      margin-bottom: 3px;
+      font-size: 11px;
+      text-decoration: none;
+      color: #CBD5E1;
+      transition: background 120ms;
+      position: relative;
+      border: 1px solid transparent;
+    }
+    .lv-item:hover {
+      background: #161822;
+      border-color: #232734;
+    }
+    .lv-item.new-valid { animation: lv-slide-in 500ms cubic-bezier(0.16,1,0.3,1); }
+    .lv-item.new-bot { animation: lv-slide-in-bot 900ms cubic-bezier(0.16,1,0.3,1); }
+    .lv-item.new-suspicious { animation: lv-slide-in-susp 700ms cubic-bezier(0.16,1,0.3,1); }
+
+    @keyframes lv-slide-in {
+      from { opacity: 0; transform: translateY(-20px); background: rgba(16,185,129,0.15); }
+      to { opacity: 1; transform: translateY(0); background: transparent; }
+    }
+    @keyframes lv-slide-in-bot {
+      from { opacity: 0; transform: translateY(-20px); background: rgba(244,63,94,0.25); box-shadow: 0 0 24px rgba(244,63,94,0.5); }
+      to { opacity: 1; transform: translateY(0); background: transparent; box-shadow: 0 0 0 transparent; }
+    }
+    @keyframes lv-slide-in-susp {
+      from { opacity: 0; transform: translateY(-20px); background: rgba(245,158,11,0.18); }
+      to { opacity: 1; transform: translateY(0); background: transparent; }
+    }
+
+    .lv-item-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: #4A5263; font-weight: 700;
+    }
+    .lv-item-icon {
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+    }
+    .lv-item-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .lv-item-row1 {
+      font-weight: 700; color: #F8FAFC;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lv-item-row2 {
+      font-size: 10px; color: #7B8496;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lv-item-zone {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: #9B80FF;
+      padding: 1px 6px; border-radius: 3px;
+      background: rgba(124,92,255,0.1);
+      max-width: 90px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lv-item-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; font-weight: 800;
+      min-width: 28px; text-align: center;
+    }
+
+    /* ============ SIDE (ALERTS + ACTIVITY) ============ */
+    .lv-side-wrap { display: flex; flex-direction: column; gap: 12px; }
+
+    .lv-side-card {
+      background: #0F1117; border: 1px solid #232734;
+      border-radius: 12px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .lv-side-head {
+      padding: 10px 14px; border-bottom: 1px solid #1A1D29;
+      background: #0A0C12;
+      font-size: 12px; font-weight: 800; color: #F8FAFC;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .lv-side-body { padding: 10px; overflow-y: auto; flex: 1; }
+
+    .lv-alert {
+      padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 11px; line-height: 1.5;
+      border: 1px solid;
+    }
+    .lv-alert.critical {
+      background: rgba(244,63,94,0.08);
+      border-color: rgba(244,63,94,0.35);
+      color: #FDA4AF;
+    }
+    .lv-alert.high {
+      background: rgba(245,158,11,0.08);
+      border-color: rgba(245,158,11,0.35);
+      color: #FCD34D;
+    }
+    .lv-alert-icon { font-size: 16px; flex-shrink: 0; }
+    .lv-alert-body { flex: 1; min-width: 0; }
+    .lv-alert-title { font-weight: 800; color: #F8FAFC; margin-bottom: 2px; font-size: 12px; }
+    .lv-alert-message { font-size: 10px; opacity: 0.9; }
+    .lv-alert-action {
+      margin-top: 6px; display: inline-block;
+      padding: 3px 8px; border-radius: 3px;
+      background: rgba(255,255,255,0.1); color: #F8FAFC;
+      font-size: 10px; font-weight: 700;
+      text-decoration: none;
+      transition: all 120ms;
+    }
+    .lv-alert-action:hover { background: rgba(255,255,255,0.2); }
+
+    .lv-side-empty {
+      padding: 30px 12px; text-align: center;
+      color: #4A5263; font-size: 12px;
+    }
+    .lv-side-empty-icon { font-size: 32px; opacity: 0.4; display: block; margin-bottom: 8px; }
+
+    /* Activity bars */
+    .lv-activity {
+      display: flex; align-items: flex-end; gap: 3px;
+      height: 60px; padding: 6px 0;
+    }
+    .lv-activity-bar {
+      flex: 1;
+      min-height: 2px;
+      border-radius: 2px 2px 0 0;
+      background: #10B981;
+      transition: height 600ms cubic-bezier(0.16,1,0.3,1);
+      position: relative;
+    }
+    .lv-activity-bar.bot { background: #F43F5E; }
+    .lv-activity-bar.mixed { background: #F59E0B; }
+    .lv-activity-label {
+      text-align: center; font-size: 9px;
+      color: #4A5263; font-family: 'JetBrains Mono', monospace;
+      margin-top: 4px;
+    }
+
+    /* ============ TOAST WRAPPER ============ */
+    .lv-toast-container {
+      position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+      z-index: 1500; display: flex; flex-direction: column; gap: 8px;
+      align-items: center; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري التحميل…</div>
+  </div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+
+      <div class="lv-header">
+        <div>
+          <h1 class="lv-title">
+            Live Monitor
+            <span class="lv-rec-badge">
+              <span class="lv-rec-dot"></span>
+              LIVE
+            </span>
+          </h1>
+          <p class="lv-sub">
+            <span>تراقب الزيارات وهي داخلة</span>
+            <span class="lv-timer" id="lvTimer">شغال من 0:00</span>
+            <span id="lvSiteName" style="color: #9B80FF;"></span>
+          </p>
+        </div>
+        <div class="lv-header-actions">
+          <button class="lv-btn" id="soundBtn" type="button" title="تنبيه صوتي">
+            🔔 <span id="soundLabel">صوت: مفعّل</span>
+          </button>
+          <button class="lv-btn" id="pauseBtn" type="button">⏸ إيقاف مؤقت</button>
+        </div>
+      </div>
+
+      <div class="lv-kpis">
+        <div class="lv-kpi" style="--kpi-color: #7C5CFF;">
+          <div class="lv-kpi-label">زيارات اليوم</div>
+          <div class="lv-kpi-value" id="kpiTodayTotal">0</div>
+          <div class="lv-kpi-sub" id="kpiTodaySub">—</div>
+        </div>
+        <div class="lv-kpi" style="--kpi-color: #F43F5E;">
+          <div class="lv-kpi-label">Bot Rate</div>
+          <div class="lv-kpi-value" id="kpiBotRate" style="color: #F43F5E;">0%</div>
+          <div class="lv-kpi-sub" id="kpiBotSub">—</div>
+        </div>
+        <div class="lv-kpi" style="--kpi-color: #F59E0B;">
+          <div class="lv-kpi-label">بوتات آخر ساعة</div>
+          <div class="lv-kpi-value" id="kpiBotHour" style="color: #F59E0B;">0</div>
+          <div class="lv-kpi-sub" id="kpiBotHourSub">—</div>
+        </div>
+        <div class="lv-kpi" style="--kpi-color: #10B981;">
+          <div class="lv-kpi-label">
+            زيارات/دقيقة
+            <span class="lv-live-dot"></span>
+          </div>
+          <div class="lv-kpi-value" id="kpiRate" style="color: #10B981;">0</div>
+          <div class="lv-kpi-sub" id="kpiRateSub">آخر دقيقة</div>
+        </div>
+      </div>
+
+      <div class="lv-body">
+        <div class="lv-feed-wrap">
+          <div class="lv-feed-head">
+            <div class="lv-feed-title">
+              📡 الزيارات الحية
+              <span class="lv-feed-count" id="lvFeedCount">0 زيارة</span>
+            </div>
+            <div class="lv-feed-filters">
+              <button class="lv-feed-filter active" data-feed-filter="all" type="button">الكل</button>
+              <button class="lv-feed-filter" data-feed-filter="invalid" type="button">🚨 بوت</button>
+              <button class="lv-feed-filter" data-feed-filter="valid" type="button">✅ صالح</button>
+            </div>
+          </div>
+          <div class="lv-feed" id="lvFeed">
+            <div class="lv-feed-empty">
+              <span class="lv-feed-empty-icon">📡</span>
+              <div>جاري انتظار أول زيارة...</div>
+              <div style="font-size: 10px; opacity: 0.6;">الزيارات هتظهر هنا في الوقت الفعلي</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lv-side-wrap">
+          <div class="lv-side-card" style="flex: 0 0 auto;">
+            <div class="lv-side-head">
+              🚨 تنبيهات
+              <span id="lvAlertsCount" style="font-size: 10px; color: #7B8496; font-family: 'JetBrains Mono', monospace;">0</span>
+            </div>
+            <div class="lv-side-body" id="lvAlerts" style="max-height: 300px;">
+              <div class="lv-side-empty">
+                <span class="lv-side-empty-icon">✅</span>
+                <div>كل حاجة هادية</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lv-side-card" style="flex: 1;">
+            <div class="lv-side-head">📊 آخر 60 دقيقة</div>
+            <div class="lv-side-body">
+              <div class="lv-activity" id="lvActivity"></div>
+              <div class="lv-activity-label" id="lvActivityLabel">جاري التحميل…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const LV = {
+      siteKey: null,
+      latestId: 0,
+      paused: false,
+      soundEnabled: true,
+      sessionStart: Date.now(),
+      feedFilter: 'all',
+      allItems: [],
+      activityChartTimer: null,
+      feedTimer: null,
+      statsTimer: null,
+      alertsTimer: null,
+    };
+
+    const esc = Shell.esc;
+    const fmtNum = Shell.fmtNum;
+
+    // ============ INJECT NAV ITEM ============
+    // Add "Live" to the sidebar navigation after mount
+    function injectNavItem() {
+      const nav = document.querySelector('.sh-nav');
+      if (!nav) return;
+      if (document.querySelector('[data-nav="live"]')) return;
+
+      const firstGroup = nav.querySelector('.sh-nav-group');
+      if (!firstGroup) return;
+      const firstItem = firstGroup.querySelector('.sh-nav-item');
+      if (!firstItem) return;
+
+      const liveItem = document.createElement('a');
+      liveItem.href = '/live';
+      liveItem.className = 'sh-nav-item active';
+      liveItem.setAttribute('data-nav', 'live');
+      liveItem.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="2" fill="currentColor"/>
+          <circle cx="12" cy="12" r="6" opacity="0.6"/>
+          <circle cx="12" cy="12" r="10" opacity="0.3"/>
+        </svg>
+        <span class="label">Live Monitor</span>
+      `;
+
+      firstItem.parentNode.insertBefore(liveItem, firstItem.nextSibling);
+    }
+
+    // ============ SESSION TIMER ============
+    function updateTimer() {
+      const elapsed = Math.floor((Date.now() - LV.sessionStart) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      const h = Math.floor(m / 60);
+      const mm = m % 60;
+      const display = h > 0
+        ? `${h}:${String(mm).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        : `${m}:${String(s).padStart(2, '0')}`;
+      const el = document.getElementById('lvTimer');
+      if (el) el.textContent = `شغال من ${display}`;
+    }
+
+    // ============ SOUND ============
+    let audioCtx = null;
+    function playBeep(isCritical) {
+      if (!LV.soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = isCritical ? 880 : 660;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+      } catch (e) {}
+    }
+
+    // ============ FEED ============
+    function verdictIcon(v) {
+      if (v === 'invalid') return '🚨';
+      if (v === 'valid') return '✅';
+      return '⚠️';
+    }
+    function scoreColor(s) {
+      if (s > 80) return '#F43F5E';
+      if (s > 40) return '#F59E0B';
+      return '#10B981';
+    }
+
+    function renderFeedItem(v, isNew) {
+      const item = document.createElement('a');
+      item.href = `/visits/${v.id}`;
+      item.className = 'lv-item';
+      if (isNew) {
+        if (v.verdict === 'invalid') item.classList.add('new-bot');
+        else if (v.verdict === 'valid') item.classList.add('new-valid');
+        else item.classList.add('new-suspicious');
+      }
+      const countryDisplay = v.country_code || v.country || '—';
+      item.innerHTML = `
+        <span class="lv-item-time">${esc(v.time)}</span>
+        <span class="lv-item-icon">${verdictIcon(v.verdict)}</span>
+        <span class="lv-item-body">
+          <span class="lv-item-row1">${esc(v.ip || '—')} · ${esc(countryDisplay)}</span>
+          <span class="lv-item-row2">${esc(v.browser || '—')} · ${esc(v.device || '—')}</span>
+        </span>
+        <span class="lv-item-zone">${esc(v.zone || '—')}</span>
+        <span class="lv-item-score" style="color: ${scoreColor(v.score || 0)};">${v.score || 0}</span>
+      `;
+      return item;
+    }
+
+    function matchesFilter(v) {
+      if (LV.feedFilter === 'all') return true;
+      return v.verdict === LV.feedFilter;
+    }
+
+    function appendToFeed(items, isNew) {
+      const feed = document.getElementById('lvFeed');
+      if (!feed) return;
+
+      const empty = feed.querySelector('.lv-feed-empty');
+      if (empty && items.length) empty.remove();
+
+      let addedCount = 0;
+      const newBots = [];
+
+      for (const v of items) {
+        LV.allItems.unshift(v);
+        if (matchesFilter(v)) {
+          const el = renderFeedItem(v, isNew);
+          feed.insertBefore(el, feed.firstChild);
+          addedCount++;
+        }
+        if (isNew && v.verdict === 'invalid') newBots.push(v);
+      }
+
+      // Keep DOM light (max 60 items)
+      while (feed.children.length > 60) {
+        feed.removeChild(feed.lastChild);
+      }
+
+      // Sound + count
+      if (newBots.length > 0) {
+        playBeep(newBots.length >= 3);
+      }
+
+      // Update counter
+      const totalShown = feed.querySelectorAll('.lv-item').length;
+      const countEl = document.getElementById('lvFeedCount');
+      if (countEl) countEl.textContent = `${totalShown} زيارة`;
+    }
+
+    function setFeedFilter(filter) {
+      LV.feedFilter = filter;
+      document.querySelectorAll('.lv-feed-filter').forEach(b => {
+        b.classList.toggle('active', b.dataset.feedFilter === filter);
+      });
+
+      const feed = document.getElementById('lvFeed');
+      if (!feed) return;
+      feed.innerHTML = '';
+
+      const filtered = LV.allItems.filter(matchesFilter);
+      if (filtered.length === 0) {
+        feed.innerHTML = `<div class="lv-feed-empty"><span class="lv-feed-empty-icon">📡</span><div>مفيش زيارات ${filter === 'invalid' ? 'بوت' : filter === 'valid' ? 'صالحة' : ''} لسه</div></div>`;
+        return;
+      }
+      for (const v of filtered.slice(0, 60)) {
+        feed.appendChild(renderFeedItem(v, false));
+      }
+      const countEl = document.getElementById('lvFeedCount');
+      if (countEl) countEl.textContent = `${filtered.length} زيارة`;
+    }
+
+    async function pollFeed() {
+      if (LV.paused) return;
+      try {
+        const siteParam = LV.siteKey ? `&site=${encodeURIComponent(LV.siteKey)}` : '';
+        const url = `/api/live/feed?since_id=${LV.latestId}&limit=20${siteParam}`;
+        const data = await Shell.api(url);
+
+        if (data.items && data.items.length > 0) {
+          appendToFeed(data.items, true);
+          LV.latestId = data.latest_id;
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+
+    // ============ STATS ============
+    async function pollStats() {
+      if (LV.paused) return;
+      try {
+        const siteParam = LV.siteKey ? `?site=${encodeURIComponent(LV.siteKey)}` : '';
+        const data = await Shell.api(`/api/live/stats${siteParam}`);
+
+        // Today total
+        const totalEl = document.getElementById('kpiTodayTotal');
+        if (totalEl) totalEl.textContent = fmtNum(data.today.total);
+        const totalSub = document.getElementById('kpiTodaySub');
+        if (totalSub) totalSub.textContent = `${fmtNum(data.today.valid)} valid · ${fmtNum(data.today.invalid)} bot`;
+
+        // Bot rate
+        const botRateEl = document.getElementById('kpiBotRate');
+        if (botRateEl) {
+          botRateEl.textContent = data.today.bot_rate.toFixed(1) + '%';
+          botRateEl.style.color = data.today.bot_rate > 30 ? '#F43F5E' : data.today.bot_rate > 15 ? '#F59E0B' : '#10B981';
+        }
+        const botSub = document.getElementById('kpiBotSub');
+        if (botSub) botSub.textContent = `${fmtNum(data.today.invalid)} من ${fmtNum(data.today.total)}`;
+
+        // Bots last hour
+        const botHourEl = document.getElementById('kpiBotHour');
+        if (botHourEl) botHourEl.textContent = fmtNum(data.last_hour.invalid);
+        const botHourSub = document.getElementById('kpiBotHourSub');
+        if (botHourSub) {
+          const rate = data.last_hour.total > 0
+            ? Math.round((data.last_hour.invalid / data.last_hour.total) * 100)
+            : 0;
+          botHourSub.textContent = `${fmtNum(data.last_hour.total)} زيارة · ${rate}%`;
+        }
+
+        // Rate
+        const rateEl = document.getElementById('kpiRate');
+        if (rateEl) rateEl.textContent = fmtNum(data.last_minute.total);
+        const rateSub = document.getElementById('kpiRateSub');
+        if (rateSub) {
+          rateSub.textContent = data.last_minute.invalid > 0
+            ? `${data.last_minute.invalid} بوت في الدقيقة`
+            : 'لا بوتات دلوقتي';
+          rateSub.style.color = data.last_minute.invalid > 0 ? '#F43F5E' : '#7B8496';
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+
+    // ============ ALERTS ============
+    async function pollAlerts() {
+      if (LV.paused) return;
+      try {
+        const siteParam = LV.siteKey ? `?site=${encodeURIComponent(LV.siteKey)}` : '';
+        const data = await Shell.api(`/api/live/alerts${siteParam}`);
+        renderAlerts(data.alerts || []);
+      } catch (e) {
+        // silent
+      }
+    }
+
+    function renderAlerts(alerts) {
+      const container = document.getElementById('lvAlerts');
+      const countEl = document.getElementById('lvAlertsCount');
+      if (countEl) countEl.textContent = alerts.length;
+
+      if (!alerts.length) {
+        container.innerHTML = `
+          <div class="lv-side-empty">
+            <span class="lv-side-empty-icon">✅</span>
+            <div>كل حاجة هادية</div>
+            <div style="font-size: 10px; margin-top: 4px; opacity: 0.6;">مفيش تنبيهات نشطة</div>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = alerts.map(a => `
+        <div class="lv-alert ${a.severity}">
+          <span class="lv-alert-icon">${a.icon}</span>
+          <div class="lv-alert-body">
+            <div class="lv-alert-title">${esc(a.title)}</div>
+            <div class="lv-alert-message">${esc(a.message)}</div>
+            ${a.action_href ? `<a href="${esc(a.action_href)}" class="lv-alert-action">${esc(a.action_label)} ←</a>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ============ ACTIVITY CHART ============
+    async function pollActivity() {
+      if (LV.paused) return;
+      try {
+        const siteParam = LV.siteKey ? `?site=${encodeURIComponent(LV.siteKey)}` : '';
+        const stats = await Shell.api(`/api/live/stats${siteParam}`);
+
+        // Simple 60-min approximation — for now, split last hour into 12 x 5-min chunks
+        // We'll use the data we have to render a simple representation
+        // Since we don't have per-5min data, we approximate
+        const total = stats.last_hour.total || 0;
+        const invalid = stats.last_hour.invalid || 0;
+        const valid = total - invalid;
+        const botRate = total > 0 ? invalid / total : 0;
+
+        // Render 12 bars
+        const container = document.getElementById('lvActivity');
+        if (!container) return;
+
+        const bars = [];
+        for (let i = 0; i < 12; i++) {
+          // Approximate distribution
+          const barHeight = total > 0 ? Math.max(4, Math.min(60, (total / 12) * 4)) : 4;
+          const barClass = botRate > 0.4 ? 'bot' : botRate > 0.15 ? 'mixed' : '';
+          bars.push(`<div class="lv-activity-bar ${barClass}" style="height: ${barHeight}px;"></div>`);
+        }
+        container.innerHTML = bars.join('');
+
+        const labelEl = document.getElementById('lvActivityLabel');
+        if (labelEl) {
+          labelEl.textContent = `آخر ساعة: ${fmtNum(total)} زيارة · ${fmtNum(invalid)} بوت`;
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+
+    // ============ UI BINDINGS ============
+    function bindUI() {
+      // Sound toggle
+      const soundBtn = document.getElementById('soundBtn');
+      if (soundBtn) {
+        soundBtn.addEventListener('click', () => {
+          LV.soundEnabled = !LV.soundEnabled;
+          soundBtn.classList.toggle('active', LV.soundEnabled);
+          document.getElementById('soundLabel').textContent = LV.soundEnabled ? 'صوت: مفعّل' : 'صوت: صامت';
+        });
+        soundBtn.classList.toggle('active', LV.soundEnabled);
+      }
+
+      // Pause
+      const pauseBtn = document.getElementById('pauseBtn');
+      if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+          LV.paused = !LV.paused;
+          pauseBtn.textContent = LV.paused ? '▶ استئناف' : '⏸ إيقاف مؤقت';
+          pauseBtn.classList.toggle('active', LV.paused);
+        });
+      }
+
+      // Feed filters
+      document.querySelectorAll('.lv-feed-filter').forEach(btn => {
+        btn.addEventListener('click', () => setFeedFilter(btn.dataset.feedFilter));
+      });
+    }
+
+    // ============ INITIAL LOAD ============
+    async function initialLoad() {
+      // Load initial batch
+      try {
+        const siteParam = LV.siteKey ? `&site=${encodeURIComponent(LV.siteKey)}` : '';
+        const data = await Shell.api(`/api/live/feed?since_id=0&limit=30${siteParam}`);
+        if (data.items && data.items.length > 0) {
+          // oldest first at bottom
+          const sorted = [...data.items].sort((a, b) => a.id - b.id);
+          for (const v of sorted) {
+            LV.allItems.push(v);
+          }
+          // Display newest at top
+          const feed = document.getElementById('lvFeed');
+          if (feed) feed.innerHTML = '';
+          for (const v of data.items) {
+            if (matchesFilter(v)) {
+              feed.appendChild(renderFeedItem(v, false));
+            }
+          }
+          const countEl = document.getElementById('lvFeedCount');
+          if (countEl) countEl.textContent = `${feed.children.length} زيارة`;
+          LV.latestId = data.latest_id;
+        }
+      } catch (e) {
+        console.error('Initial feed load failed:', e);
+      }
+
+      // Stats + alerts + activity
+      await Promise.all([pollStats(), pollAlerts(), pollActivity()]);
+    }
+
+    // ============ BOOT ============
+    (async function boot() {
+      try {
+        const params = new URLSearchParams(location.search);
+        LV.siteKey = params.get('site') || null;
+
+        let currentSite = null;
+        if (LV.siteKey) {
+          try {
+            const sites = await Shell.api('/api/sites');
+            currentSite = sites.find(s => s.site_key === LV.siteKey) || null;
+          } catch (e) {}
+        }
+
+        await Shell.mount({
+          active: 'live',
+          lang: 'ar',
+          currentSite: currentSite,
+          breadcrumb: [
+            { label: 'Live Monitor', href: '/live' },
+            ...(currentSite ? [{ label: currentSite.name }] : []),
+          ],
+        });
+
+        // Inject nav item (before making root visible to prevent flash)
+        injectNavItem();
+
+        // Site name in subtitle
+        if (currentSite) {
+          document.getElementById('lvSiteName').textContent = '· ' + currentSite.name;
+        }
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+
+        bindUI();
+        updateTimer();
+        await initialLoad();
+
+        // Polling intervals
+        setInterval(updateTimer, 1000);
+        setInterval(pollFeed, 2000);
+        setInterval(pollStats, 5000);
+        setInterval(pollAlerts, 10000);
+        setInterval(pollActivity, 15000);
+      } catch (e) {
+        console.error('[Live Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color:#F43F5E;font-weight:700;margin-bottom:8px;">فشل التحميل</div>
+            <div style="font-size:12px;color:#7B8496;max-width:340px;text-align:center;line-height:1.6;">${Shell.esc(e.message || 'خطأ')}</div>
+            <button onclick="location.reload()" style="margin-top:16px;padding:8px 16px;background:#7C5CFF;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · لوحة التحكم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-size: 13px; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    .db-hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .db-hero { grid-template-columns: repeat(2, 1fr); } }
+    .db-kpi { position: relative; background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px; overflow: hidden; transition: border-color 120ms, transform 120ms; }
+    .db-kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--kpi-color, #7C5CFF); opacity: 0.65; }
+    .db-kpi:hover { border-color: #2E3446; transform: translateY(-1px); }
+    .db-kpi-label { font-size: 10px; font-weight: 700; color: #4A5263; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .db-kpi-value { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 800; color: #F8FAFC; line-height: 1.05; letter-spacing: -0.02em; }
+    
+    .db-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .db-split { grid-template-columns: 1fr; } }
+    
+    .db-card { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; }
+    .db-card-title { font-size: 13px; font-weight: 800; color: #F8FAFC; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+    
+    .db-camp-row { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #161822; border-radius: 8px; margin-bottom: 8px; text-decoration: none; color: inherit; transition: background 120ms; }
+    .db-camp-row:hover { background: #1C1F2E; }
+    .db-camp-name { font-size: 13px; font-weight: 700; color: #F8FAFC; margin-bottom: 2px; }
+    .db-camp-meta { font-size: 10px; color: #7B8496; }
+    .db-camp-val { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 800; }
+    .db-camp-val.pos { color: #10B981; }
+    .db-camp-val.neg { color: #F43F5E; }
+    
+    .db-empty { text-align: center; padding: 32px 16px; color: #7B8496; font-size: 12px; }
+    .db-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+      <div class="db-hero" id="heroKpis">
+        <div class="db-kpi" style="--kpi-color: #7C5CFF;">
+          <div class="db-kpi-label">إجمالي الزيارات</div>
+          <div class="db-kpi-value" id="kpiTotal">0</div>
+        </div>
+        <div class="db-kpi" style="--kpi-color: #10B981;">
+          <div class="db-kpi-label">الزيارات الصالحة</div>
+          <div class="db-kpi-value" id="kpiValid" style="color:#10B981;">0</div>
+        </div>
+        <div class="db-kpi" style="--kpi-color: #F43F5E;">
+          <div class="db-kpi-label">الزيارات المرفوضة</div>
+          <div class="db-kpi-value" id="kpiInvalid" style="color:#F43F5E;">0</div>
+        </div>
+        <div class="db-kpi" style="--kpi-color: #22D3EE;">
+          <div class="db-kpi-label">إجمالي الربح</div>
+          <div class="db-kpi-value" id="kpiProfit" style="color:#22D3EE;">$0.00</div>
+        </div>
+      </div>
+
+      <div class="db-split">
+        <!-- Top Performing Campaigns -->
+        <div class="db-card">
+          <div class="db-card-title">🔥 أفضل الحملات (أعلى ربح)</div>
+          <div id="topCampaigns"></div>
+        </div>
+
+        <!-- Worst Performing Campaigns -->
+        <div class="db-card">
+          <div class="db-card-title">🚨 حملات بتخسر (أقل ربح)</div>
+          <div id="worstCampaigns"></div>
+        </div>
+      </div>
+
+      <!-- Recent Campaigns Grid -->
+      <div class="db-card">
+        <div class="db-card-title">
+          🎯 كل الحملات 
+          <a href="/campaigns" class="sh-btn sh-btn-ghost sh-btn-sm" style="text-decoration:none;">عرض الكل ←</a>
+        </div>
+        <div id="allCampaignsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:12px;"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const DB = { campaigns: [] };
+
+    function fmtMoney(n) { const v = Number(n || 0); if (Math.abs(v) < 0.005) return '$0.00'; return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2); }
+
+    async function loadDashboard() {
+      try {
+        // جلب كل الحملات
+        DB.campaigns = await Shell.api('/api/campaigns');
+        
+        let totalAll = 0, totalValid = 0, totalInvalid = 0, totalProfit = 0;
+        
+        DB.campaigns.forEach(c => {
+          const st = c.stats || {};
+          totalAll += (st.total || 0);
+          totalValid += (st.valid || 0);
+          totalInvalid += (st.invalid || 0);
+          totalProfit += ((st.pl && st.pl.profit) || 0);
+        });
+
+        document.getElementById('kpiTotal').textContent = Shell.fmtNum(totalAll);
+        document.getElementById('kpiValid').textContent = Shell.fmtNum(totalValid);
+        document.getElementById('kpiInvalid').textContent = Shell.fmtNum(totalInvalid);
+        
+        const profEl = document.getElementById('kpiProfit');
+        profEl.textContent = fmtMoney(totalProfit);
+        profEl.style.color = totalProfit >= 0 ? '#22D3EE' : '#F43F5E';
+
+        // ترتيب الحملات حسب الربح
+        const sorted = [...DB.campaigns].sort((a, b) => {
+          const pA = (a.stats?.pl?.profit) || 0;
+          const pB = (b.stats?.pl?.profit) || 0;
+          return pB - pA; // تنازلي (الأعلى ربحاً)
+        });
+
+        // أفضل الحملات
+        const top = sorted.filter(c => (c.stats?.total || 0) > 0).slice(0, 3);
+        renderCampaignList('topCampaigns', top, 'لا توجد بيانات كافية بعد');
+
+        // أسوأ الحملات
+        const worst = [...sorted].reverse().filter(c => (c.stats?.total || 0) > 0).slice(0, 3);
+        renderCampaignList('worstCampaigns', worst, 'لا توجد بيانات كافية بعد');
+
+        // كل الحملات
+        renderCampaignsGrid(DB.campaigns);
+
+      } catch (e) {
+        console.error(e);
+        Shell.toast('فشل تحميل البيانات', 'error');
+      }
+    }
+
+    function renderCampaignList(containerId, campaigns, emptyMsg) {
+      const el = document.getElementById(containerId);
+      if (!campaigns.length) {
+        el.innerHTML = `<div class="db-empty"><span class="db-empty-icon">📭</span>${emptyMsg}</div>`;
+        return;
+      }
+      el.innerHTML = campaigns.map(c => {
+        const st = c.stats || {}; const profit = (st.pl && st.pl.profit) || 0;
+        const cls = profit >= 0 ? 'pos' : 'neg';
+        return `
+          <a href="/campaigns/${c.id}" class="db-camp-row">
+            <div>
+              <div class="db-camp-name">${Shell.esc(c.name)}</div>
+              <div class="db-camp-meta">${Shell.esc(c.traffic_source_slug)} → ${Shell.esc(c.destination_slug)}</div>
+            </div>
+            <div class="db-camp-val ${cls}">${fmtMoney(profit)}</div>
+          </a>`;
+      }).join('');
+    }
+
+    function renderCampaignsGrid(campaigns) {
+      const grid = document.getElementById('allCampaignsGrid');
+      if (!campaigns.length) {
+        grid.innerHTML = `<div class="db-empty" style="grid-column:1/-1;"><span class="db-empty-icon">🎯</span>مفيش حملات لسه. ابدأ بإضافة حملة جديدة.</div>`;
+        return;
+      }
+      grid.innerHTML = campaigns.slice(0, 6).map(c => {
+        const st = c.stats || {}; const profit = (st.pl && st.pl.profit) || 0;
+        const cls = profit >= 0 ? 'pos' : 'neg';
+        const badge = c.status === 'active' ? '🟢 نشطة' : c.status === 'paused' ? '⏸ موقوفة' : '📦 مؤرشفة';
+        return `
+          <a href="/campaigns/${c.id}" class="db-camp-row" style="flex-direction:column;align-items:flex-start;">
+            <div style="width:100%;display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+              <div>
+                <div class="db-camp-name">${Shell.esc(c.name)}</div>
+                <div class="db-camp-meta">${badge} · ${Shell.esc(c.type)}</div>
+              </div>
+              <div class="db-camp-val ${cls}">${fmtMoney(profit)}</div>
+            </div>
+            <div style="width:100%;display:flex;justify-content:space-between;font-size:10px;color:#4A5263;border-top:1px solid #1A1D29;padding-top:8px;">
+              <span>إجمالي: ${Shell.fmtNum(st.total || 0)}</span>
+              <span style="color:#F43F5E;">بوت: ${Number(st.bot_rate || 0).toFixed(0)}%</span>
+            </div>
+          </a>`;
+      }).join('');
+    }
+
+    (async function boot() {
+      try {
+        await Shell.mount({ active: 'dashboard', lang: 'ar', breadcrumb: [{ label: 'لوحة التحكم' }] });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+        await loadDashboard();
+      } catch (e) {
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">فشل التحميل: ${Shell.esc(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+            </html>

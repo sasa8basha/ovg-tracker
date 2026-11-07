@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · تسجيل الدخول</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Cairo',sans-serif;background:#0F172A;color:#F1F5F9;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+    .card{background:#1E293B;border:1px solid #334155;border-radius:24px;padding:32px;width:100%;max-width:440px}
+    .input{width:100%;padding:12px 16px;border:1.5px solid #334155;border-radius:12px;font-size:15px;background:#0F172A;color:#F1F5F9;margin-top:6px;box-sizing:border-box;font-family:'Cairo',sans-serif}
+    .input:focus{outline:none;border-color:#6366F1;box-shadow:0 0 0 4px rgba(99,102,241,.15)}
+    .btn{background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;padding:13px;border-radius:12px;font-weight:700;width:100%;border:none;cursor:pointer;font-size:15px;font-family:'Cairo',sans-serif}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .tab{padding:10px;border-radius:10px;font-weight:700;font-size:14px;flex:1;background:transparent;color:#94A3B8;border:none;cursor:pointer;font-family:'Cairo',sans-serif}
+    .tab.active{background:rgba(99,102,241,.2);color:#6366F1}
+    label{font-size:13px;color:#CBD5E1;font-weight:600}
+    .error{background:rgba(244,63,94,.1);color:#F43F5E;padding:10px;border-radius:10px;font-size:13px;text-align:center;border:1px solid rgba(244,63,94,.2)}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:36px">🛡️</div>
+      <h1 style="font-size:24px;font-weight:800;margin:0">OVG Tracker</h1>
+      <p style="color:#94A3B8;font-size:13px;margin:6px 0 0">منصة تتبع الترافيك ومنع البوتات</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px;background:rgba(0,0,0,.2);padding:4px;border-radius:12px">
+      <button class="tab active" id="tab-login" onclick="switchTab('login')">تسجيل دخول</button>
+      <button class="tab" id="tab-signup" onclick="switchTab('signup')">إنشاء حساب</button>
+    </div>
+
+    <form id="authForm" style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label>اسم المستخدم</label>
+        <input name="username" class="input" placeholder="ahmed أو بريدك الإلكتروني" required>
+      </div>
+      <div id="emailWrap" style="display:none">
+        <label>البريد الإلكتروني</label>
+        <input name="email" type="email" class="input" placeholder="you@example.com">
+      </div>
+      <div>
+        <label>كلمة المرور</label>
+        <input name="password" type="password" class="input" placeholder="••••••••" required minlength="6">
+      </div>
+      <div id="confirmWrap" style="display:none">
+        <label>تأكيد كلمة المرور</label>
+        <input name="confirm" type="password" class="input" placeholder="••••••••">
+      </div>
+      <p id="error" class="error" style="display:none"></p>
+      <button type="submit" id="submitBtn" class="btn">تسجيل الدخول</button>
+      <a href="/forgot-password" style="text-align:center;color:#818CF8;font-size:13px;text-decoration:none;margin-top:4px">نسيت كلمة المرور؟</a>
+    </form>
+  </div>
+
+  <script>
+    let MODE = 'login';
+    function switchTab(m) {
+      MODE = m;
+      document.getElementById('tab-login').classList.toggle('active', m === 'login');
+      document.getElementById('tab-signup').classList.toggle('active', m === 'signup');
+      document.getElementById('emailWrap').style.display = m === 'signup' ? 'block' : 'none';
+      document.getElementById('confirmWrap').style.display = m === 'signup' ? 'block' : 'none';
+      document.getElementById('submitBtn').textContent = m === 'signup' ? 'إنشاء حساب' : 'تسجيل الدخول';
+      document.getElementById('error').style.display = 'none';
+    }
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const err = document.getElementById('error');
+      btn.disabled = true; err.style.display = 'none';
+      const orig = btn.textContent; btn.textContent = 'جاري...';
+      const fd = new FormData(e.target);
+      const body = {
+        username: (fd.get('username')||'').trim(),
+        password: fd.get('password'),
+        email: (fd.get('email')||'').trim(),
+      };
+      if (MODE === 'signup' && body.password !== fd.get('confirm')) {
+        err.textContent = 'كلمتا المرور غير متطابقتين'; err.style.display = 'block';
+        btn.disabled = false; btn.textContent = orig; return;
+      }
+      const url = MODE === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+      try {
+        const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const d = await r.json().catch(()=>({}));
+        if (r.ok) { location.href = '/dashboard'; return; }
+        err.textContent = d.detail || 'فشل العملية'; err.style.display = 'block';
+      } catch(e) {
+        err.textContent = 'خطأ في الاتصال بالسيرفر'; err.style.display = 'block';
+      } finally {
+        btn.disabled = false; btn.textContent = orig;
+      }
+    });
+  </script>
+</body>
+        </html>

@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · Ban Risk Radar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/design-system-v8.css">
+  <style>
+    .radar-gauge {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+    #progressArc {
+      transition: stroke-dashoffset 1000ms cubic-bezier(0.16, 1, 0.3, 1),
+                  stroke 400ms ease;
+    }
+    @keyframes pulseCritical {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+    .critical-pulse {
+      animation: pulseCritical 2s ease-in-out infinite;
+    }
+    .factor-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--v8-line-default);
+      overflow: hidden;
+    }
+    .factor-bar > div {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 900ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    details > summary {
+      cursor: pointer;
+      list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+    details[open] > summary .chev {
+      transform: rotate(180deg);
+    }
+    .chev {
+      transition: transform 200ms ease;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body class="v8-body min-h-screen">
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="border-b border-[var(--v8-line-default)] sticky top-0 z-20 bg-[var(--v8-canvas)]/85 backdrop-blur-md">
+    <div class="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="/dashboard" class="v8-btn v8-btn-ghost !p-2" aria-label="رجوع">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </a>
+        <div class="min-w-0">
+          <h1 class="text-sm md:text-base font-bold text-[var(--v8-ink-hi)] leading-tight">🎯 Ban Risk Radar</h1>
+          <p class="text-[10px] md:text-[11px] text-[var(--v8-ink-lo)] leading-tight">مؤشر خطر حظر Adsterra</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="lastUpdated" class="hidden md:inline text-[11px] text-[var(--v8-ink-mute)] v8-mono"></span>
+        <button id="snapshotBtn" class="v8-btn v8-btn-ghost !text-[11px] !px-3 !py-1.5">
+          📸 لقطة
+        </button>
+        <button id="refreshBtn" class="v8-btn v8-btn-primary !text-[11px] !px-3 !py-1.5">
+          🔄 تحديث
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+
+    <!-- ============ SKELETON ============ -->
+    <div id="skeletonView" class="space-y-6">
+      <div class="v8-card p-8 flex flex-col items-center">
+        <div class="v8-skeleton w-48 h-48 rounded-full"></div>
+        <div class="v8-skeleton w-40 h-4 mt-6"></div>
+        <div class="v8-skeleton w-56 h-3 mt-3"></div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="v8-skeleton h-20"></div>
+        <div class="v8-skeleton h-20"></div>
+        <div class="v8-skeleton h-20"></div>
+        <div class="v8-skeleton h-20"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="v8-skeleton h-32"></div>
+        <div class="v8-skeleton h-32"></div>
+        <div class="v8-skeleton h-32"></div>
+      </div>
+    </div>
+
+    <!-- ============ INSUFFICIENT DATA ============ -->
+    <div id="insufficientView" class="hidden">
+      <div class="v8-card p-8 md:p-12 text-center max-w-2xl mx-auto">
+        <div class="text-6xl mb-4">🛰️</div>
+        <h2 class="text-xl font-bold text-[var(--v8-ink-hi)] mb-3">الرادار لسه بيجمع بيانات</h2>
+        <p id="insufficientMsg" class="text-sm text-[var(--v8-ink-md)] mb-6 leading-relaxed"></p>
+        <div class="v8-card !bg-[var(--v8-elevated)] p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-[var(--v8-ink-lo)]">التقدم</span>
+            <span id="sampleCount" class="text-xs v8-mono text-[var(--v8-ink-md)]">0 / 30</span>
+          </div>
+          <div class="factor-bar">
+            <div id="sampleBar" class="bg-[var(--v8-brand)]" style="width: 0%"></div>
+          </div>
+        </div>
+        <p class="text-[11px] text-[var(--v8-ink-mute)] mt-4">
+          💡 كل ما يوصلك ترافيك أكتر، المؤشر بيبقى أدق.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============ ERROR ============ -->
+    <div id="errorView" class="hidden">
+      <div class="v8-card p-8 text-center max-w-md mx-auto border-[var(--v8-rose)]/30">
+        <div class="text-5xl mb-4">⚠️</div>
+        <h2 class="text-lg font-bold text-[var(--v8-ink-hi)] mb-2">فشل تحميل البيانات</h2>
+        <p id="errorMsg" class="text-sm text-[var(--v8-ink-md)] mb-6"></p>
+        <button onclick="load(true)" class="v8-btn v8-btn-primary mx-auto">
+          🔄 إعادة المحاولة
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ CONTENT ============ -->
+    <div id="contentView" class="hidden space-y-6">
+
+      <!-- HERO: Gauge + metrics -->
+      <section class="v8-card p-6 md:p-10">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+
+          <!-- Gauge -->
+          <div class="flex flex-col items-center">
+            <svg class="radar-gauge" viewBox="0 0 280 280" aria-label="مؤشر خطر الحظر">
+              <g id="ticks"></g>
+
+              <circle cx="140" cy="140" r="128" fill="none"
+                      stroke="#232734" stroke-width="3" opacity="0.35"/>
+              <g id="zoneSegments"></g>
+
+              <circle cx="140" cy="140" r="108" fill="none"
+                      stroke="#232734" stroke-width="14"/>
+
+              <circle id="progressArc" cx="140" cy="140" r="108" fill="none"
+                      stroke="#10B981" stroke-width="14" stroke-linecap="round"
+                      stroke-dasharray="678.58" stroke-dashoffset="678.58"
+                      transform="rotate(-90 140 140)"/>
+
+              <text id="scoreText" x="140" y="138" text-anchor="middle"
+                    fill="#F8FAFC" font-size="60" font-weight="800"
+                    font-family="JetBrains Mono, monospace">—</text>
+              <text x="140" y="162" text-anchor="middle"
+                    fill="#7B8496" font-size="10" font-weight="700"
+                    letter-spacing="2" font-family="Inter, sans-serif">BAN RISK</text>
+              <text id="levelText" x="140" y="198" text-anchor="middle"
+                    fill="#10B981" font-size="13" font-weight="700"
+                    font-family="IBM Plex Sans Arabic, sans-serif">—</text>
+            </svg>
+
+            <p id="levelDesc" class="mt-4 text-center text-sm text-[var(--v8-ink-md)] leading-relaxed max-w-xs"></p>
+          </div>
+
+          <!-- Quick metrics -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="v8-card !bg-[var(--v8-elevated)] p-4">
+              <div class="text-[10px] text-[var(--v8-ink-mute)] v8-uppercase mb-1">زيارات 24س</div>
+              <div id="mTotal" class="text-2xl font-bold v8-num text-[var(--v8-ink-hi)]">—</div>
+            </div>
+            <div class="v8-card !bg-[var(--v8-elevated)] p-4">
+              <div class="text-[10px] text-[var(--v8-ink-mute)] v8-uppercase mb-1">Bot Rate</div>
+              <div id="mBot" class="text-2xl font-bold v8-num text-[var(--v8-ink-hi)]">—</div>
+            </div>
+            <div class="v8-card !bg-[var(--v8-elevated)] p-4">
+              <div class="text-[10px] text-[var(--v8-ink-mute)] v8-uppercase mb-1">Human Quality</div>
+              <div id="mHuman" class="text-2xl font-bold v8-num text-[var(--v8-ink-hi)]">—</div>
+            </div>
+            <div class="v8-card !bg-[var(--v8-elevated)] p-4">
+              <div class="text-[10px] text-[var(--v8-ink-mute)] v8-uppercase mb-1">Zones</div>
+              <div id="mZones" class="text-2xl font-bold v8-num text-[var(--v8-ink-hi)]">—</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FACTORS -->
+      <section>
+        <div class="mb-4 px-1">
+          <h2 class="text-sm font-bold text-[var(--v8-ink-hi)]">🧮 العوامل الستة</h2>
+          <p class="text-[11px] text-[var(--v8-ink-lo)] mt-0.5">كل عامل بيأثر على المؤشر بوزن مختلف</p>
+        </div>
+        <div id="factorsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </section>
+
+      <!-- RECOMMENDATIONS -->
+      <section>
+        <div class="mb-4 px-1">
+          <h2 class="text-sm font-bold text-[var(--v8-ink-hi)]">💡 التوصيات</h2>
+          <p class="text-[11px] text-[var(--v8-ink-lo)] mt-0.5">إيه اللي محتاج تعمله عشان تحمي حسابك</p>
+        </div>
+        <div id="recsList" class="space-y-2"></div>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="v8-card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-sm font-bold text-[var(--v8-ink-hi)]">📊 تطور المؤشر</h2>
+            <p class="text-[11px] text-[var(--v8-ink-lo)] mt-0.5">آخر 30 يوم</p>
+          </div>
+          <span id="historyCount" class="text-[11px] text-[var(--v8-ink-mute)] v8-mono"></span>
+        </div>
+        <div id="historyEmpty" class="hidden text-center py-8 text-sm text-[var(--v8-ink-lo)]">
+          مفيش تاريخ كافي بعد. سيب الأداة شغالة يومين وهتلاقي بيانات هنا.
+        </div>
+        <div class="h-64 relative" id="historyWrap">
+          <canvas id="historyChart"></canvas>
+        </div>
+      </section>
+
+      <!-- METHODOLOGY -->
+      <section class="v8-card p-6">
+        <details>
+          <summary class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-base">ℹ️</span>
+              <span class="text-sm font-bold text-[var(--v8-ink-hi)]">إزاي بنحسب المؤشر؟</span>
+            </div>
+            <span class="text-[var(--v8-ink-lo)] chev">▼</span>
+          </summary>
+          <div class="mt-4 text-xs text-[var(--v8-ink-md)] leading-relaxed space-y-3">
+            <p>
+              المؤشر بياخد <b>6 عوامل</b> من بيانات آخر <b>24 ساعة</b>، بيحسب لكل عامل <b>درجة أمان</b> من 0-100،
+              وبعدين بيجمعهم بأوزان مختلفة. النتيجة النهائية = <code class="v8-mono text-[var(--v8-brand)]">100 - درجة الأمان الكلية</code>.
+            </p>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-[11px]">
+              <div class="v8-card !bg-[var(--v8-elevated)] p-2">🤖 Bot Rate — <b>30%</b></div>
+              <div class="v8-card !bg-[var(--v8-elevated)] p-2">💸 Wasted Rate — <b>15%</b></div>
+              <div class="v8-card !bg-[var(--v8-elevated)] p-2">🧑 Human Quality — <b>20%</b></div>
+              <div class="v8-card !bg-[var(--v8-elevated)] p-2">🎯 Zone Diversity — <b>15%</b></div>
+              <div class="v8-card !bg-[var(--v8-elevated)] p-2">🔗 Source Diversity — <b>10%</b></div>
+              <div class="v8-card !bg-[var(--v8-elevated)] p-2">📈 Volume Stability — <b>10%</b></div>
+            </div>
+            <p class="text-[var(--v8-ink-lo)]">
+              ⚠️ المؤشر تقديري، مش تنبؤ مضمون. بيعكس حالة الترافيك عندك مقارنة بـ "الممارسات الآمنة" اللي Adsterra بتفضلها.
+            </p>
+          </div>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // ============ STATE ============
+    const state = {
+      radar: null,
+      history: null,
+      chart: null,
+    };
+
+    const LEVELS = {
+      low:      { label: 'منخفض', desc: 'حسابك آمن. استمر في المراقبة.', color: '#10B981' },
+      medium:   { label: 'متوسط', desc: 'في بعض المؤشرات اللي محتاجة انتباه.', color: '#F59E0B' },
+      high:     { label: 'عالي',  desc: 'خطر حظر مرتفع. راجع العوامل فوراً.', color: '#F97316' },
+      critical: { label: 'حرج',   desc: 'خطر حظر حرج. تصرف دلوقتي.', color: '#F43F5E' },
+      unknown:  { label: 'غير معروف', desc: 'بيانات غير كافية.', color: '#7B8496' },
+    };
+
+    const FACTOR_ICONS = {
+      bot_rate: '🤖',
+      wasted_rate: '💸',
+      human_quality: '🧑',
+      zone_diversity: '🎯',
+      source_diversity: '🔗',
+      volume_stability: '📈',
+    };
+
+    // ============ HELPERS ============
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+    const fmtNum = (n) => Number(n || 0).toLocaleString('en-US');
+    const fmtPct = (n) => Number(n || 0).toFixed(1) + '%';
+
+    function fmtTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+    }
+
+    function showOnly(id) {
+      ['skeletonView', 'insufficientView', 'errorView', 'contentView'].forEach(x => {
+        document.getElementById(x).classList.toggle('hidden', x !== id);
+      });
+    }
+
+    // ============ SVG GAUGE ============
+    function buildTicks() {
+      const g = document.getElementById('ticks');
+      g.innerHTML = '';
+      const cx = 140, cy = 140, rOuter = 128, rInner = 118;
+      for (let i = 0; i < 60; i++) {
+        const angle = (i * 6) * Math.PI / 180 - Math.PI / 2;
+        const isMajor = i % 5 === 0;
+        const r1 = isMajor ? rInner - 3 : rInner;
+        const r2 = rOuter;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', (cx + Math.cos(angle) * r1).toFixed(2));
+        line.setAttribute('y1', (cy + Math.sin(angle) * r1).toFixed(2));
+        line.setAttribute('x2', (cx + Math.cos(angle) * r2).toFixed(2));
+        line.setAttribute('y2', (cy + Math.sin(angle) * r2).toFixed(2));
+        line.setAttribute('stroke', isMajor ? '#4A5263' : '#232734');
+        line.setAttribute('stroke-width', isMajor ? '1.5' : '1');
+        line.setAttribute('stroke-linecap', 'round');
+        g.appendChild(line);
+      }
+    }
+
+    function buildZoneSegments() {
+      const g = document.getElementById('zoneSegments');
+      g.innerHTML = '';
+      const r = 128;
+      const c = 2 * Math.PI * r;
+      const zones = [
+        { from: 0.00, to: 0.20, color: '#10B981' },
+        { from: 0.20, to: 0.45, color: '#F59E0B' },
+        { from: 0.45, to: 0.70, color: '#F97316' },
+        { from: 0.70, to: 1.00, color: '#F43F5E' },
+      ];
+      zones.forEach(z => {
+        const dashLen = (z.to - z.from) * c;
+        const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circ.setAttribute('cx', 140);
+        circ.setAttribute('cy', 140);
+        circ.setAttribute('r', r);
+        circ.setAttribute('fill', 'none');
+        circ.setAttribute('stroke', z.color);
+        circ.setAttribute('stroke-width', '4');
+        circ.setAttribute('stroke-dasharray', dashLen.toFixed(2) + ' ' + c.toFixed(2));
+        circ.setAttribute('stroke-dashoffset', (-(z.from * c)).toFixed(2));
+        circ.setAttribute('transform', 'rotate(-90 140 140)');
+        circ.setAttribute('opacity', '0.55');
+        g.appendChild(circ);
+      });
+    }
+
+    function animateScore(target) {
+      const el = document.getElementById('scoreText');
+      if (target === null || target === undefined) {
+        el.textContent = '—';
+        return;
+      }
+      const start = performance.now();
+      const duration = 900;
+      function tick(now) {
+        const p = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(eased * target);
+        if (p < 1) requestAnimationFrame(tick);
+        else el.textContent = target;
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function animateArc(score, color) {
+      const arc = document.getElementById('progressArc');
+      const c = 2 * Math.PI * 108;
+      const offset = c * (1 - score / 100);
+
+      arc.style.stroke = color;
+      arc.style.strokeDasharray = c.toFixed(2);
+      arc.style.strokeDashoffset = c.toFixed(2);
+
+      // Force reflow so browser sees reset before transition
+      void arc.getBoundingClientRect();
+
+      requestAnimationFrame(() => {
+        arc.style.strokeDashoffset = offset.toFixed(2);
+      });
+    }
+
+    // ============ RENDERERS ============
+    function renderGauge(score, level) {
+      const L = LEVELS[level] || LEVELS.unknown;
+      const levelEl = document.getElementById('levelText');
+      levelEl.textContent = L.label;
+      levelEl.setAttribute('fill', L.color);
+      document.getElementById('levelDesc').textContent = L.desc;
+
+      const arc = document.getElementById('progressArc');
+      arc.classList.toggle('critical-pulse', level === 'critical');
+
+      animateScore(score);
+      setTimeout(() => animateArc(score, L.color), 80);
+    }
+
+    function renderMetrics(m) {
+      if (!m) return;
+      document.getElementById('mTotal').textContent = fmtNum(m.total_24h);
+      document.getElementById('mBot').textContent = fmtPct(m.bot_rate);
+      document.getElementById('mHuman').textContent = fmtPct(m.human_quality);
+      document.getElementById('mZones').textContent = m.zone_diversity;
+    }
+
+    function renderFactors(factors) {
+      const grid = document.getElementById('factorsGrid');
+      if (!factors || !factors.length) { grid.innerHTML = ''; return; }
+
+      grid.innerHTML = factors.map(f => {
+        const icon = FACTOR_ICONS[f.name] || '•';
+        const score = f.score;
+        const barColor = score >= 80 ? '#10B981' : score >= 50 ? '#F59E0B' : '#F43F5E';
+        return (
+          '<div class="v8-card p-4">' +
+            '<div class="flex items-start justify-between mb-2">' +
+              '<div class="flex items-center gap-2">' +
+                '<span class="text-base">' + icon + '</span>' +
+                '<span class="text-xs font-bold text-[var(--v8-ink-hi)]">' + esc(f.label) + '</span>' +
+              '</div>' +
+              '<span class="text-[10px] text-[var(--v8-ink-mute)] v8-mono">' + f.weight + '%</span>' +
+            '</div>' +
+            '<div class="flex items-baseline gap-1 mb-3">' +
+              '<span class="text-2xl font-bold v8-num text-[var(--v8-ink-hi)]">' + f.value + (f.unit || '') + '</span>' +
+              '<span class="text-[10px] text-[var(--v8-ink-mute)]">' + esc(f.threshold) + '</span>' +
+            '</div>' +
+            '<div class="factor-bar">' +
+              '<div style="width:' + score + '%;background:' + barColor + '"></div>' +
+            '</div>' +
+            '<div class="flex justify-between mt-1.5">' +
+              '<span class="text-[10px] text-[var(--v8-ink-mute)]">Safety</span>' +
+              '<span class="text-[10px] v8-mono font-bold" style="color:' + barColor + '">' + score + '%</span>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderRecommendations(recs) {
+      const list = document.getElementById('recsList');
+      if (!recs || !recs.length) { list.innerHTML = ''; return; }
+
+      const sevStyle = {
+        high:   { bg: 'bg-[var(--v8-rose-tint)]',  border: 'border-[var(--v8-rose)]/30',  icon: '🚨' },
+        medium: { bg: 'bg-[var(--v8-amber-tint)]', border: 'border-[var(--v8-amber)]/30', icon: '⚠️' },
+        low:    { bg: 'bg-[var(--v8-green-tint)]', border: 'border-[var(--v8-green)]/30', icon: 'ℹ️' },
+        good:   { bg: 'bg-[var(--v8-green-tint)]', border: 'border-[var(--v8-green)]/30', icon: '✅' },
+      };
+
+      list.innerHTML = recs.map(r => {
+        const s = sevStyle[r.severity] || sevStyle.low;
+        const action = r.link
+          ? '<a href="' + esc(r.link) + '" class="v8-btn v8-btn-ghost !text-[11px] !px-3 !py-1.5 shrink-0">' + esc(r.action) + '</a>'
+          : '';
+        return (
+          '<div class="v8-card p-3.5 ' + s.bg + ' ' + s.border + ' flex items-center gap-3">' +
+            '<span class="text-xl shrink-0">' + s.icon + '</span>' +
+            '<div class="flex-1 min-w-0">' +
+              '<div class="text-xs font-bold text-[var(--v8-ink-hi)]">' + esc(r.title) + '</div>' +
+              '<div class="text-[11px] text-[var(--v8-ink-md)] mt-0.5 leading-relaxed">' + esc(r.text) + '</div>' +
+            '</div>' +
+            action +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderHistory(history) {
+      const empty = document.getElementById('historyEmpty');
+      const canvas = document.getElementById('historyChart');
+      const wrap = document.getElementById('historyWrap');
+      const countEl = document.getElementById('historyCount');
+
+      if (!history || !history.series || history.series.length < 2) {
+        empty.classList.remove('hidden');
+        wrap.style.display = 'none';
+        countEl.textContent = '';
+        return;
+      }
+
+      empty.classList.add('hidden');
+      wrap.style.display = 'block';
+      countEl.textContent = history.series.length + ' نقطة';
+
+      if (state.chart) state.chart.destroy();
+
+      const labels = history.series.map(s => fmtDate(s.t) + ' ' + fmtTime(s.t));
+      const data = history.series.map(s => s.score);
+
+      state.chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Ban Risk',
+            data: data,
+            borderColor: '#7C5CFF',
+            backgroundColor: 'rgba(124, 92, 255, 0.10)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#7C5CFF',
+            pointBorderColor: '#7C5CFF',
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#161822',
+              borderColor: '#2E3446',
+              borderWidth: 1,
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              padding: 10,
+              cornerRadius: 6,
+              displayColors: false,
+              callbacks: {
+                label: function(ctx) { return 'Ban Risk: ' + ctx.parsed.y; }
+              }
+            }
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 100,
+              ticks: {
+                color: '#7B8496',
+                font: { size: 10, family: 'JetBrains Mono' },
+                stepSize: 20,
+              },
+              grid: {
+                color: function(ctx) {
+                  const v = ctx.tick.value;
+                  if (v === 20) return 'rgba(16, 185, 129, 0.20)';
+                  if (v === 40) return 'rgba(245, 158, 11, 0.15)';
+                  if (v === 60) return 'rgba(249, 115, 22, 0.15)';
+                  if (v === 80) return 'rgba(244, 63, 94, 0.20)';
+                  return 'rgba(255, 255, 255, 0.04)';
+                }
+              }
+            },
+            x: {
+              ticks: {
+                color: '#7B8496',
+                font: { size: 9 },
+                maxTicksLimit: 6,
+              },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    function renderInsufficient(r) {
+      showOnly('insufficientView');
+      document.getElementById('insufficientMsg').textContent = r.message || 'بيانات غير كافية.';
+      const count = (r.metrics && r.metrics.total_24h) || 0;
+      const target = 30;
+      const pct = Math.min(100, (count / target) * 100);
+      document.getElementById('sampleCount').textContent = count + ' / ' + target;
+      document.getElementById('sampleBar').style.width = pct + '%';
+    }
+
+    function renderError(msg) {
+      showOnly('errorView');
+      document.getElementById('errorMsg').textContent = msg || 'حصلت مشكلة غير متوقعة.';
+    }
+
+    // ============ MAIN LOADER ============
+    async function load(force) {
+      try {
+        const rUrl = '/api/radar' + (force ? '?force=true' : '');
+        const [rRes, hRes] = await Promise.all([
+          fetch(rUrl, { credentials: 'same-origin' }),
+          fetch('/api/radar/history?days=30', { credentials: 'same-origin' }),
+        ]);
+
+        if (rRes.status === 401) {
+          window.location.href = '/';
+          return;
+        }
+        if (!rRes.ok) throw new Error('HTTP ' + rRes.status);
+
+        const radar = await rRes.json();
+        const history = hRes.ok ? await hRes.json() : { series: [], has_enough_data: false };
+
+        state.radar = radar;
+        state.history = history;
+
+        if (radar.insufficient_data) {
+          renderInsufficient(radar);
+          return;
+        }
+
+        showOnly('contentView');
+        renderGauge(radar.score, radar.level);
+        renderMetrics(radar.metrics);
+        renderFactors(radar.factors);
+        renderRecommendations(radar.recommendations);
+        renderHistory(history);
+
+        const lu = document.getElementById('lastUpdated');
+        lu.textContent = 'آخر تحديث: ' + fmtTime(radar.computed_at);
+        lu.classList.remove('hidden');
+      } catch (e) {
+        renderError(e.message || 'فشل الاتصال بالسيرفر');
+      }
+    }
+
+    // ============ EVENTS ============
+    document.getElementById('refreshBtn').addEventListener('click', async function() {
+      const btn = this;
+      const orig = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ جاري...';
+      await load(true);
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    });
+
+    document.getElementById('snapshotBtn').addEventListener('click', async function() {
+      const btn = this;
+      const orig = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳...';
+      try {
+        const r = await fetch('/api/radar/snapshot', {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        if (r.ok) {
+          btn.innerHTML = '✅ تم';
+          setTimeout(function() { btn.innerHTML = orig; }, 1500);
+          load(false);
+        } else {
+          const d = await r.json().catch(function() { return {}; });
+          alert(d.detail || 'فشل الحفظ');
+          btn.innerHTML = orig;
+        }
+      } catch (e) {
+        alert('خطأ في الاتصال');
+        btn.innerHTML = orig;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ============ BOOT ============
+    buildTicks();
+    buildZoneSegments();
+    showOnly('skeletonView');
+    load(false);
+  </script>
+</body>
+</html>
