@@ -142,7 +142,7 @@ class InterstitialPrecheckPayload(BaseModel):
     t_ms: int = Field(default=0, ge=0)
     url: str = Field(default="", max_length=2000)
     nav: Dict[str, Any] = Field(default_factory=dict)
-    fp: Dict[str, Any] = Field(default_factory=dict)  # 👈 ضيفنا دي
+    fp: Dict[str, Any] = Field(default_factory=dict)
     tracking_params: Dict[str, Any] = Field(default_factory=dict)
 
 class InterstitialLogPayload(BaseModel):
@@ -154,3 +154,16 @@ class InterstitialLogPayload(BaseModel):
     reasons: List[str] = Field(default_factory=list)
     t_ms: int = Field(default=0, ge=0)
     url: str = Field(default="", max_length=2000)
+
+# =========================================================
+# Anubis Proof-of-Work Challenge (v1.0)
+# =========================================================
+class ChallengeRequestPayload(BaseModel):
+    session_id: str = Field(min_length=8, max_length=64)
+    campaign_key: str = Field(min_length=1, max_length=100)
+
+class ChallengeVerifyPayload(BaseModel):
+    session_id: str = Field(min_length=8, max_length=64)
+    nonce: int = Field(ge=0)
+    hash: str = Field(min_length=64, max_length=64)
+    elapsed_ms: int = Field(default=0, ge=0)

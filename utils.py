@@ -89,6 +89,12 @@ handshake_limiter = WindowRateLimiter(max_req=HANDSHAKE_RATE_PER_MIN, window=60)
 heartbeat_limiter = WindowRateLimiter(max_req=HEARTBEAT_RATE_PER_MIN, window=60)
 final_limiter = WindowRateLimiter(max_req=FINAL_RATE_PER_MIN, window=60)
 
+# =========================================================
+# Anubis Challenge rate limiters (v1.0)
+# =========================================================
+challenge_limiter = WindowRateLimiter(max_req=30, window=60)
+challenge_verify_limiter = WindowRateLimiter(max_req=30, window=60)
+
 
 def _is_private_ip(ip: str) -> bool:
     try:
