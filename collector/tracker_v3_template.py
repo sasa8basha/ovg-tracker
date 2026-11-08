@@ -1,17 +1,12 @@
 """
-collector/tracker_v3_template.py — V3 tracker (v8.1 — Beacon fix)
+collector/tracker_v3_template.py — V3 tracker (v8.0 — Ultimate Suite)
 
 Integrated:
     - BotD (18 detectors from FingerprintJS)
     - vi-bot (28 detectors + Stack Traps + Honeypots)
     - Flagon (rage clicks, intervals, mutations, detailed events)
-    - rebrowser-bot-detector (22 modern tests — catches Patchright/Puppeteer/Playwright)
+    - rebrowser-bot-detector (10 modern tests — catches Patchright/Puppeteer/Playwright)
     - BehaviorTracker (mouse/keys/scroll/touch/interaction)
-
-FIX v8.1:
-    - sendBeacon now uses text/plain (simple content type → no preflight).
-      Previously used application/json which triggered CORS preflight
-      (OPTIONS succeeded but POST never fired).
 """
 TRACKER_V3_JS = r"""(function () {
   'use strict';
@@ -97,6 +92,9 @@ TRACKER_V3_JS = r"""(function () {
   // Flagon: Detailed Events
   var detailedEvents = [];
 
+  // rebrowser test state
+  var rbTests = {};
+
   var trackingParams = {};
   try {
     var urlParams = new URLSearchParams(window.location.search);
@@ -124,30 +122,20 @@ TRACKER_V3_JS = r"""(function () {
     return d.substring(0, 8) + '-' + r.substring(0, 27);
   }
 
-  // ===================== IMPORTANT FIX =====================
-  // sendBeacon with 'application/json' Blob triggers a CORS preflight
-  // (OPTIONS fires, but the actual POST never fires because sendBeacon
-  //  doesn't follow the preflight flow). Using 'text/plain' makes the
-  // request "simple" — no preflight — and the server parses JSON anyway.
-  // =========================================================
   function safeSend(url, body, useBeacon) {
     var bodyStr;
     try { bodyStr = JSON.stringify(body); } catch (e) { return Promise.reject(e); }
-
     if (useBeacon && navigator.sendBeacon) {
       try {
-        var blob = new Blob([bodyStr], { type: 'text/plain;charset=UTF-8' });
+        var blob = new Blob([bodyStr], { type: 'application/json;charset=UTF-8' });
         if (navigator.sendBeacon(url, blob)) return Promise.resolve({ ok: true });
       } catch (e) {}
     }
-
     try {
       return fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: bodyStr,
-        keepalive: true,
-        credentials: 'omit'
+        body: bodyStr, keepalive: true, credentials: 'omit'
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (d) {
           return { ok: r.ok, data: d };
@@ -795,19 +783,19 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // REBROWSER-BOT-DETECTOR TESTS
+  // REBROWSER-BOT-DETECTOR TESTS (10 critical tests)
   // =========================================================
   function runRebrowserTests() {
     var rb = {};
     var w = window, n = navigator, d = document;
 
-    // 1) pwInitScripts
+    // 1) pwInitScripts — Playwright's __pwInitScripts
     try {
       if (typeof w.__pwInitScripts !== 'undefined') rb.pwInitScripts = 1;
       if (typeof w.__playwright__binding__ !== 'undefined') rb.pwBinding = 1;
     } catch (e) {}
 
-    // 2) documentInterception
+    // 2) documentInterception — Patchright signature
     try {
       var navEntries = performance.getEntriesByType('navigation');
       if (navEntries && navEntries.length > 0) {
@@ -821,7 +809,7 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 3) runtimeEnableLeak
+    // 3) runtimeEnableLeak — CDP Runtime.enable detection
     try {
       var stackLookupCount = 0;
       var prepareStackTraceCount = 0;
@@ -866,13 +854,14 @@ TRACKER_V3_JS = r"""(function () {
       else if (stackLookupCount > 0) rb.runtimeEnableLeak = 0.7;
     } catch (e) {}
 
-    // 4) sourceUrlLeak
+    // 4) sourceUrlLeak — detect pptr: / UtilityScript. / bare app.js
     try {
       var srcErr = new Error('Detection Error');
       var stackStr = srcErr.stack ? srcErr.stack.toString() : '';
       if (stackStr.indexOf('pptr:') !== -1) { rb.sourceUrlLeak = 1; rb.sourceUrlKind = 'puppeteer'; }
       else if (stackStr.indexOf('UtilityScript.') !== -1) { rb.sourceUrlLeak = 1; rb.sourceUrlKind = 'playwright'; }
       else {
+        // Check for bare file names (injected via //# sourceURL=app.js without a URL)
         var bareFiles = [];
         var lines = stackStr.split('\n');
         for (var li = 0; li < lines.length; li++) {
@@ -891,25 +880,25 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 5) nativeTampering
+    // 5) nativeTampering — Proxy cyclic __proto__ detection
     try {
       var tampered = [];
       var automationFrames = [];
       var targets = {
-        'Navigator.webdriver': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver'); return dd && dd.get; })(),
-        'Navigator.userAgent': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent'); return dd && dd.get; })(),
-        'Navigator.platform': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'platform'); return dd && dd.get; })(),
-        'Navigator.languages': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'languages'); return dd && dd.get; })(),
-        'Navigator.plugins': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'plugins'); return dd && dd.get; })(),
-        'Navigator.hardwareConcurrency': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'hardwareConcurrency'); return dd && dd.get; })(),
-        'Navigator.deviceMemory': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'deviceMemory'); return dd && dd.get; })(),
-        'Navigator.maxTouchPoints': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints'); return dd && dd.get; })(),
-        'Screen.width': (function () { var dd = Object.getOwnPropertyDescriptor(Screen.prototype, 'width'); return dd && dd.get; })(),
-        'Screen.height': (function () { var dd = Object.getOwnPropertyDescriptor(Screen.prototype, 'height'); return dd && dd.get; })(),
+        'Navigator.webdriver': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver'); return d && d.get; })(),
+        'Navigator.userAgent': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent'); return d && d.get; })(),
+        'Navigator.platform': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'platform'); return d && d.get; })(),
+        'Navigator.languages': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'languages'); return d && d.get; })(),
+        'Navigator.plugins': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'plugins'); return d && d.get; })(),
+        'Navigator.hardwareConcurrency': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'hardwareConcurrency'); return d && d.get; })(),
+        'Navigator.deviceMemory': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'deviceMemory'); return d && d.get; })(),
+        'Navigator.maxTouchPoints': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints'); return d && d.get; })(),
+        'Screen.width': (function () { var d = Object.getOwnPropertyDescriptor(Screen.prototype, 'width'); return d && d.get; })(),
+        'Screen.height': (function () { var d = Object.getOwnPropertyDescriptor(Screen.prototype, 'height'); return d && d.get; })(),
         'Permissions.query': w.Permissions && w.Permissions.prototype && w.Permissions.prototype.query,
         'WebGLRenderingContext.getParameter': w.WebGLRenderingContext && w.WebGLRenderingContext.prototype && w.WebGLRenderingContext.prototype.getParameter,
         'HTMLCanvasElement.toDataURL': HTMLCanvasElement.prototype.toDataURL,
-        'HTMLIFrameElement.contentWindow': (function () { var dd = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow'); return dd && dd.get; })(),
+        'HTMLIFrameElement.contentWindow': (function () { var d = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow'); return d && d.get; })(),
         'Function.toString': Function.prototype.toString,
         'Date.getTimezoneOffset': Date.prototype.getTimezoneOffset,
         'Intl.DateTimeFormat.resolvedOptions': Intl.DateTimeFormat.prototype.resolvedOptions
@@ -920,15 +909,18 @@ TRACKER_V3_JS = r"""(function () {
         if (typeof fn !== 'function') continue;
         var reasons = [];
 
+        // Check 1: Native source code
         var src = Function.prototype.toString.call(fn);
         if (!/^function [^(]*\(\) \{\s*\[native code\]\s*\}$/.test(src)) {
           reasons.push('toString mismatch');
         }
 
+        // Check 2: own prototype
         if (Object.prototype.hasOwnProperty.call(fn, 'prototype')) {
           reasons.push('has own prototype');
         }
 
+        // Check 3: Proxy detection via cyclic __proto__
         var origProto = Object.getPrototypeOf(fn);
         try {
           Object.setPrototypeOf(fn, Object.create(fn));
@@ -943,10 +935,11 @@ TRACKER_V3_JS = r"""(function () {
           }
         }
 
+        // Check 4: Call the function and look for automation stack frames
         try {
           var callResult = fn.call(Object.create(null));
           if (callResult && typeof callResult.then === 'function') {
-            // Skip async
+            // Skip async - would need setTimeout
           }
         } catch (ce) {
           var errStack = String(ce && ce.stack).split('\n').slice(1);
@@ -961,6 +954,7 @@ TRACKER_V3_JS = r"""(function () {
         if (reasons.length > 0) tampered.push({ name: tname, reasons: reasons });
       }
 
+      // Check for navigator own properties (stealth plugins do this)
       try {
         var ownNav = Object.getOwnPropertyNames(navigator);
         if (ownNav.length > 0) {
@@ -968,6 +962,7 @@ TRACKER_V3_JS = r"""(function () {
         }
       } catch (e) {}
 
+      // Check iframe.contentWindow evasion (puppeteer-extra-plugin-stealth)
       try {
         var ifr = d.createElement('iframe');
         ifr.srcdoc = '<p></p>';
@@ -987,7 +982,7 @@ TRACKER_V3_JS = r"""(function () {
       if (automationFrames.length > 0) rb.automationFrames = automationFrames.slice(0, 5);
     } catch (e) {}
 
-    // 6) exposeFunctionLeak
+    // 6) exposeFunctionLeak — puppeteer_* / __playwright__binding__
     try {
       var keyList = Object.keys(window);
       for (var ki = 0; ki < keyList.length; ki++) {
@@ -1002,7 +997,7 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 7) cdpBindingGlobals
+    // 7) cdpBindingGlobals — unnamed native functions on window
     try {
       var unnamed = [];
       var props = Object.getOwnPropertyNames(window);
@@ -1018,7 +1013,7 @@ TRACKER_V3_JS = r"""(function () {
       if (unnamed.length >= 2) rb.cdpBindingGlobals = unnamed.slice(0, 5);
     } catch (e) {}
 
-    // 8) headless indicators
+    // 8) headless — chrome-headless-shell indicators
     try {
       var isDesktop = !(navigator.userAgentData && navigator.userAgentData.mobile) && !/Android|iPhone|iPad|Mobile/.test(navigator.userAgent);
       var isChromium = n.vendor && n.vendor.indexOf('Google') === 0;
@@ -1036,7 +1031,7 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 9) mobile emulation
+    // 9) mobileEmulation — maxTouchPoints=1 on mobile
     try {
       var isMobileUA = /Android|iPhone|iPad|iPod|Mobile/.test(navigator.userAgent);
       if (isMobileUA) {
@@ -1047,7 +1042,11 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 10) platform mismatch
+    // 10) workerConsistency — navigator values differ in worker
+    // (Simplified: we skip the async worker check to avoid delaying the payload.
+    //  The server-side check uses the fingerprint values we already send.)
+
+    // 11) platformMismatch — UA vs platform
     try {
       var uaLower = navigator.userAgent.toLowerCase();
       var platformLower = (navigator.platform || '').toLowerCase();
@@ -1068,6 +1067,7 @@ TRACKER_V3_JS = r"""(function () {
         rb.platformMismatch = { ua: uaOS, platform: platOS };
       }
 
+      // ActiveText color trick (Chrome 138+)
       try {
         var el = d.createElement('div');
         el.style.setProperty('color-scheme', 'light', 'important');
@@ -1539,13 +1539,8 @@ TRACKER_V3_JS = r"""(function () {
     try { bodyStr = JSON.stringify(body); } catch (e) { return; }
 
     var sent = false;
-    // ============ CRITICAL FIX ============
-    // text/plain → no preflight → sendBeacon actually fires the POST
     try {
-      sent = navigator.sendBeacon(
-        ENDPOINT + '/api/collect/final',
-        new Blob([bodyStr], { type: 'text/plain;charset=UTF-8' })
-      );
+      sent = navigator.sendBeacon(ENDPOINT + '/api/collect/final', new Blob([bodyStr], { type: 'application/json;charset=UTF-8' }));
     } catch (e) {}
 
     if (!sent) {
