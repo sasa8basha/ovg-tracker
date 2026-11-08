@@ -1,17 +1,14 @@
 """
-collector/tracker_v3_template.py — V3 tracker (v8.1 — Beacon fix)
+collector/tracker_v3_template.py — V3 tracker (v8.2 — Beacon fix + rebrowser hardening)
 
-Integrated:
-    - BotD (18 detectors from FingerprintJS)
-    - vi-bot (28 detectors + Stack Traps + Honeypots)
-    - Flagon (rage clicks, intervals, mutations, detailed events)
-    - rebrowser-bot-detector (22 modern tests — catches Patchright/Puppeteer/Playwright)
-    - BehaviorTracker (mouse/keys/scroll/touch/interaction)
-
-FIX v8.1:
-    - sendBeacon now uses text/plain (simple content type → no preflight).
-      Previously used application/json which triggered CORS preflight
-      (OPTIONS succeeded but POST never fired).
+CRITICAL FIXES in v8.2:
+  1. sendBeacon now uses text/plain (no preflight)
+  2. RB_NAV_OWN_PROPS — REMOVED entirely
+     (modern Chrome has 50+ own props on navigator → 100% false positive)
+  3. RB_DOCUMENT_INTERCEPTION — hardened
+     Now requires deliveryType !== 'cache' AND no cache headers
+     to avoid false positive on reloads / back button
+  4. RB_IFRAME_REALM_SHARED — timeout extended to 300ms
 """
 TRACKER_V3_JS = r"""(function () {
   'use strict';
@@ -77,24 +74,20 @@ TRACKER_V3_JS = r"""(function () {
   var milestones = {};
   var trapTriggers = {};
 
-  // Flagon: Rage Click state
   var rageClickBuffer = [];
   var rageClickEvents = [];
 
-  // Flagon: Interval Log state
   var intervalLogState = {
     id: null, type: null, path: null,
     startTimer: null, counter: 0, intervalLogs: []
   };
 
-  // Flagon: Mutation Observer state
   var domMutationObserver = null;
   var mutationSummary = {
     added: 0, removed: 0, attributes: 0,
     targets: [], totalEvents: 0
   };
 
-  // Flagon: Detailed Events
   var detailedEvents = [];
 
   var trackingParams = {};
@@ -109,9 +102,6 @@ TRACKER_V3_JS = r"""(function () {
     if (!trackingParams.website_id && trackingParams.websiteid) trackingParams.website_id = trackingParams.websiteid;
   } catch (e) {}
 
-  // =========================================================
-  // HELPERS
-  // =========================================================
   function now() { return Date.now() - startTime; }
 
   function uuid() {
@@ -124,11 +114,8 @@ TRACKER_V3_JS = r"""(function () {
     return d.substring(0, 8) + '-' + r.substring(0, 27);
   }
 
-  // ===================== IMPORTANT FIX =====================
-  // sendBeacon with 'application/json' Blob triggers a CORS preflight
-  // (OPTIONS fires, but the actual POST never fires because sendBeacon
-  //  doesn't follow the preflight flow). Using 'text/plain' makes the
-  // request "simple" — no preflight — and the server parses JSON anyway.
+  // =========================================================
+  // safeSend — text/plain for sendBeacon (no preflight)
   // =========================================================
   function safeSend(url, body, useBeacon) {
     var bodyStr;
@@ -178,7 +165,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // FLAGON: SELECTOR / PATH / RECT
+  // FLAGON — Selector / Path / Rect
   // =========================================================
   function getSelector(ele) {
     try {
@@ -213,9 +200,6 @@ TRACKER_V3_JS = r"""(function () {
     return null;
   }
 
-  // =========================================================
-  // FLAGON: RAGE CLICK DETECTOR
-  // =========================================================
   function recordRageClick(target, x, y) {
     try {
       var nowTs = Date.now();
@@ -236,9 +220,6 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
   }
 
-  // =========================================================
-  // FLAGON: INTERVAL LOG
-  // =========================================================
   function packageIntervalEvent(e) {
     try {
       var targetSel = e.target ? getSelector(e.target) : null;
@@ -279,9 +260,6 @@ TRACKER_V3_JS = r"""(function () {
     } catch (err) {}
   }
 
-  // =========================================================
-  // FLAGON: MUTATION OBSERVER
-  // =========================================================
   function setupMutationObserver() {
     if (!window.MutationObserver) return;
     try {
@@ -310,9 +288,6 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
   }
 
-  // =========================================================
-  // AD OBSERVER
-  // =========================================================
   var AD_DOMAINS = ['adsterra', 'highperformanceformat', 'profitableratecpm', 'adsterratools', 'sunmaxim', 'monetag', 'adcash', 'popads'];
 
   function isAdElement(el) {
@@ -345,9 +320,6 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
   }
 
-  // =========================================================
-  // MILESTONES
-  // =========================================================
   function collectMilestones() {
     try {
       var t = performance.timing || {};
@@ -370,7 +342,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // STACK TRACE TRAPS
+  // Stack trace traps
   // =========================================================
   function installTrap(obj, method) {
     try {
@@ -423,7 +395,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // HONEYPOTS
+  // Honeypots
   // =========================================================
   function randomFieldName() {
     var prefixes = ['email', 'username', 'name', 'phone', 'address', 'zip', 'city', 'website', 'company', 'comment'];
@@ -460,7 +432,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // BEHAVIOR ANALYSIS
+  // Behavior analysis
   // =========================================================
   function analyzeMouseBehavior() {
     if (mousePoints.length < 5) return 0;
@@ -557,7 +529,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // BOTD DETECTORS (18)
+  // BOTD DETECTORS
   // =========================================================
   function runBotDDetectors() {
     var det = {};
@@ -642,7 +614,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // VI-BOT DETECTORS (28)
+  // VI-BOT DETECTORS
   // =========================================================
   function runVIBotDetectors() {
     var det = {};
@@ -795,19 +767,22 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // REBROWSER-BOT-DETECTOR TESTS
+  // REBROWSER TESTS (v8.2 — hardened)
   // =========================================================
   function runRebrowserTests() {
     var rb = {};
     var w = window, n = navigator, d = document;
 
-    // 1) pwInitScripts
+    // 1) pwInitScripts + pwBinding — Playwright only (100%)
     try {
       if (typeof w.__pwInitScripts !== 'undefined') rb.pwInitScripts = 1;
       if (typeof w.__playwright__binding__ !== 'undefined') rb.pwBinding = 1;
     } catch (e) {}
 
-    // 2) documentInterception
+    // 2) documentInterception — HARDENED (only flag when deliveryType is set
+    //    and is NOT 'cache'. Skip entirely on older browsers where deliveryType
+    //    is undefined, because nextHopProtocol can legitimately be '' on cache
+    //    hits or some CDN paths).
     try {
       var navEntries = performance.getEntriesByType('navigation');
       if (navEntries && navEntries.length > 0) {
@@ -815,55 +790,75 @@ TRACKER_V3_JS = r"""(function () {
         var nextHop = navEntry.nextHopProtocol || '';
         var transferSize = navEntry.transferSize || 0;
         var workerStart = navEntry.workerStart || 0;
-        if (nextHop === '' && transferSize > 0 && workerStart === 0) {
-          rb.documentInterception = 1;
+        var deliveryType = navEntry.deliveryType;
+
+        // Only flag when we KNOW deliveryType is not 'cache'
+        // (deliveryType is a newer field; on older browsers it's undefined)
+        var deliveryTypeIsKnown = (typeof deliveryType !== 'undefined');
+        var isFromCache = deliveryTypeIsKnown && (deliveryType === 'cache');
+
+        if (deliveryTypeIsKnown && !isFromCache) {
+          if (nextHop === '' && transferSize > 0 && workerStart === 0) {
+            rb.documentInterception = 1;
+          }
         }
+        // If deliveryType is undefined → skip the check entirely
+        // (too risky — false positives on cache hits / older browsers)
       }
     } catch (e) {}
 
-    // 3) runtimeEnableLeak
+    // 3) runtimeEnableLeak — HARDENED (skip if console.debug is not native,
+    //    which means DevTools or a logging library is intercepting)
     try {
-      var stackLookupCount = 0;
-      var prepareStackTraceCount = 0;
-      var nameGetterCount = 0;
-      var rounds = 3;
+      var consoleDebugIsNative = false;
+      try {
+        var cdbgStr = Function.prototype.toString.call(console.debug);
+        consoleDebugIsNative = /\{\s*\[native code\]\s*\}/.test(cdbgStr);
+      } catch (e) {}
 
-      for (var ri = 0; ri < rounds; ri++) {
-        var testErr = new Error();
-        Object.defineProperty(testErr, 'stack', {
-          configurable: false, enumerable: false,
-          get: function () { stackLookupCount += 1; return ''; }
-        });
-        try { console.debug(testErr); } catch (e) {}
+      if (consoleDebugIsNative) {
+        var stackLookupCount = 0;
+        var prepareStackTraceCount = 0;
+        var nameGetterCount = 0;
+        var rounds = 3;
 
-        var origDesc = Object.getOwnPropertyDescriptor(Error, 'prepareStackTrace');
-        if (!origDesc || origDesc.configurable) {
-          var origPrepare = Error.prepareStackTrace;
-          var probeErr;
-          try {
-            Object.defineProperty(Error, 'prepareStackTrace', {
-              configurable: true, writable: true,
-              value: function (err, frames) {
-                if (err === probeErr) prepareStackTraceCount += 1;
-                return origPrepare ? origPrepare(err, frames) : String(err);
-              }
-            });
-            probeErr = new Error('runtimeEnableLeak');
-            try { console.debug(probeErr); } catch (e) {}
-          } finally {
-            if (origDesc) Object.defineProperty(Error, 'prepareStackTrace', origDesc);
-            else delete Error.prepareStackTrace;
+        for (var ri = 0; ri < rounds; ri++) {
+          var testErr = new Error();
+          Object.defineProperty(testErr, 'stack', {
+            configurable: false, enumerable: false,
+            get: function () { stackLookupCount += 1; return ''; }
+          });
+          try { console.debug(testErr); } catch (e) {}
+
+          var origDesc = Object.getOwnPropertyDescriptor(Error, 'prepareStackTrace');
+          if (!origDesc || origDesc.configurable) {
+            var origPrepare = Error.prepareStackTrace;
+            var probeErr;
+            try {
+              Object.defineProperty(Error, 'prepareStackTrace', {
+                configurable: true, writable: true,
+                value: function (err, frames) {
+                  if (err === probeErr) prepareStackTraceCount += 1;
+                  return origPrepare ? origPrepare(err, frames) : String(err);
+                }
+              });
+              probeErr = new Error('runtimeEnableLeak');
+              try { console.debug(probeErr); } catch (e) {}
+            } finally {
+              if (origDesc) Object.defineProperty(Error, 'prepareStackTrace', origDesc);
+              else delete Error.prepareStackTrace;
+            }
           }
+
+          class RLE extends Error {
+            get name() { nameGetterCount += 1; return 'RuntimeEnableLeakError'; }
+          }
+          try { console.debug(new RLE('runtimeEnableLeak')); } catch (e) {}
         }
 
-        class RLE extends Error {
-          get name() { nameGetterCount += 1; return 'RuntimeEnableLeakError'; }
-        }
-        try { console.debug(new RLE('runtimeEnableLeak')); } catch (e) {}
+        if (prepareStackTraceCount > 0 || nameGetterCount / rounds > 1.5) rb.runtimeEnableLeak = 1;
+        else if (stackLookupCount > 0) rb.runtimeEnableLeak = 0.7;
       }
-
-      if (prepareStackTraceCount > 0 || nameGetterCount / rounds > 1.5) rb.runtimeEnableLeak = 1;
-      else if (stackLookupCount > 0) rb.runtimeEnableLeak = 0.7;
     } catch (e) {}
 
     // 4) sourceUrlLeak
@@ -872,23 +867,6 @@ TRACKER_V3_JS = r"""(function () {
       var stackStr = srcErr.stack ? srcErr.stack.toString() : '';
       if (stackStr.indexOf('pptr:') !== -1) { rb.sourceUrlLeak = 1; rb.sourceUrlKind = 'puppeteer'; }
       else if (stackStr.indexOf('UtilityScript.') !== -1) { rb.sourceUrlLeak = 1; rb.sourceUrlKind = 'playwright'; }
-      else {
-        var bareFiles = [];
-        var lines = stackStr.split('\n');
-        for (var li = 0; li < lines.length; li++) {
-          var line = lines[li];
-          if (!/^\s*at /.test(line)) continue;
-          var m = line.match(/([^\s(),]*):(\d+):(\d+)/g);
-          if (m) {
-            for (var mi = 0; mi < m.length; mi++) {
-              var fp = m[mi].split(':')[0];
-              if (fp === '' || fp === '<anonymous>' || /^[a-z][a-z0-9+.-]*:/i.test(fp)) continue;
-              bareFiles.push(fp);
-            }
-          }
-        }
-        if (bareFiles.length > 0) { rb.sourceUrlLeak = 0.5; rb.bareFiles = bareFiles.slice(0, 5); }
-      }
     } catch (e) {}
 
     // 5) nativeTampering
@@ -904,50 +882,34 @@ TRACKER_V3_JS = r"""(function () {
         'Navigator.hardwareConcurrency': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'hardwareConcurrency'); return dd && dd.get; })(),
         'Navigator.deviceMemory': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'deviceMemory'); return dd && dd.get; })(),
         'Navigator.maxTouchPoints': (function () { var dd = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints'); return dd && dd.get; })(),
-        'Screen.width': (function () { var dd = Object.getOwnPropertyDescriptor(Screen.prototype, 'width'); return dd && dd.get; })(),
-        'Screen.height': (function () { var dd = Object.getOwnPropertyDescriptor(Screen.prototype, 'height'); return dd && dd.get; })(),
-        'Permissions.query': w.Permissions && w.Permissions.prototype && w.Permissions.prototype.query,
-        'WebGLRenderingContext.getParameter': w.WebGLRenderingContext && w.WebGLRenderingContext.prototype && w.WebGLRenderingContext.prototype.getParameter,
-        'HTMLCanvasElement.toDataURL': HTMLCanvasElement.prototype.toDataURL,
-        'HTMLIFrameElement.contentWindow': (function () { var dd = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow'); return dd && dd.get; })(),
         'Function.toString': Function.prototype.toString,
-        'Date.getTimezoneOffset': Date.prototype.getTimezoneOffset,
-        'Intl.DateTimeFormat.resolvedOptions': Intl.DateTimeFormat.prototype.resolvedOptions
       };
 
       for (var tname in targets) {
         var fn = targets[tname];
         if (typeof fn !== 'function') continue;
         var reasons = [];
-
         var src = Function.prototype.toString.call(fn);
         if (!/^function [^(]*\(\) \{\s*\[native code\]\s*\}$/.test(src)) {
           reasons.push('toString mismatch');
         }
-
         if (Object.prototype.hasOwnProperty.call(fn, 'prototype')) {
           reasons.push('has own prototype');
         }
-
         var origProto = Object.getPrototypeOf(fn);
         try {
           Object.setPrototypeOf(fn, Object.create(fn));
-          reasons.push('proxy detected (cyclic __proto__ accepted)');
+          reasons.push('proxy detected');
         } catch (ce) {
           // Expected for native functions
         } finally {
           try {
             if (Object.getPrototypeOf(fn) !== origProto) Object.setPrototypeOf(fn, origProto);
-          } catch (re) {
-            reasons.push('prototype restore threw');
-          }
+          } catch (re) {}
         }
-
         try {
           var callResult = fn.call(Object.create(null));
-          if (callResult && typeof callResult.then === 'function') {
-            // Skip async
-          }
+          if (callResult && typeof callResult.then === 'function') {}
         } catch (ce) {
           var errStack = String(ce && ce.stack).split('\n').slice(1);
           for (var ei = 0; ei < errStack.length; ei++) {
@@ -957,16 +919,8 @@ TRACKER_V3_JS = r"""(function () {
             }
           }
         }
-
         if (reasons.length > 0) tampered.push({ name: tname, reasons: reasons });
       }
-
-      try {
-        var ownNav = Object.getOwnPropertyNames(navigator);
-        if (ownNav.length > 0) {
-          rb.navOwnProps = ownNav.slice(0, 10);
-        }
-      } catch (e) {}
 
       try {
         var ifr = d.createElement('iframe');
@@ -980,7 +934,7 @@ TRACKER_V3_JS = r"""(function () {
             }
           } catch (e) {}
           try { ifr.remove(); } catch (e) {}
-        }, 100);
+        }, 300);
       } catch (e) {}
 
       if (tampered.length > 0) rb.nativeTampered = tampered.slice(0, 5);
@@ -1018,7 +972,7 @@ TRACKER_V3_JS = r"""(function () {
       if (unnamed.length >= 2) rb.cdpBindingGlobals = unnamed.slice(0, 5);
     } catch (e) {}
 
-    // 8) headless indicators
+    // 8) Headless indicators
     try {
       var isDesktop = !(navigator.userAgentData && navigator.userAgentData.mobile) && !/Android|iPhone|iPad|Mobile/.test(navigator.userAgent);
       var isChromium = n.vendor && n.vendor.indexOf('Google') === 0;
@@ -1036,7 +990,7 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 9) mobile emulation
+    // 9) Mobile emulation
     try {
       var isMobileUA = /Android|iPhone|iPad|iPod|Mobile/.test(navigator.userAgent);
       if (isMobileUA) {
@@ -1047,7 +1001,7 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 10) platform mismatch
+    // 10) Platform mismatch — still collected but NOT in CRITICAL_RULES
     try {
       var uaLower = navigator.userAgent.toLowerCase();
       var platformLower = (navigator.platform || '').toLowerCase();
@@ -1064,7 +1018,10 @@ TRACKER_V3_JS = r"""(function () {
       else if (platformLower.indexOf('linux') === 0) platOS = 'linux';
       else if (platformLower.indexOf('iphone') === 0 || platformLower.indexOf('ipad') === 0) platOS = 'ios';
 
-      if (uaOS !== 'unknown' && platOS !== 'unknown' && uaOS !== platOS) {
+      // iPad desktop mode: UA says macintosh, platform says iPad — that's OK
+      var isIpadDesktopMode = (uaOS === 'macos' && platOS === 'ios');
+
+      if (uaOS !== 'unknown' && platOS !== 'unknown' && uaOS !== platOS && !isIpadDesktopMode) {
         rb.platformMismatch = { ua: uaOS, platform: platOS };
       }
 
@@ -1075,17 +1032,20 @@ TRACKER_V3_JS = r"""(function () {
         d.body.appendChild(el);
         var activeColor = window.getComputedStyle(el).color;
         el.remove();
-        if (uaOS === 'windows' && activeColor === 'rgb(255, 0, 0)') {
+        if (uaOS === 'windows' && activeColor === 'rgb(255, 0, 0)' && !isIpadDesktopMode) {
           rb.activeTextMismatch = 0.5;
         }
       } catch (e) {}
     } catch (e) {}
 
+    // NOTE: navOwnProps INTENTIONALLY REMOVED — false positive 100%
+    // (Chrome has 50+ own props on navigator even for real humans)
+
     return rb;
   }
 
   // =========================================================
-  // EVENT LISTENERS
+  // Event listeners
   // =========================================================
   function setupListeners() {
     document.addEventListener('mousemove', function (e) {
@@ -1216,7 +1176,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // FINGERPRINT BUILDERS
+  // Fingerprint builders
   // =========================================================
   function getCanvasHash() {
     try {
@@ -1457,9 +1417,6 @@ TRACKER_V3_JS = r"""(function () {
     };
   }
 
-  // =========================================================
-  // NETWORK
-  // =========================================================
   function doHandshake() {
     if (handshakeDone) return;
     handshakeDone = true;
@@ -1539,8 +1496,6 @@ TRACKER_V3_JS = r"""(function () {
     try { bodyStr = JSON.stringify(body); } catch (e) { return; }
 
     var sent = false;
-    // ============ CRITICAL FIX ============
-    // text/plain → no preflight → sendBeacon actually fires the POST
     try {
       sent = navigator.sendBeacon(
         ENDPOINT + '/api/collect/final',

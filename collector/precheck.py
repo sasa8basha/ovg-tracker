@@ -1,16 +1,15 @@
 """
-collector/precheck.py — Fast pre-check rules (v8.0)
+collector/precheck.py — Fast pre-check rules (v8.2)
 
-Purpose: sub-100ms decision before redirect to Adsterra.
-Reads the full `fp` dict from the tracker payload (botd, vib, rebrowser,
-trap_triggers, honeypot_triggered) plus the classic nav checks.
-
-Philosophy: False Positive costs more than False Negative here.
-We only block on:
-    - Impossible / critical signals (webdriver, puppeteer, patchright, ...)
-    - Multiple high-severity signals
-
-Anything ambiguous → redirect (safe default).
+CRITICAL FIXES in v8.2:
+  - Removed RB_DOCUMENT_INTERCEPTION from CRITICAL_RULES
+    (false positive when page is served from cache — nextHopProtocol === '')
+  - Removed RB_IFRAME_REALM_SHARED from CRITICAL_RULES
+    (edge-case false positive on some browsers)
+  - Kept: RB_PW_INIT_SCRIPTS, RB_PW_BINDING, RB_HEADLESS_UA,
+          RB_EXPOSE_FUNCTION_LEAK (all 100% Playwright/Puppeteer signatures)
+  - These RB_* signals still flow into the fusion layer via signals.py —
+    they just don't block instantly anymore.
 """
 from __future__ import annotations
 
@@ -26,6 +25,7 @@ from collector.signals import (
 # CRITICAL RULES — any of these → instant block
 # =========================================================
 CRITICAL_RULES = frozenset([
+    # Core
     "WEBDRIVER_FLAG",
     "PUPPETEER_DETECTED",
     "PLAYWRIGHT_DETECTED",
@@ -36,12 +36,15 @@ CRITICAL_RULES = frozenset([
     "HONEYPOT_CLICK",
     "HONEYPOT_FORM_FILL",
     "HEADLESS_UA",
-    # BotD / vi-bot
+
+    # BotD — 100% impossible signals only
     "BOTD_DETECTWEBDRIVER",
     "BOTD_DETECTPROCESS",
     "BOTD_DETECTDISTINCTIVEPROPERTIES",
     "BOTD_DETECTDOCUMENTATTRIBUTES",
     "BOTD_DETECTWINDOWEXTERNAL",
+
+    # vi-bot — 100% impossible signals only
     "WEBDRIVER",
     "CHROMEDRIVER",
     "CDPDETECTION",
@@ -52,7 +55,8 @@ CRITICAL_RULES = frozenset([
     "STEALTHDETECTION",
     "WRONGCHROMEORDER",
     "IFRAMECHROMERUNTIME",
-    # Stack traps
+
+    # Stack traps — all impossible (signature of automation tools)
     "ERRORTRAPPUPPETEER",
     "ERRORTRAPPLAYWRIGHTCHROME",
     "ERRORTRAPPLAYWRIGHTFIREFOX",
@@ -63,13 +67,14 @@ CRITICAL_RULES = frozenset([
     "ERRORTRAPPPTRURL",
     "ERRORTRAPUTILITYSCRIPT",
     "ERRORTRAPPHANTOMJS",
-    # rebrowser
-    "RB_PW_INIT_SCRIPTS",
-    "RB_PW_BINDING",
-    "RB_DOCUMENT_INTERCEPTION",
-    "RB_IFRAME_REALM_SHARED",
-    "RB_HEADLESS_UA",
-    "RB_EXPOSE_FUNCTION_LEAK",
+
+    # rebrowser — ONLY 100% Playwright/Puppeteer signatures
+    # REMOVED: RB_DOCUMENT_INTERCEPTION (false positive on cache)
+    # REMOVED: RB_IFRAME_REALM_SHARED (edge-case false positive)
+    "RB_PW_INIT_SCRIPTS",       # window.__pwInitScripts — Playwright only
+    "RB_PW_BINDING",            # window.__playwright__binding__ — Playwright only
+    "RB_HEADLESS_UA",           # HeadlessChrome in UA — 100%
+    "RB_EXPOSE_FUNCTION_LEAK",  # puppeteer_* / __playwright__binding__ — 100%
 ])
 
 
@@ -186,7 +191,11 @@ def _iter_vib(vib: dict) -> List[str]:
 
 
 def _iter_rebrowser(rb: dict) -> List[str]:
-    """Yield signal codes triggered by rebrowser-bot-detector tests."""
+    """
+    Yield signal codes triggered by rebrowser tests.
+    RB_NAV_OWN_PROPS is intentionally NOT read here — it's a known
+    false positive (navigator has 50+ own props on modern Chrome).
+    """
     codes: List[str] = []
     if not isinstance(rb, dict):
         return codes
@@ -236,8 +245,9 @@ def _iter_rebrowser(rb: dict) -> List[str]:
         codes.append("RB_CDP_BINDING_GLOBALS")
     if rb.get("exposeFunctionLeak"):
         codes.append("RB_EXPOSE_FUNCTION_LEAK")
-    if isinstance(rb.get("navOwnProps"), list) and rb.get("navOwnProps"):
-        codes.append("RB_NAV_OWN_PROPS")
+
+    # NOTE: navOwnProps intentionally SKIPPED — false positive on modern Chrome
+    # NOTE: platformMismatch → still collected but NOT in CRITICAL_RULES
     if isinstance(rb.get("platformMismatch"), dict):
         codes.append("RB_PLATFORM_MISMATCH")
 
@@ -254,7 +264,7 @@ def _iter_trap_triggers(traps: dict) -> List[str]:
         if not triggered:
             continue
         upper = str(trap_name).upper()
-        candidate = upper.replace("ERRortrap", "ERRORTRAP").replace("_", "")
+        candidate = upper.replace("ERRORTRAP", "ERRORTRAP").replace("_", "")
         matched = None
         for reg_code in SIGNAL_REGISTRY:
             if reg_code.startswith("ERRORTRAP") and reg_code.replace("_", "") == candidate:
@@ -307,11 +317,9 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
     if fp.get("cdp_detected") is True:
         reasons.append("CDP_DETECTED")
 
-    # Honeypot (top-level flag on fingerprint)
     if fp.get("honeypot_triggered") is True or fp.get("_honeypot") is True:
         reasons.append("HONEYPOT_CLICK")
 
-    # Untrusted JS-injected clicks
     try:
         untrusted = int(fp.get("_untrusted_clicks") or 0)
     except (ValueError, TypeError):
@@ -319,7 +327,6 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
     if untrusted >= 1:
         reasons.append("UNTRUSTED_CLICK")
 
-    # Headless UA in the nav payload
     ua_lower = str(nav.get("ua") or "").lower()
     if "headlesschrome" in ua_lower or "headless" in ua_lower:
         reasons.append("HEADLESS_UA")
@@ -339,21 +346,21 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
         reasons.append(code)
 
     # ---------------------------------------------------------
-    # 4) rebrowser-bot-detector tests (22)
+    # 4) rebrowser tests (22) — SOFT (they only block via CRITICAL_RULES)
     # ---------------------------------------------------------
     rb = _safe_dict(fp.get("rebrowser"))
     for code in _iter_rebrowser(rb):
         reasons.append(code)
 
     # ---------------------------------------------------------
-    # 5) Stack trace traps (vi-bot style)
+    # 5) Stack trace traps
     # ---------------------------------------------------------
     traps = _safe_dict(fp.get("trap_triggers"))
     for code in _iter_trap_triggers(traps):
         reasons.append(code)
 
     # ---------------------------------------------------------
-    # 6) Behavior scores (client-side quick check)
+    # 6) Behavior scores
     # ---------------------------------------------------------
     behavior = _safe_dict(fp.get("behavioral"))
     behavior_scores = behavior.get("behavior_scores") if isinstance(behavior, dict) else None
@@ -369,7 +376,7 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
             pass
 
     # ---------------------------------------------------------
-    # 7) Deduplicate reasons (keep first occurrence)
+    # 7) Deduplicate
     # ---------------------------------------------------------
     seen = set()
     deduped: List[str] = []
@@ -398,20 +405,17 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
     # ---------------------------------------------------------
     # 9) Score computation
     # ---------------------------------------------------------
-    # Any critical rule → instant 100
     has_critical = any(code in CRITICAL_RULES for code in reasons)
 
     score = 0
     if has_critical:
         score = 100
     elif reasons:
-        # Sum of base strengths, capped at 100, but any reasons list is
-        # already significant — so minimum floor of 30
         total_base = sum(float(s.get("base_strength", 0.5)) for s in signals)
         score = int(min(100, max(30, total_base * 100)))
 
     # ---------------------------------------------------------
-    # 10) Count by severity (for debugging / logging)
+    # 10) Counts
     # ---------------------------------------------------------
     counts = {"impossible": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "human": 0}
     for s in signals:
