@@ -1,30 +1,18 @@
 """
-collector/header_analyzer.py — HTTP header analysis (v4.0)
+collector/header_analyzer.py — HTTP header analysis (v4.1)
 
-Pre-JS layer — cannot be spoofed easily.
-Produces signals in the new unified format:
-    {
-        "code", "severity", "direction", "category",
-        "base_strength",   # from SIGNAL_REGISTRY
-        "score",           # legacy compat (positive int)
-        "detail"
-    }
-
-Checks:
-  - UA vs sec-ch-ua consistency
-  - Missing sec-fetch-* headers
-  - HTTP/1.0 over HTTPS
-  - Accept-Encoding patterns
-  - Contradictions (Firefox + sec-ch-ua, Safari + sec-ch-ua)
+FIX in v4.1:
+    - Removed HTTP_1_1_ON_HTTPS false positive
+      Behind reverse proxies (Cloudflare, Netrun, Nginx, etc.) every request
+      arrives as HTTP/1.1 even when the client uses HTTP/2. Emitting a signal
+      for this resulted in blocking 100% of legit users.
+    - Only HTTP/1.0 is flagged now (truly suspicious).
 """
 import re
 
 from collector.signals import SIGNAL_REGISTRY
 
 
-# =========================================================
-# HELPERS
-# =========================================================
 def _base(code: str, default: float = 0.5) -> float:
     reg = SIGNAL_REGISTRY.get(code)
     if reg:
@@ -43,7 +31,6 @@ def _severity(code: str, default: str = "medium") -> str:
 
 
 def _make_signal(code: str, detail: str, default_sev: str = "medium") -> dict:
-    """Build a unified signal dict for header findings."""
     sev = _severity(code, default_sev)
     strength = _base(code, 0.5)
     return {
@@ -70,12 +57,13 @@ def _normalize_headers(headers) -> dict:
     return {}
 
 
-# =========================================================
-# MAIN ANALYZER
-# =========================================================
 def analyze_headers(headers, ua, http_version):
     """
     Analyze HTTP headers. Returns list of unified signals.
+
+    NOTE: http_version reflects the connection between the reverse proxy
+    and this server — NOT the client-to-proxy connection. Therefore
+    HTTP/1.1 is normal and MUST NOT be flagged. Only HTTP/1.0 is suspicious.
     """
     h = _normalize_headers(headers)
     ua_lower = (ua or "").lower()
@@ -96,7 +84,7 @@ def analyze_headers(headers, ua, http_version):
         except (ValueError, TypeError):
             chrome_major = 0
 
-    # ===== 1) Chrome/Edge ≥ 90 should send sec-ch-ua =====
+    # ===== 1) Chrome/Edge >= 90 should send sec-ch-ua =====
     if (is_chrome or is_edge) and chrome_major >= 90 and not is_ios:
         if "sec-ch-ua" not in h:
             signals.append(_make_signal(
@@ -145,9 +133,13 @@ def analyze_headers(headers, ua, http_version):
             "Safari UA + sec-ch-ua present (contradiction)",
         ))
 
-    # ===== 4) HTTP version check =====
+    # ===== 4) HTTP version check — ONLY flag 1.0 now =====
+    # FIX v4.1: HTTP/1.1 is the normal case behind any reverse proxy
+    # (Cloudflare, Netrun, Nginx, HAProxy, AWS ELB...). The `http_version`
+    # from uvicorn reflects proxy→server, not client→proxy.
+    # Flagging HTTP/1.1 caused 100% false positive on all legit users.
     hv = str(http_version or "").strip()
-    if hv in ("1.0", "1.1") and (is_chrome or is_firefox or is_safari or is_edge):
+    if hv == "1.0" and (is_chrome or is_firefox or is_safari or is_edge):
         signals.append(_make_signal(
             "HTTP_1_1_ON_HTTPS",
             f"Modern browser using HTTP/{hv} (bot likely)",
@@ -186,7 +178,6 @@ def analyze_headers(headers, ua, http_version):
 
 
 def get_ua_from_headers(headers):
-    """Extract UA from headers (fallback if JS didn't send)."""
     if headers is None:
         return ""
     try:
