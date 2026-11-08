@@ -1,14 +1,15 @@
 """
-routers/collector_v3.py — Collector v3 API (v4.2 — full audit fixes)
+routers/collector_v3.py — Collector v3 API (v4.2.1 — full audit fixes)
 
 Fixes over v4.0:
-    - Zone extraction tries helpers → analysis → tracking_params → campaign default
+    - Zone extraction: helpers → analysis → tracking_params → campaign default
     - ip_info is persisted in session.meta at handshake time
     - final processor reads ip_info from session.meta (no asyncio.run in threads)
     - _fetch_ip_info_sync() for safe fallback
     - stale_session_finalizer_loop() — converts stuck PENDING sessions
-    - New fields (confidence, bot_probability, mode, reason, data_quality_report)
+    - Confidence / bot_probability / mode / reason / data_quality_report
       stored as indexed columns on VisitModel + SessionModel
+    - [FIX] data_quality keyword duplicate in VisitModel for dead stale sessions
 """
 import json
 import asyncio
@@ -92,12 +93,16 @@ def _extract_macros(tp: dict) -> dict:
                 break
 
     def _to_float(v):
-        try: return float(v)
-        except (ValueError, TypeError): return 0.0
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return 0.0
 
     def _to_int(v):
-        try: return int(float(v))
-        except (ValueError, TypeError): return None
+        try:
+            return int(float(v))
+        except (ValueError, TypeError):
+            return None
 
     def _to_bool(v):
         return str(v).strip() in ("1", "true", "True", "yes", "YES")
@@ -119,9 +124,6 @@ def _extract_macros(tp: dict) -> dict:
 # =========================================================
 def _extract_zone_from_payload(url: str, tracking_params: dict, campaign) -> tuple:
     """Returns (zone_id, source)."""
-    zone_id = None
-    source = "none"
-
     # 1) helpers.extract_zone_id_from_url — handles zone/zoneid/z/path
     try:
         _z = extract_zone_id_from_url(url or "")
@@ -451,7 +453,6 @@ def _process_final_background(
 
         campaign = db.query(CampaignModel).get(session.campaign_id)
 
-        # ---- Zone extraction ----
         zone_id, zone_source = _extract_zone_from_payload(
             payload.url or "",
             payload.tracking_params or {},
@@ -459,7 +460,6 @@ def _process_final_background(
         )
         print(f"[ZONE] url={payload.url!r} zone={zone_id!r} source={zone_source}")
 
-        # ---- IP info: session.meta first, sync fallback ----
         ip_info = None
         try:
             if session.meta and isinstance(session.meta, dict):
@@ -477,7 +477,6 @@ def _process_final_background(
         if "country_code" not in ip_info:
             ip_info["country_code"] = session.country_code or ""
 
-        # ---- Cross-visit signals ----
         recent_fp_count = 0
         same_ip_last_minute = 0
         same_canvas_ip_count = 0
@@ -508,7 +507,6 @@ def _process_final_background(
         except Exception:
             pass
 
-        # ---- Heartbeats ----
         heartbeats = db.query(VisitHeartbeatModel).filter(
             VisitHeartbeatModel.session_id == session_id,
         ).order_by(VisitHeartbeatModel.seq.asc()).all()
@@ -572,7 +570,7 @@ def _process_final_background(
         visit_click_id = (payload.click_id or "").strip() or None
 
         full_payload = {
-            "engine_version": "v4.2",
+            "engine_version": "v4.2.1",
             "verdict": result.get("verdict"),
             "score": result.get("score"),
             "confidence": result.get("confidence"),
@@ -640,7 +638,6 @@ def _process_final_background(
                 stats_cache.invalidate(f"stats:campaign:{session.campaign_id}")
             return
 
-        # ---- New visit ----
         visit = VisitModel(
             campaign_id=session.campaign_id,
             session_id=session_id,
@@ -762,10 +759,9 @@ def _finalize_stale_session(session_id: str) -> bool:
     """
     Finalize a session that never sent its final beacon.
 
-    Strategy:
-        - Heartbeats present → feed them as synthetic final payload
-        - No heartbeats + session age >= 120s → treat as DEAD (bot didn't
-          even try to send a final beacon — verdict=invalid directly)
+    Two paths:
+        A) Has heartbeats → feed them as synthetic final payload
+        B) No heartbeats + aged 120s+ → treat as DEAD (verdict=invalid)
     """
     db_check = SessionLocal()
     try:
@@ -811,7 +807,7 @@ def _finalize_stale_session(session_id: str) -> bool:
     finally:
         db_check.close()
 
-    # DEAD session — no heartbeats + aged 120s+ → invalid directly
+    # ---------- Path B: DEAD session (no heartbeats + aged 120s+) ----------
     if not hb_data and age_sec >= 120:
         try:
             db = SessionLocal()
@@ -832,6 +828,7 @@ def _finalize_stale_session(session_id: str) -> bool:
 
                     cc = str(ip_info.get("country_code") or "").upper().strip()
 
+                    # VisitModel: each kwarg appears EXACTLY once
                     visit = VisitModel(
                         campaign_id=s.campaign_id,
                         session_id=session_id,
@@ -845,7 +842,7 @@ def _finalize_stale_session(session_id: str) -> bool:
                         reason="stale_no_heartbeats",
                         data_quality="partial",
                         full_payload={
-                            "engine_version": "v4.2-stale",
+                            "engine_version": "v4.2.1-stale",
                             "verdict": "invalid",
                             "reason": "stale_no_heartbeats",
                             "reason_detail": f"No heartbeats and no final after {age_sec:.0f}s",
@@ -860,7 +857,6 @@ def _finalize_stale_session(session_id: str) -> bool:
                         }],
                         country=ip_info.get("country", "Unknown"),
                         country_code=cc[:2] if cc in ("LO", "XX", "") else cc,
-                        data_quality="partial",
                         time_on_page=int(age_sec * 1000),
                         counting_type="landing",
                         filter_reason="STALE_NO_HEARTBEATS",
@@ -880,13 +876,14 @@ def _finalize_stale_session(session_id: str) -> bool:
                     if s.user_id:
                         stats_cache.invalidate(f"stats:user:{s.user_id}:all")
                         stats_cache.invalidate(f"stats:campaign:{s.campaign_id}")
-                    print(f"[STALE] dead session {session_id} → invalid (no heartbeats)")
+                    print(f"[STALE] dead session {session_id} -> invalid (no heartbeats)")
             finally:
                 db.close()
         except Exception as e:
             print(f"[STALE] dead finalization failed for {session_id}: {e}")
         return True
 
+    # ---------- Path A: has heartbeats ----------
     total_clicks = sum(h["clicks"] for h in hb_data)
     total_scrolls = sum(h["scrolls"] for h in hb_data)
     total_mousemoves = sum(h["mousemoves"] for h in hb_data)
