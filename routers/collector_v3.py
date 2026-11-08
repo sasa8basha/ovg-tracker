@@ -1,29 +1,25 @@
 """
-routers/collector_v3.py — Collector v3 API (v4.0 engine)
+routers/collector_v3.py — Collector v3 API (v4.2 — full audit fixes)
 
-Integrates the new Multi-Layer Probabilistic Risk Engine.
-
-Flow:
-    1. POST /api/collect/handshake     — session start + fast precheck
-    2. POST /api/collect/heartbeat     — periodic heartbeat
-    3. POST /api/collect/final         — final visit analysis (background)
-
-Key changes from v3.5:
-    - Handshake uses `quick_precheck` (fast, critical-only) — no full engine.
-    - Final uses `evaluate_visit` with `campaign_mode` derived from the
-      campaign's `bot_block_threshold`.
-    - All new engine fields (confidence, bot_probability, decision, fusion)
-      are stored in `full_payload` (JSON) — no DB schema change needed.
-    - Backward-compatible: old fields (score, verdict, evidence,
-      data_quality, filter_reason) still populated exactly as before.
+Fixes over v4.0:
+    - Zone extraction tries helpers → analysis → tracking_params → campaign default
+    - ip_info is persisted in session.meta at handshake time
+    - final processor reads ip_info from session.meta (no asyncio.run in threads)
+    - _fetch_ip_info_sync() for safe fallback
+    - stale_session_finalizer_loop() — converts stuck PENDING sessions
+    - New fields (confidence, bot_probability, mode, reason, data_quality_report)
+      stored as indexed columns on VisitModel + SessionModel
 """
 import json
+import asyncio
+import httpx
 from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 
-from config import COLLECTOR_V3_ENABLED, MAX_SESSIONS_PER_IP_HOUR
+from config import COLLECTOR_V3_ENABLED, MAX_SESSIONS_PER_IP_HOUR, GEO_LOOKUP_TIMEOUT
 from database import get_db, SessionLocal
 from models import SessionModel, VisitHeartbeatModel, VisitModel, CampaignModel
 from schemas import HandshakePayload, HeartbeatPayload, FinalPayload
@@ -33,8 +29,9 @@ from utils import (
     heartbeat_limiter,
     final_limiter,
     stats_cache,
+    ip_cache,
 )
-from analysis import get_ip_info, parse_ua, extract_zone_id
+from analysis import get_ip_info, parse_ua, extract_zone_id, safe_asn, safe_float
 from collector.precheck import quick_precheck
 from collector.filter_engine import evaluate_visit
 from collector.decision import mode_from_block_threshold
@@ -95,16 +92,12 @@ def _extract_macros(tp: dict) -> dict:
                 break
 
     def _to_float(v):
-        try:
-            return float(v)
-        except (ValueError, TypeError):
-            return 0.0
+        try: return float(v)
+        except (ValueError, TypeError): return 0.0
 
     def _to_int(v):
-        try:
-            return int(float(v))
-        except (ValueError, TypeError):
-            return None
+        try: return int(float(v))
+        except (ValueError, TypeError): return None
 
     def _to_bool(v):
         return str(v).strip() in ("1", "true", "True", "yes", "YES")
@@ -118,6 +111,112 @@ def _extract_macros(tp: dict) -> dict:
         "quality": _to_int(known.get("quality")),
         "adblock": _to_bool(known.get("adblock", "0")),
         "country": str(known.get("country") or "")[:10] or None,
+    }
+
+
+# =========================================================
+# Zone extraction — try everything before falling back
+# =========================================================
+def _extract_zone_from_payload(url: str, tracking_params: dict, campaign) -> tuple:
+    """Returns (zone_id, source)."""
+    zone_id = None
+    source = "none"
+
+    # 1) helpers.extract_zone_id_from_url — handles zone/zoneid/z/path
+    try:
+        _z = extract_zone_id_from_url(url or "")
+        if _z:
+            return _z, "url_helpers"
+    except Exception:
+        pass
+
+    # 2) analysis.extract_zone_id — zoneid only
+    try:
+        _z = extract_zone_id(url or "")
+        if _z and _z != "unknown":
+            return _z, "url_analysis"
+    except Exception:
+        pass
+
+    # 3) tracking_params — any zone-like key
+    try:
+        tp = tracking_params or {}
+        tp_lower = {str(k).lower().strip(): v for k, v in tp.items() if v}
+        for key in ("zoneid", "zone_id", "zone", "z", "zn", "zid"):
+            if key in tp_lower and tp_lower[key]:
+                _val = str(tp_lower[key]).strip()[:100]
+                if _val:
+                    return _val, "tracking_params"
+    except Exception:
+        pass
+
+    # 4) campaign default — last resort
+    try:
+        if campaign is not None and campaign.destination_zone_id:
+            _val = str(campaign.destination_zone_id).strip()[:100]
+            if _val:
+                return _val, "campaign_default"
+    except Exception:
+        pass
+
+    return "unknown", "none"
+
+
+# =========================================================
+# Sync IP info fetch — safe from threads
+# =========================================================
+def _fetch_ip_info_sync(ip: str, timeout: float = GEO_LOOKUP_TIMEOUT) -> dict:
+    """Synchronous IP lookup. Safe from any thread. Uses cache first."""
+    if not ip:
+        return {
+            "country": "Unknown", "country_code": "", "isp": "Unknown",
+            "type": "Unknown", "asn": "Unknown", "security": {},
+            "lat": 0.0, "lon": 0.0,
+        }
+
+    try:
+        cached = ip_cache.get(ip)
+        if cached is not None:
+            return cached
+    except Exception:
+        pass
+
+    try:
+        r = httpx.get(
+            f"http://ip-api.com/json/{ip}?fields=status,country,countryCode,isp,as,proxy,hosting,lat,lon",
+            timeout=timeout,
+        )
+        if r.status_code == 200:
+            d = r.json()
+            if d.get("status") == "success":
+                is_proxy = bool(d.get("proxy"))
+                is_hosting = bool(d.get("hosting"))
+                out = {
+                    "country": d.get("country", "Unknown"),
+                    "country_code": str(d.get("countryCode") or "").upper()[:2],
+                    "isp": d.get("isp", "Unknown"),
+                    "type": "hosting" if is_hosting else "residential",
+                    "asn": safe_asn(d.get("as")),
+                    "security": {
+                        "vpn": is_proxy or is_hosting,
+                        "proxy": is_proxy,
+                        "hosting": is_hosting,
+                    },
+                    "lat": safe_float(d.get("lat"), 0.0),
+                    "lon": safe_float(d.get("lon"), 0.0),
+                }
+                try:
+                    ip_cache.set(ip, out)
+                except Exception:
+                    pass
+                return out
+    except Exception as e:
+        print(f"[ip_sync] fetch failed for {ip}: {e}")
+
+    return {
+        "country": "Unknown", "country_code": "", "isp": "Unknown",
+        "type": "Unknown", "asn": "Unknown", "security": {},
+        "lat": 0.0, "lon": 0.0,
     }
 
 
@@ -160,7 +259,6 @@ def _check_flood(ip: str, db: Session):
 
 
 def _campaign_mode(campaign: CampaignModel) -> str:
-    """Derive campaign mode from `bot_block_threshold`."""
     try:
         threshold = int(campaign.bot_block_threshold or 100)
     except (ValueError, TypeError):
@@ -169,7 +267,7 @@ def _campaign_mode(campaign: CampaignModel) -> str:
 
 
 # =========================================================
-# HANDSHAKE
+# HANDSHAKE — persists ip_info in session.meta
 # =========================================================
 @router.post("/collect/handshake")
 async def collect_handshake(
@@ -184,7 +282,6 @@ async def collect_handshake(
     handshake_limiter.check(client_ip)
     session_id = _validate_session_id(payload.session_id)
 
-    # ---- Duplicate? ----
     existing = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
     if existing:
         return {
@@ -195,14 +292,12 @@ async def collect_handshake(
             "hide": False,
         }
 
-    # ---- Resolve campaign ----
     campaign = _resolve_campaign(payload.campaign_key, db)
     if not campaign:
         raise HTTPException(400, "invalid_campaign_key")
 
     _check_flood(client_ip, db)
 
-    # ---- Fast precheck (critical-only, <100ms) ----
     try:
         threshold = int(campaign.bot_block_threshold or 100)
     except (ValueError, TypeError):
@@ -213,7 +308,6 @@ async def collect_handshake(
         threshold=threshold,
     )
 
-    # ---- IP info ----
     try:
         ip_info = await get_ip_info(client_ip)
     except Exception:
@@ -223,12 +317,9 @@ async def collect_handshake(
 
     ua = str((payload.nav or {}).get("ua") or "")
     cc = str(ip_info.get("country_code") or "").upper().strip()
-
-    # ---- Extract macros ----
     macros = _extract_macros(payload.tracking_params or {})
     click_id = payload.click_id or None
 
-    # ---- Decide session verdict ----
     blocked = precheck["action"] == "block"
     verdict = "invalid" if blocked else "pending"
     score = precheck["score"] if blocked else 0
@@ -258,6 +349,12 @@ async def collect_handshake(
             "macros_known": macros.get("known"),
             "click_id": click_id,
             "campaign_mode": _campaign_mode(campaign),
+            "ip_info": ip_info,
+            "nav_ua": ua[:500],
+            "fp_brief": {
+                "canvas_hash": str((payload.fp or {}).get("canvas_hash") or "")[:50],
+                "timezone": str((payload.fp or {}).get("timezone") or "")[:50],
+            },
         },
     )
     db.add(session)
@@ -329,7 +426,7 @@ async def collect_heartbeat(
 
 
 # =========================================================
-# FINAL (background)
+# FINAL PROCESSOR
 # =========================================================
 def _process_final_background(
     session_id: str,
@@ -338,7 +435,6 @@ def _process_final_background(
     headers_dict: dict,
     http_version: str,
 ):
-    """Runs the full analysis in a background task, saves the visit."""
     db = SessionLocal()
     try:
         session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
@@ -353,28 +449,35 @@ def _process_final_background(
         except Exception:
             os_name, device, browser = "Unknown", "Unknown", "Unknown"
 
-        # ---------- Zone ----------
-        zone_id = extract_zone_id(payload.url or "")
-        if not zone_id or zone_id == "unknown":
-            c = db.query(CampaignModel).get(session.campaign_id)
-            if c and c.destination_zone_id:
-                zone_id = str(c.destination_zone_id).strip()[:100]
-        if not zone_id:
-            zone_id = "unknown"
+        campaign = db.query(CampaignModel).get(session.campaign_id)
 
-        # ---------- IP info ----------
+        # ---- Zone extraction ----
+        zone_id, zone_source = _extract_zone_from_payload(
+            payload.url or "",
+            payload.tracking_params or {},
+            campaign,
+        )
+        print(f"[ZONE] url={payload.url!r} zone={zone_id!r} source={zone_source}")
+
+        # ---- IP info: session.meta first, sync fallback ----
+        ip_info = None
         try:
-            ip_info = __import__("asyncio").run(get_ip_info(client_ip))
+            if session.meta and isinstance(session.meta, dict):
+                ip_info = session.meta.get("ip_info")
         except Exception:
-            ip_info = {
-                "country": "Unknown",
-                "country_code": session.country_code,
-                "isp": "Unknown",
-                "asn": "",
-                "security": {},
-            }
+            ip_info = None
 
-        # ---------- Cross-visit signals ----------
+        if not ip_info or not isinstance(ip_info, dict) or not ip_info.get("country_code"):
+            ip_info = _fetch_ip_info_sync(client_ip)
+
+        if not isinstance(ip_info, dict):
+            ip_info = {}
+        if "security" not in ip_info or not isinstance(ip_info.get("security"), dict):
+            ip_info["security"] = {}
+        if "country_code" not in ip_info:
+            ip_info["country_code"] = session.country_code or ""
+
+        # ---- Cross-visit signals ----
         recent_fp_count = 0
         same_ip_last_minute = 0
         same_canvas_ip_count = 0
@@ -394,43 +497,33 @@ def _process_final_background(
                     VisitModel.canvas_hash == canvas_key,
                     VisitModel.timestamp > cutoff_1m,
                 ).count()
-                same_canvas_ip_count = int(
-                    db.query(func.count(distinct(VisitModel.ip))).filter(
-                        VisitModel.canvas_hash == canvas_key,
-                        VisitModel.timestamp > cutoff_1h,
-                    ).scalar() or 0
-                )
-                same_ip_canvas_count = int(
-                    db.query(func.count(distinct(VisitModel.canvas_hash))).filter(
-                        VisitModel.ip == client_ip,
-                        VisitModel.timestamp > cutoff_1h,
-                    ).scalar() or 0
-                )
+                same_canvas_ip_count = int(db.query(func.count(distinct(VisitModel.ip))).filter(
+                    VisitModel.canvas_hash == canvas_key,
+                    VisitModel.timestamp > cutoff_1h,
+                ).scalar() or 0)
+                same_ip_canvas_count = int(db.query(func.count(distinct(VisitModel.canvas_hash))).filter(
+                    VisitModel.ip == client_ip,
+                    VisitModel.timestamp > cutoff_1h,
+                ).scalar() or 0)
         except Exception:
             pass
 
-        # ---------- Heartbeats ----------
-        heartbeats = (
-            db.query(VisitHeartbeatModel)
-            .filter(VisitHeartbeatModel.session_id == session_id)
-            .order_by(VisitHeartbeatModel.seq.asc())
-            .all()
-        )
+        # ---- Heartbeats ----
+        heartbeats = db.query(VisitHeartbeatModel).filter(
+            VisitHeartbeatModel.session_id == session_id,
+        ).order_by(VisitHeartbeatModel.seq.asc()).all()
+
         heartbeats_list = [
             {
-                "seq": hb.seq,
-                "t_ms": hb.t_ms,
-                "clicks": hb.clicks,
-                "scrolls": hb.scrolls,
-                "mousemoves": hb.mousemoves,
-                "keydowns": hb.keydowns,
+                "seq": hb.seq, "t_ms": hb.t_ms,
+                "clicks": hb.clicks, "scrolls": hb.scrolls,
+                "mousemoves": hb.mousemoves, "keydowns": hb.keydowns,
             }
             for hb in heartbeats
         ]
 
         time_ms = max(int(payload.t_ms or 0), session.total_time_ms or 0)
 
-        # ---------- Build analysis payload ----------
         data = {
             "nav": payload.nav or {},
             "fingerprint": payload.fingerprint or {},
@@ -456,47 +549,30 @@ def _process_final_background(
             "_click_id": payload.click_id or None,
         }
 
-        # ---------- Get campaign mode ----------
-        campaign = db.query(CampaignModel).get(session.campaign_id)
-        if campaign:
-            campaign_mode = _campaign_mode(campaign)
-        else:
-            campaign_mode = "balanced"
+        campaign_mode = _campaign_mode(campaign) if campaign else "balanced"
 
-        # ---------- Run the new engine ----------
         try:
             result = evaluate_visit(data, ip_info, campaign_mode=campaign_mode)
         except Exception as e:
             print(f"[BG] engine failure: {e}")
             result = {
-                "score": 50,
-                "verdict": "suspicious",
-                "confidence": 0.30,
-                "bot_probability": 0.50,
-                "evidence": [],
-                "filter_reason": "ENGINE_ERROR",
-                "data_quality": "partial",
-                "reason": "engine_error",
-                "reason_detail": str(e)[:200],
-                "mode": campaign_mode,
-                "decision": {},
-                "fusion": {},
-                "signals": [],
-                "data_quality_report": {},
-                "contradiction_impossible": False,
-                "fingerprint_strikes": 0,
+                "score": 50, "verdict": "suspicious", "confidence": 0.30,
+                "bot_probability": 0.50, "evidence": [],
+                "filter_reason": "ENGINE_ERROR", "data_quality": "partial",
+                "reason": "engine_error", "reason_detail": str(e)[:200],
+                "mode": campaign_mode, "decision": {}, "fusion": {},
+                "signals": [], "data_quality_report": {},
+                "contradiction_impossible": False, "fingerprint_strikes": 0,
             }
 
-        # ---------- Extract macros ----------
         macros = _extract_macros(payload.tracking_params or {})
         fp = payload.fingerprint or {}
         events = (payload.behavior or {}).get("events") or {}
         cc = str(ip_info.get("country_code") or "").upper().strip()
         visit_click_id = (payload.click_id or "").strip() or None
 
-        # ---------- Build full_payload for storage ----------
         full_payload = {
-            "engine_version": "v4.0",
+            "engine_version": "v4.2",
             "verdict": result.get("verdict"),
             "score": result.get("score"),
             "confidence": result.get("confidence"),
@@ -512,16 +588,19 @@ def _process_final_background(
             "signals": result.get("signals"),
         }
 
-        # ---------- Existing visit? ----------
-        existing_visit = (
-            db.query(VisitModel).filter(VisitModel.session_id == session_id).first()
-        )
+        existing_visit = db.query(VisitModel).filter(VisitModel.session_id == session_id).first()
 
         if existing_visit:
             existing_visit.score = result.get("score", existing_visit.score)
             existing_visit.verdict = result.get("verdict", existing_visit.verdict)
             existing_visit.evidence = result.get("evidence", existing_visit.evidence)
             existing_visit.filter_reason = result.get("filter_reason")
+            existing_visit.confidence = result.get("confidence")
+            existing_visit.bot_probability = result.get("bot_probability")
+            existing_visit.mode = result.get("mode")
+            existing_visit.reason = result.get("reason")
+            existing_visit.data_quality_report = result.get("data_quality_report")
+            existing_visit.full_payload = full_payload
             existing_visit.time_on_page = time_ms
             existing_visit.clicks = int(events.get("clicks", 0) or 0)
             existing_visit.scrolls = int(events.get("scrolls", 0) or 0)
@@ -532,7 +611,6 @@ def _process_final_background(
             existing_visit.clock_drift_ms = payload.clock_drift_ms or 0
             existing_visit.is_honeypot_triggered = bool(payload.honeypot_triggered)
             existing_visit.data_quality = result.get("data_quality", "partial")
-            existing_visit.full_payload = full_payload
             if macros.get("raw"):
                 merged = dict(existing_visit.popads_data or {})
                 merged.update(macros["raw"])
@@ -552,6 +630,8 @@ def _process_final_background(
             session.visit_id = existing_visit.id
             session.verdict = existing_visit.verdict
             session.score = existing_visit.score
+            session.confidence = existing_visit.confidence
+            session.bot_probability = existing_visit.bot_probability
             session.data_quality = result.get("data_quality", "partial")
             session.ended_at = datetime.utcnow()
             db.commit()
@@ -560,7 +640,7 @@ def _process_final_background(
                 stats_cache.invalidate(f"stats:campaign:{session.campaign_id}")
             return
 
-        # ---------- New visit ----------
+        # ---- New visit ----
         visit = VisitModel(
             campaign_id=session.campaign_id,
             session_id=session_id,
@@ -570,6 +650,12 @@ def _process_final_background(
             zone_id=zone_id,
             click_id=visit_click_id,
             filter_reason=result.get("filter_reason"),
+            confidence=result.get("confidence"),
+            bot_probability=result.get("bot_probability"),
+            mode=result.get("mode"),
+            reason=result.get("reason"),
+            data_quality_report=result.get("data_quality_report"),
+            full_payload=full_payload,
             bid=macros.get("bid", 0.0),
             popads_impression_id=macros.get("impression_id"),
             popads_website_id=macros.get("website_id"),
@@ -585,6 +671,8 @@ def _process_final_background(
             country=macros.get("country") or ip_info.get("country", "Unknown"),
             country_code=cc[:2] if cc in ("LO", "XX", "") else cc,
             isp=macros.get("known", {}).get("isp_name") or ip_info.get("isp", "Unknown"),
+            asn=ip_info.get("asn", "Unknown"),
+            is_vpn=bool(ip_info.get("security", {}).get("vpn")),
             timezone=str(fp.get("timezone", "Unknown"))[:50],
             canvas_hash=(str(fp.get("canvas_hash", ""))[:15] + "...") if fp.get("canvas_hash") else "Unknown",
             data_quality=result.get("data_quality", "partial"),
@@ -599,7 +687,6 @@ def _process_final_background(
             clock_drift_ms=payload.clock_drift_ms or 0,
             is_honeypot_triggered=bool(payload.honeypot_triggered),
             consent_state=payload.consent_state or "unknown",
-            full_payload=full_payload,
         )
 
         try:
@@ -610,6 +697,8 @@ def _process_final_background(
             session.visit_id = visit.id
             session.verdict = visit.verdict
             session.score = visit.score
+            session.confidence = visit.confidence
+            session.bot_probability = visit.bot_probability
             session.data_quality = result.get("data_quality", "partial")
             session.ended_at = datetime.utcnow()
             db.commit()
@@ -661,10 +750,209 @@ async def collect_final(
 
     background_tasks.add_task(
         _process_final_background,
-        session_id,
-        payload_dict,
-        client_ip,
-        headers_dict,
-        http_version,
+        session_id, payload_dict, client_ip, headers_dict, http_version,
     )
     return {"ok": True, "status": "processing", "duplicate": False}
+
+
+# =========================================================
+# STALE SESSION FINALIZER
+# =========================================================
+def _finalize_stale_session(session_id: str) -> bool:
+    """
+    Finalize a session that never sent its final beacon.
+
+    Strategy:
+        - Heartbeats present → feed them as synthetic final payload
+        - No heartbeats + session age >= 120s → treat as DEAD (bot didn't
+          even try to send a final beacon — verdict=invalid directly)
+    """
+    db_check = SessionLocal()
+    try:
+        session = db_check.query(SessionModel).filter(
+            SessionModel.session_id == session_id,
+        ).first()
+        if not session or session.visit_id:
+            return False
+
+        client_ip = session.ip or ""
+        url = session.url or ""
+        user_agent = session.user_agent or ""
+        consent = session.consent_state or "unknown"
+
+        started_at = session.started_at or datetime.utcnow()
+        age_sec = (datetime.utcnow() - started_at).total_seconds()
+
+        heartbeats = db_check.query(VisitHeartbeatModel).filter(
+            VisitHeartbeatModel.session_id == session_id,
+        ).order_by(VisitHeartbeatModel.seq.asc()).all()
+
+        hb_data = [
+            {
+                "clicks": hb.clicks or 0,
+                "scrolls": hb.scrolls or 0,
+                "mousemoves": hb.mousemoves or 0,
+                "keydowns": hb.keydowns or 0,
+                "t_ms": hb.t_ms or 0,
+                "is_visible": bool(hb.is_visible),
+                "is_focused": bool(hb.is_focused),
+            }
+            for hb in heartbeats
+        ]
+
+        meta_ua = ""
+        meta_macros = {}
+        try:
+            if session.meta and isinstance(session.meta, dict):
+                meta_ua = session.meta.get("nav_ua") or ""
+                meta_macros = session.meta.get("macros") or {}
+        except Exception:
+            pass
+    finally:
+        db_check.close()
+
+    # DEAD session — no heartbeats + aged 120s+ → invalid directly
+    if not hb_data and age_sec >= 120:
+        try:
+            db = SessionLocal()
+            try:
+                s = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
+                if s and not s.visit_id:
+                    campaign = db.query(CampaignModel).get(s.campaign_id)
+                    zone_id, zone_source = _extract_zone_from_payload(url, meta_macros, campaign)
+
+                    ip_info = None
+                    try:
+                        if s.meta and isinstance(s.meta, dict):
+                            ip_info = s.meta.get("ip_info")
+                    except Exception:
+                        pass
+                    if not ip_info:
+                        ip_info = _fetch_ip_info_sync(client_ip)
+
+                    cc = str(ip_info.get("country_code") or "").upper().strip()
+
+                    visit = VisitModel(
+                        campaign_id=s.campaign_id,
+                        session_id=session_id,
+                        timestamp=datetime.utcnow(),
+                        ip=client_ip,
+                        user_agent=user_agent,
+                        zone_id=zone_id,
+                        confidence=0.85,
+                        bot_probability=0.85,
+                        mode="balanced",
+                        reason="stale_no_heartbeats",
+                        data_quality="partial",
+                        full_payload={
+                            "engine_version": "v4.2-stale",
+                            "verdict": "invalid",
+                            "reason": "stale_no_heartbeats",
+                            "reason_detail": f"No heartbeats and no final after {age_sec:.0f}s",
+                        },
+                        score=85,
+                        verdict="invalid",
+                        evidence=[{
+                            "code": "STALE_NO_HEARTBEATS",
+                            "severity": "critical",
+                            "score": 85,
+                            "detail": f"No heartbeat/final after {age_sec:.0f}s",
+                        }],
+                        country=ip_info.get("country", "Unknown"),
+                        country_code=cc[:2] if cc in ("LO", "XX", "") else cc,
+                        data_quality="partial",
+                        time_on_page=int(age_sec * 1000),
+                        counting_type="landing",
+                        filter_reason="STALE_NO_HEARTBEATS",
+                    )
+                    db.add(visit)
+                    db.commit()
+                    db.refresh(visit)
+
+                    s.visit_id = visit.id
+                    s.verdict = visit.verdict
+                    s.score = visit.score
+                    s.confidence = visit.confidence
+                    s.bot_probability = visit.bot_probability
+                    s.data_quality = "partial"
+                    s.ended_at = datetime.utcnow()
+                    db.commit()
+                    if s.user_id:
+                        stats_cache.invalidate(f"stats:user:{s.user_id}:all")
+                        stats_cache.invalidate(f"stats:campaign:{s.campaign_id}")
+                    print(f"[STALE] dead session {session_id} → invalid (no heartbeats)")
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[STALE] dead finalization failed for {session_id}: {e}")
+        return True
+
+    total_clicks = sum(h["clicks"] for h in hb_data)
+    total_scrolls = sum(h["scrolls"] for h in hb_data)
+    total_mousemoves = sum(h["mousemoves"] for h in hb_data)
+    total_keydowns = sum(h["keydowns"] for h in hb_data)
+    max_t_ms = max((h["t_ms"] for h in hb_data), default=0)
+
+    payload_dict = {
+        "v": 3,
+        "session_id": session_id,
+        "click_id": "",
+        "campaign_key": "",
+        "seq": 999,
+        "t_ms": max_t_ms,
+        "url": url,
+        "webrtc_ip": "None",
+        "nav": {"ua": user_agent or meta_ua},
+        "fingerprint": {},
+        "behavior": {
+            "events": {
+                "clicks": total_clicks,
+                "scrolls": total_scrolls,
+                "mousemove": total_mousemoves,
+                "keydown": total_keydowns,
+            },
+            "total_time_ms": max_t_ms,
+            "time_on_page_ms": max_t_ms,
+            "mouse_points": [],
+            "key_intervals": [],
+        },
+        "screen": {},
+        "milestones": {},
+        "first_30s": {},
+        "ad_events": [],
+        "honeypot_triggered": False,
+        "clock_drift_ms": 0,
+        "consent_state": consent,
+        "data_quality": "partial",
+        "tracking_params": meta_macros if isinstance(meta_macros, dict) else {},
+    }
+
+    _process_final_background(session_id, payload_dict, client_ip, {}, "1.1")
+    return True
+
+
+async def stale_session_finalizer_loop():
+    """Every 60s: finalize any PENDING session older than 120s."""
+    while True:
+        try:
+            await asyncio.sleep(60)
+            db = SessionLocal()
+            try:
+                cutoff = datetime.utcnow() - timedelta(seconds=120)
+                stale = db.query(SessionModel).filter(
+                    SessionModel.visit_id.is_(None),
+                    SessionModel.started_at < cutoff,
+                ).order_by(SessionModel.started_at.asc()).limit(50).all()
+                session_ids = [s.session_id for s in stale]
+            finally:
+                db.close()
+
+            if session_ids:
+                print(f"[STALE] finalizing {len(session_ids)} stuck sessions")
+                for sid in session_ids:
+                    try:
+                        _finalize_stale_session(sid)
+                    except Exception as e:
+                        print(f"[STALE] failed for {sid}: {e}")
+        except Exception as e:
+            print(f"[STALE] loop error: {e}")
