@@ -1,22 +1,17 @@
 """
-collector/decision.py — Decision Policy Layer (v4.0)
+collector/decision.py — Decision Policy Layer (v4.1)
 
 Turns a fusion result into a final verdict, respecting:
-    • Data quality report (max confidence cap, can_decide flag)
-    • Campaign mode (strict / balanced / permissive)
-    • Impossible contradictions (override data quality gate)
+    - Data quality report (max confidence cap, can_decide flag)
+    - Campaign mode (strict / balanced / permissive)
+    - Impossible contradictions (override data quality gate)
 
 Three modes:
-
     strict      — invalid threshold 0.55, suspicious threshold 0.30
-                  Use for high-value traffic (Adsterra strict publishers).
     balanced    — invalid threshold 0.65, suspicious threshold 0.40
-                  Default. Good balance of FP vs FN.
     permissive  — invalid threshold 0.75, suspicious threshold 0.50
-                  Use when you cannot afford false positives
-                  (small campaigns, cold start).
 
-This module is PURE. No DB, no network, no side effects.
+Pure module — no DB, no network, no side effects.
 """
 from __future__ import annotations
 
@@ -26,19 +21,13 @@ from collector.data_quality import (
     DataQualityReport,
     LEVEL_FAILED,
     LEVEL_LEGACY,
-    LEVEL_POOR,
-    LEVEL_PARTIAL,
 )
 
 
-# =========================================================
-# CAMPAIGN MODES
-# =========================================================
 VALID_MODES = ("strict", "balanced", "permissive")
 DEFAULT_MODE = "balanced"
 
 
-# Bot probability boundaries per mode.
 MODE_THRESHOLDS = {
     "strict": {
         "invalid":    0.55,
@@ -55,9 +44,6 @@ MODE_THRESHOLDS = {
 }
 
 
-# =========================================================
-# HELPERS
-# =========================================================
 def _normalize_mode(mode: Optional[str]) -> str:
     if not mode:
         return DEFAULT_MODE
@@ -73,8 +59,13 @@ def _compute_local_confidence(
     """
     Confidence = distance from decision boundary, scaled by data reliability.
 
-    A distance of 0.30+ from the boundary → 100% local confidence.
-    Then blended with data reliability and capped.
+    Linear ramp:
+        - distance 0.00 → 50% local confidence
+        - distance 0.25+ → 100% local confidence
+    Then blended with data reliability and clamped to [0,1].
+
+    FIX (v4.1): previous version returned 0.33 for bp=0.75/th=0.65,
+    which was absurdly low. New linear ramp is more reasonable.
     """
     try:
         bp = float(bot_probability)
@@ -83,7 +74,11 @@ def _compute_local_confidence(
         return 0.0
 
     distance = abs(bp - th)
-    local_conf = min(1.0, distance / 0.30)
+
+    if distance >= 0.25:
+        local_conf = 1.0
+    else:
+        local_conf = 0.5 + (distance / 0.25) * 0.5
 
     reliability = float(getattr(data_quality, "reliability", 0.7) or 0.7)
     conf = local_conf * (0.5 + 0.5 * reliability)
@@ -91,9 +86,6 @@ def _compute_local_confidence(
     return max(0.0, min(1.0, conf))
 
 
-# =========================================================
-# CORE DECISION
-# =========================================================
 def decide(
     fusion_result: dict,
     data_quality: DataQualityReport,
@@ -104,35 +96,13 @@ def decide(
     """
     Produce a final decision from the fusion result.
 
-    Parameters
-    ----------
-    fusion_result : dict
-        Output of `fuse_signals`.
-    data_quality : DataQualityReport
-        Output of `evaluate_data_quality`.
-    campaign_mode : str
-        "strict" | "balanced" | "permissive".
-    has_impossible : bool | None
-        If None, inferred from fusion_result["has_impossible"].
-
     Returns
     -------
     dict with keys:
-        verdict              "valid" | "suspicious" | "invalid" | "unknown"
-        score                int 0..100 (compat with legacy `score`)
-        confidence           float 0..1 — already capped
-        raw_confidence       float 0..1 — before cap
-        bot_probability      float 0..1
-        reason               str — machine code
-        reason_detail        str — human-readable
-        mode                 str — mode actually used
-        thresholds           dict
-        capped               bool — True if cap reduced confidence
-        max_confidence_cap   float
-        has_impossible       bool
-        data_quality_level   str
+        verdict, score, confidence, raw_confidence, bot_probability,
+        reason, reason_detail, mode, thresholds, capped,
+        max_confidence_cap, has_impossible, data_quality_level
     """
-    # ---------- Setup ----------
     mode = _normalize_mode(campaign_mode)
     thresholds = MODE_THRESHOLDS[mode]
     invalid_th = thresholds["invalid"]
@@ -153,10 +123,8 @@ def decide(
     dq_can_decide = bool(getattr(data_quality, "can_decide", False))
     dq_cap = float(getattr(data_quality, "max_confidence_cap", 0.30) or 0.30)
 
-    # ---------- Score (0..100) ----------
     score = max(0, min(100, int(round(bp * 100))))
 
-    # ---------- Decision flow ----------
     raw_confidence = 0.0
     verdict = "unknown"
     reason = "unknown"
@@ -175,7 +143,6 @@ def decide(
         sb_sev = sb.get("severity") if isinstance(sb, dict) else None
 
         if sb_sev in ("critical", "impossible"):
-            # Critical evidence bypasses the low-quality gate
             verdict = "invalid"
             reason = "critical_evidence_despite_low_quality"
             reason_detail = "Critical bot signal found even with limited data."
@@ -197,7 +164,7 @@ def decide(
             verdict = "invalid"
             reason = "high_bot_probability"
             reason_detail = (
-                f"bot_probability={bp:.2f} ≥ {mode} invalid threshold {invalid_th:.2f}"
+                f"bot_probability={bp:.2f} >= {mode} invalid threshold {invalid_th:.2f}"
             )
             raw_confidence = _compute_local_confidence(bp, invalid_th, data_quality)
 
@@ -224,7 +191,7 @@ def decide(
                 reason_detail = f"No meaningful bot signals (bot_probability={bp:.2f})"
             raw_confidence = _compute_local_confidence(bp, suspicious_th, data_quality)
 
-    # ---------- Cap confidence ----------
+    # Cap confidence
     capped = False
     confidence = raw_confidence
     if confidence > dq_cap:
@@ -234,7 +201,6 @@ def decide(
     confidence = max(0.0, min(1.0, confidence))
     raw_confidence = max(0.0, min(1.0, raw_confidence))
 
-    # ---------- Return ----------
     return {
         "verdict": verdict,
         "score": score,
@@ -255,16 +221,11 @@ def decide(
     }
 
 
-# =========================================================
-# CONVENIENCE HELPERS
-# =========================================================
 def is_blocked(decision: dict) -> bool:
-    """True if this visit should be blocked from reaching the destination."""
     return decision.get("verdict") == "invalid"
 
 
 def verdict_label(verdict: str) -> str:
-    """Human-readable verdict label."""
     return {
         "valid": "Valid",
         "suspicious": "Suspicious",
@@ -274,14 +235,6 @@ def verdict_label(verdict: str) -> str:
 
 
 def mode_from_block_threshold(threshold: int) -> str:
-    """
-    Map a numeric block threshold (legacy campaign setting) to a mode.
-
-    Legacy thresholds:
-        >= 90 → permissive  (block only near-certain bots)
-        60-89 → balanced    (default)
-        < 60  → strict      (block aggressively)
-    """
     try:
         t = int(threshold)
     except (ValueError, TypeError):
