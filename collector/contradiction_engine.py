@@ -1,5 +1,5 @@
 """
-contradiction_engine.py — Impossibility & Contradiction Detection (v4.0)
+contradiction_engine.py — Impossibility & Contradiction Detection (v8.0)
 
 Philosophy:
   NOT "does it look like a bot" — but "is this PHYSICALLY IMPOSSIBLE for a
@@ -12,10 +12,14 @@ Severity tiers:
   - medium:     unusual pattern worth noting
   - low:        slightly odd
 
-v4.0 additions (vs v3.4):
-  - Every finding now carries `direction` and `base_strength` so the
-    new fusion layer can weight it probabilistically.
-  - Everything else (rules) unchanged.
+v8.0 additions (vs v4.0):
+  - Patchright / Puppeteer / Playwright specific signatures
+  - Chromium runtime-enable leak detection (from error stack analysis)
+  - iframe realm sharing (from puppeteer-extra-plugin-stealth)
+  - CDP binding globals detection
+  - ActiveText OS spoofing detection
+  - Document interception (Fetch.fulfillRequest) detection
+  - Every finding carries direction + base_strength (v4.0 kept)
 """
 import re
 
@@ -23,7 +27,7 @@ from collector.signals import SIGNAL_REGISTRY
 
 
 # =========================================================
-# HELPERS FOR SIGNAL ENRICHMENT
+# HELPERS
 # =========================================================
 def _base_for(code: str, severity: str) -> float:
     """Look up base_strength from registry; fall back to severity-based default."""
@@ -57,7 +61,6 @@ class ContradictionEngine:
             "detail": detail[:200],
             "category": category,
             "source": "contradiction",
-            # === v4.0 unified shape ===
             "direction": "bot",
             "base_strength": base,
         })
@@ -82,9 +85,6 @@ class ContradictionEngine:
         return any(f["severity"] == "impossible" for f in self.findings)
 
 
-# =========================================================
-# RULE HELPERS
-# =========================================================
 def _safe_dict(v):
     return v if isinstance(v, dict) else {}
 
@@ -123,7 +123,7 @@ def _get(ctx, path, default=None):
 
 
 # =========================================================
-# IMPOSSIBILITY RULES (100% — cannot be spoofed without breaking)
+# IMPOSSIBILITY RULES
 # =========================================================
 
 def rule_windows_linux_platform(ctx):
@@ -332,7 +332,199 @@ def rule_viewport_2x_screen(ctx):
 
 
 # =========================================================
-# CRITICAL RULES (99%+)
+# NEW: PATCHRIGHT / PUPPETEER / PLAYWRIGHT SPECIFIC
+# =========================================================
+
+def rule_pw_init_scripts(ctx):
+    """Playwright's __pwInitScripts object — impossible in a real browser."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    if rb.get("pwInitScripts"):
+        return {"severity": "impossible", "score": 100,
+                "detail": "Playwright's window.__pwInitScripts detected",
+                "category": "automation"}
+    return None
+
+
+def rule_pw_binding(ctx):
+    """Playwright's __playwright__binding__ object — impossible."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    if rb.get("pwBinding"):
+        return {"severity": "impossible", "score": 100,
+                "detail": "Playwright's window.__playwright__binding__ detected",
+                "category": "automation"}
+    return None
+
+
+def rule_document_interception(ctx):
+    """Patchright's signature: document served without network protocol."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    if rb.get("documentInterception"):
+        return {"severity": "critical", "score": 95,
+                "detail": "Document served via DevTools (Fetch.fulfillRequest) — Patchright signature",
+                "category": "automation"}
+    return None
+
+
+def rule_iframe_realm_shared(ctx):
+    """puppeteer-extra-plugin-stealth's iframe.contentWindow evasion."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    if rb.get("iframeRealmShared"):
+        return {"severity": "impossible", "score": 100,
+                "detail": "srcdoc iframe shares realm with parent (stealth plugin)",
+                "category": "automation"}
+    return None
+
+
+def rule_automation_frame_in_stack(ctx):
+    """A native function's stack contains pptr:/UtilityScript./newHandler."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    frames = rb.get("automationFrames")
+    if isinstance(frames, list) and frames:
+        sample = ", ".join(str(x)[:30] for x in frames[:3])
+        return {"severity": "impossible", "score": 100,
+                "detail": f"Automation stack frames: {sample}",
+                "category": "automation"}
+    return None
+
+
+def rule_native_tampered(ctx):
+    """Native functions are wrapped in a Proxy (stealth plugins)."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    tampered = rb.get("nativeTampered")
+    if isinstance(tampered, list) and tampered:
+        sample = ", ".join(str(t.get("name", ""))[:25] for t in tampered[:3] if isinstance(t, dict))
+        return {"severity": "high", "score": 80,
+                "detail": f"Native functions tampered: {sample}",
+                "category": "automation"}
+    return None
+
+
+def rule_expose_function_leak(ctx):
+    """page.exposeFunction leak (puppeteer_* or __playwright__binding__)."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    if rb.get("exposeFunctionLeak"):
+        kind = rb.get("exposeKind", "unknown")
+        return {"severity": "critical", "score": 90,
+                "detail": f"page.exposeFunction leak ({kind})",
+                "category": "automation"}
+    return None
+
+
+def rule_cdp_binding_globals(ctx):
+    """CDP Runtime.addBinding leaves unnamed native functions."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    globals_list = rb.get("cdpBindingGlobals")
+    if isinstance(globals_list, list) and len(globals_list) >= 2:
+        return {"severity": "medium", "score": 55,
+                "detail": f"Unnamed native globals: {globals_list[:3]}",
+                "category": "automation"}
+    return None
+
+
+def rule_headless_no_chrome(ctx):
+    """Desktop Chrome without window.chrome = chrome-headless-shell."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    if rb.get("headlessNoChrome"):
+        return {"severity": "critical", "score": 90,
+                "detail": "Desktop Chrome UA but window.chrome missing",
+                "category": "headless"}
+    return None
+
+
+def rule_active_text_os_spoof(ctx):
+    """Chrome claims Windows but ActiveText is pure red (Linux/macOS palette)."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    if rb.get("activeTextMismatch") == 0.5:
+        return {"severity": "medium", "score": 50,
+                "detail": "Claims Windows but ActiveText renders Linux/macOS colour",
+                "category": "os"}
+    return None
+
+
+def rule_platform_mismatch(ctx):
+    """UA OS vs navigator.platform OS mismatch."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    pm = rb.get("platformMismatch")
+    if isinstance(pm, dict):
+        return {"severity": "critical", "score": 90,
+                "detail": f"UA says {pm.get('ua')}, platform says {pm.get('platform')}",
+                "category": "os"}
+    return None
+
+
+def rule_nav_own_props(ctx):
+    """Navigator has own properties — stealth plugins do this."""
+    rb = _safe_dict(ctx.get("fp.rebrowser"))
+    props = rb.get("navOwnProps")
+    if isinstance(props, list) and props:
+        return {"severity": "high", "score": 75,
+                "detail": f"navigator has own props: {props[:3]}",
+                "category": "stealth"}
+    return None
+
+
+def rule_playwright_orientation(ctx):
+    """Playwright opens Chromium with landscape 90 on desktop."""
+    vib = _safe_dict(ctx.get("fp.vib"))
+    if vib.get("playwrightOrientation"):
+        return {"severity": "critical", "score": 85,
+                "detail": "Playwright default orientation (landscape 90)",
+                "category": "automation"}
+    return None
+
+
+def rule_tostring_spoofed(ctx):
+    """Function.prototype.toString was overridden."""
+    vib = _safe_dict(ctx.get("fp.vib"))
+    if vib.get("toStringSpoofed"):
+        return {"severity": "impossible", "score": 100,
+                "detail": "Function.prototype.toString is not native",
+                "category": "automation"}
+    return None
+
+
+def rule_fake_create_element(ctx):
+    """document.createElement was modified."""
+    vib = _safe_dict(ctx.get("fp.vib"))
+    if vib.get("fakeCreateElement"):
+        return {"severity": "impossible", "score": 100,
+                "detail": "document.createElement !== Document.prototype.createElement",
+                "category": "automation"}
+    return None
+
+
+def rule_stealth_canvas(ctx):
+    """HTMLCanvasElement.getContext was rewritten with a large payload."""
+    vib = _safe_dict(ctx.get("fp.vib"))
+    if vib.get("stealthCanvas"):
+        return {"severity": "impossible", "score": 95,
+                "detail": "getContext.toString() is not native (stealth plugin)",
+                "category": "stealth"}
+    return None
+
+
+def rule_wrong_chrome_order(ctx):
+    """window.chrome keys out of expected order — spoofing."""
+    vib = _safe_dict(ctx.get("fp.vib"))
+    if vib.get("wrongChromeOrder"):
+        return {"severity": "high", "score": 85,
+                "detail": "window.chrome.loadTimes is not the first key",
+                "category": "automation"}
+    return None
+
+
+def rule_iframe_chrome_runtime(ctx):
+    """chrome.runtime leaks into iframe context (proxy spoofing)."""
+    vib = _safe_dict(ctx.get("fp.vib"))
+    if vib.get("iframeChromeRuntime"):
+        return {"severity": "impossible", "score": 95,
+                "detail": "chrome.runtime inside iframe contentWindow",
+                "category": "automation"}
+    return None
+
+
+# =========================================================
+# CRITICAL RULES
 # =========================================================
 
 def rule_ua_chrome_missing_sec_ch_ua(ctx):
@@ -351,7 +543,6 @@ def rule_ua_chrome_missing_sec_ch_ua(ctx):
         return None
     if "iphone" in ua or "ipad" in ua:
         return None
-
     if not headers.get("sec-ch-ua"):
         return {"severity": "critical", "score": 90,
                 "detail": f"Chrome {version}+ UA missing sec-ch-ua header",
@@ -538,56 +729,6 @@ def rule_speech_zero_with_chrome_desktop(ctx):
     return None
 
 
-# =========================================================
-# HIGH RULES
-# =========================================================
-
-def rule_impossible_cpu_memory(ctx):
-    cores = _safe_int(_get(ctx, "fp.hardwareConcurrency"), 0)
-    memory = _safe_float(_get(ctx, "fp.deviceMemory"), 0)
-    if cores >= 16 and 0 < memory <= 2:
-        return {"severity": "high", "score": 70,
-                "detail": f"{cores} cores + {memory}GB RAM",
-                "category": "hardware"}
-    if cores >= 8 and 0 < memory <= 1:
-        return {"severity": "high", "score": 65,
-                "detail": f"{cores} cores + {memory}GB RAM",
-                "category": "hardware"}
-    return None
-
-
-def rule_absurd_hardware_4k(ctx):
-    sw = _safe_int(_get(ctx, "screen.width"), 0)
-    cores = _safe_int(_get(ctx, "fp.hardwareConcurrency"), 0)
-    if sw >= 2560 and 0 < cores <= 2:
-        return {"severity": "high", "score": 60,
-                "detail": f"screen.width={sw}px but {cores} cores",
-                "category": "hardware"}
-    return None
-
-
-def rule_mobile_high_memory(ctx):
-    ua = (_get(ctx, "ua") or "").lower()
-    memory = _safe_float(_get(ctx, "fp.deviceMemory"), 0)
-    is_mobile = ("mobile" in ua or "android" in ua or "iphone" in ua)
-    if is_mobile and memory > 8:
-        return {"severity": "high", "score": 65,
-                "detail": f"Mobile UA + deviceMemory={memory}GB",
-                "category": "hardware"}
-    return None
-
-
-def rule_mobile_pixel_ratio_1(ctx):
-    ua = (_get(ctx, "ua") or "").lower()
-    pr = _safe_float(_get(ctx, "screen.pixelRatio"), 1)
-    is_mobile = ("mobile" in ua or "android" in ua or "iphone" in ua)
-    if is_mobile and pr == 1:
-        return {"severity": "high", "score": 55,
-                "detail": "Mobile UA + pixelRatio=1 (desktop spoof)",
-                "category": "screen"}
-    return None
-
-
 def rule_chrome_http_1_0(ctx):
     ua = (_get(ctx, "ua") or "").lower()
     http_ver = str(ctx.get("http_version") or "").strip()
@@ -644,6 +785,56 @@ def rule_webgl_no_vendor(ctx):
             return {"severity": "high", "score": 55,
                     "detail": f"WebGL renderer='{renderer}' but vendor empty",
                     "category": "webgl"}
+    return None
+
+
+# =========================================================
+# HIGH RULES
+# =========================================================
+
+def rule_impossible_cpu_memory(ctx):
+    cores = _safe_int(_get(ctx, "fp.hardwareConcurrency"), 0)
+    memory = _safe_float(_get(ctx, "fp.deviceMemory"), 0)
+    if cores >= 16 and 0 < memory <= 2:
+        return {"severity": "high", "score": 70,
+                "detail": f"{cores} cores + {memory}GB RAM",
+                "category": "hardware"}
+    if cores >= 8 and 0 < memory <= 1:
+        return {"severity": "high", "score": 65,
+                "detail": f"{cores} cores + {memory}GB RAM",
+                "category": "hardware"}
+    return None
+
+
+def rule_absurd_hardware_4k(ctx):
+    sw = _safe_int(_get(ctx, "screen.width"), 0)
+    cores = _safe_int(_get(ctx, "fp.hardwareConcurrency"), 0)
+    if sw >= 2560 and 0 < cores <= 2:
+        return {"severity": "high", "score": 60,
+                "detail": f"screen.width={sw}px but {cores} cores",
+                "category": "hardware"}
+    return None
+
+
+def rule_mobile_high_memory(ctx):
+    ua = (_get(ctx, "ua") or "").lower()
+    memory = _safe_float(_get(ctx, "fp.deviceMemory"), 0)
+    is_mobile = ("mobile" in ua or "android" in ua or "iphone" in ua)
+    if is_mobile and memory > 8:
+        return {"severity": "high", "score": 65,
+                "detail": f"Mobile UA + deviceMemory={memory}GB",
+                "category": "hardware"}
+    return None
+
+
+def rule_mobile_pixel_ratio_1(ctx):
+    ua = (_get(ctx, "ua") or "").lower()
+    pr = _safe_float(_get(ctx, "screen.pixelRatio"), 1)
+    is_mobile = ("mobile" in ua or "android" in ua or "iphone" in ua)
+    if is_mobile and pr == 1:
+        return {"severity": "high", "score": 55,
+                "detail": "Mobile UA + pixelRatio=1 (desktop spoof)",
+                "category": "screen"}
     return None
 
 
@@ -705,7 +896,7 @@ def rule_multi_locale_conflict(ctx):
     if nav_p and first_p and intl_p:
         if nav_p != first_p and nav_p != intl_p and first_p != intl_p:
             return {"severity": "medium", "score": 40,
-                    "detail": f"3 different: nav='{nav_lang}', first='{first_lang}', intl='{intl}'",
+                    "detail": f"3 different locales: nav='{nav_lang}', first='{first_lang}', intl='{intl}'",
                     "category": "locale"}
     return None
 
@@ -800,6 +991,27 @@ RULES = [
     ("CLICK_NO_MOUSE_DESKTOP", rule_click_no_mouse_desktop),
     ("VIEWPORT_2X_SCREEN", rule_viewport_2x_screen),
     ("CHROME_LOW_WITH_UA_DATA", rule_chrome_low_version_with_ua_data),
+
+    # PATCHRIGHT / PUPPETEER / PLAYWRIGHT SPECIFIC
+    ("RB_PW_INIT_SCRIPTS", rule_pw_init_scripts),
+    ("RB_PW_BINDING", rule_pw_binding),
+    ("RB_DOCUMENT_INTERCEPTION", rule_document_interception),
+    ("RB_IFRAME_REALM_SHARED", rule_iframe_realm_shared),
+    ("RB_AUTOMATION_FRAME", rule_automation_frame_in_stack),
+    ("RB_NATIVE_TAMPERED", rule_native_tampered),
+    ("RB_EXPOSE_FUNCTION_LEAK", rule_expose_function_leak),
+    ("RB_CDP_BINDING_GLOBALS", rule_cdp_binding_globals),
+    ("RB_HEADLESS_NO_CHROME", rule_headless_no_chrome),
+    ("RB_ACTIVE_TEXT_MISMATCH", rule_active_text_os_spoof),
+    ("RB_PLATFORM_MISMATCH", rule_platform_mismatch),
+    ("RB_NAV_OWN_PROPS", rule_nav_own_props),
+    ("PLAYWRIGHTORIENTATION", rule_playwright_orientation),
+    ("TOSTRINGSPOOFED", rule_tostring_spoofed),
+    ("FAKECREATEELEMENT", rule_fake_create_element),
+    ("STEALTHCANVAS", rule_stealth_canvas),
+    ("WRONGCHROMEORDER", rule_wrong_chrome_order),
+    ("IFRAMECHROMERUNTIME", rule_iframe_chrome_runtime),
+
     # CRITICAL
     ("CHROME_MISSING_SEC_CH_UA", rule_ua_chrome_missing_sec_ch_ua),
     ("UA_BRANDS_MISMATCH", rule_ua_brands_mismatch),
@@ -811,6 +1023,7 @@ RULES = [
     ("SPEECH_ZERO_CHROME_DESKTOP", rule_speech_zero_with_chrome_desktop),
     ("WEBGL2_NO_WEBGL1", rule_webgl2_no_webgl1),
     ("IDLE_VISIBLE_LONG", rule_idle_visible_long),
+
     # HIGH
     ("ACCEPT_LANGUAGE_JS_MISMATCH", rule_accept_language_js_mismatch),
     ("SCROLL_NO_WHEEL_DESKTOP", rule_scroll_no_wheel_desktop),
@@ -822,6 +1035,7 @@ RULES = [
     ("WEBGL_NO_VENDOR", rule_webgl_no_vendor),
     ("HEARTBEAT_BEYOND_SESSION", rule_heartbeat_beyond_session),
     ("SESSION_END_BEFORE_START", rule_session_ending_before_starting),
+
     # MEDIUM
     ("UA_CHROME_OUTDATED", rule_ua_chrome_outdated),
     ("TOUCH_DESKTOP_HIGH", rule_touch_desktop_high),
