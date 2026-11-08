@@ -20,7 +20,8 @@
     .cd-badge { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
     .cd-badge.active { background: rgba(16,185,129,0.15); color: #10B981; }
     .cd-badge.paused { background: rgba(245,158,11,0.15); color: #F59E0B; }
-    
+    .cd-badge.archived { background: rgba(100,116,139,0.15); color: #94A3B8; }
+
     .cd-hero { background: linear-gradient(135deg, #0F1117 0%, #161822 100%); border: 1px solid #232734; border-radius: 16px; padding: 22px 26px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 24px; position: relative; overflow: hidden; }
     .cd-hero::before { content: ''; position: absolute; top: -50%; right: -30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(34,211,238,0.2) 0%, transparent 70%); pointer-events: none; }
     .cd-hero.neg::before { background: radial-gradient(circle, rgba(244,63,94,0.2) 0%, transparent 70%); }
@@ -33,24 +34,111 @@
     .cd-hero-stats { display: grid; grid-template-columns: repeat(3, auto); gap: 24px; align-items: end; position: relative; }
     .cd-hero-stat-label { font-size: 9px; color: #4A5263; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
     .cd-hero-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; color: #F8FAFC; }
-    
+
     .cd-section { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
     .cd-section-title { font-size: 12px; font-weight: 800; color: #F8FAFC; margin: 0 0 12px 0; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
-    
+
     .cd-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .cd-info-item { padding: 10px 12px; background: #161822; border-radius: 8px; }
     .cd-info-label { font-size: 10px; color: #4A5263; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
     .cd-info-value { font-size: 13px; color: #F8FAFC; font-weight: 700; font-family: 'JetBrains Mono', monospace; word-break: break-all; }
-    
+
     .cd-code-box { background: #08090D; border: 1px solid #232734; border-radius: 8px; padding: 14px; position: relative; margin-top: 10px; }
     .cd-code-box pre { margin: 0; color: #10B981; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 250px; overflow-y: auto; }
     .cd-copy-btn { position: absolute; top: 10px; left: 10px; height: 28px; padding: 0 12px; background: #7C5CFF; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 120ms; }
     .cd-copy-btn:hover { background: #9B80FF; }
     .cd-copy-btn.copied { background: #10B981; }
-    
+
     .cd-url-box { padding: 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #10B981; word-break: break-all; margin-top: 8px; }
-    
+
     .cd-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+    /* NEW: Download section */
+    .cd-download-section { margin-top: 16px; }
+    .cd-download-hero {
+      background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(124,92,255,0.08));
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .cd-download-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #10B981, #059669);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .cd-download-text { flex: 1; min-width: 200px; }
+    .cd-download-title { font-size: 13px; font-weight: 800; color: #F8FAFC; margin-bottom: 3px; }
+    .cd-download-desc { font-size: 11px; color: #7B8496; line-height: 1.5; }
+    .cd-download-btn {
+      height: 36px; padding: 0 18px;
+      background: #10B981; color: white;
+      border: none; border-radius: 8px;
+      font-family: inherit; font-size: 12px; font-weight: 800;
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all 120ms;
+      white-space: nowrap;
+    }
+    .cd-download-btn:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+    .cd-download-btn:active { transform: translateY(0); }
+    .cd-download-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .cd-copy-parts {
+      display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+    }
+    .cd-copy-parts button {
+      height: 32px; padding: 0 14px;
+      background: #161822; color: #CBD5E1;
+      border: 1px solid #232734; border-radius: 6px;
+      font-family: inherit; font-size: 11px; font-weight: 700;
+      cursor: pointer; transition: all 120ms;
+    }
+    .cd-copy-parts button:hover { background: #1C1F2E; border-color: #2E3446; color: #F8FAFC; }
+    .cd-copy-parts button.copied { background: rgba(16,185,129,0.15); border-color: #10B981; color: #10B981; }
+
+    .cd-info-box {
+      background: rgba(34,211,238,0.08);
+      border: 1px solid rgba(34,211,238,0.25);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 11.5px;
+      color: #67E8F9;
+      line-height: 1.7;
+      margin-top: 12px;
+    }
+    .cd-warn-box {
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 11.5px;
+      color: #FCD34D;
+      line-height: 1.7;
+      margin-top: 12px;
+    }
+
+    .cd-danger-zone {
+      background: rgba(244,63,94,0.06);
+      border: 1px solid rgba(244,63,94,0.25);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+    .cd-danger-title {
+      font-size: 12px; font-weight: 800; color: #F43F5E;
+      margin: 0 0 6px 0;
+    }
+    .cd-danger-desc {
+      font-size: 11px; color: #FDA4AF;
+      margin: 0 0 12px 0; line-height: 1.6;
+    }
   </style>
 </head>
 <body>
@@ -73,39 +161,84 @@
       <div id="cdLoading" style="text-align:center;padding:40px;color:#7B8496;">جاري التحميل…</div>
 
       <div id="cdContent" style="display:none;">
+
+        <!-- HERO: P&L -->
         <div class="cd-hero" id="cdHero">
-          <div><div class="cd-hero-label">صافي الربح</div><div class="cd-hero-val" id="heroProfit">$0.00</div><div class="cd-hero-roi pos" id="heroRoi">ROI 0%</div></div>
+          <div>
+            <div class="cd-hero-label">صافي الربح</div>
+            <div class="cd-hero-val" id="heroProfit">$0.00</div>
+            <div class="cd-hero-roi pos" id="heroRoi">ROI 0%</div>
+          </div>
           <div class="cd-hero-stats">
-            <div><div class="cd-hero-stat-label">التكلفة</div><div class="cd-hero-stat-val" id="heroCost">$0.00</div></div>
-            <div><div class="cd-hero-stat-label">الإيراد</div><div class="cd-hero-stat-val" id="heroRev">$0.00</div></div>
-            <div><div class="cd-hero-stat-label">الزيارات</div><div class="cd-hero-stat-val" id="heroTotal">0</div></div>
+            <div>
+              <div class="cd-hero-stat-label">التكلفة</div>
+              <div class="cd-hero-stat-val" id="heroCost">$0.00</div>
+            </div>
+            <div>
+              <div class="cd-hero-stat-label">الإيراد</div>
+              <div class="cd-hero-stat-val" id="heroRev">$0.00</div>
+            </div>
+            <div>
+              <div class="cd-hero-stat-label">الزيارات</div>
+              <div class="cd-hero-stat-val" id="heroTotal">0</div>
+            </div>
           </div>
         </div>
 
+        <!-- INFO GRID -->
         <div class="cd-section">
           <h3 class="cd-section-title">⚙️ الإعدادات</h3>
           <div class="cd-info-grid">
-            <div class="cd-info-item"><div class="cd-info-label">المصدر</div><div class="cd-info-value" id="infoSource">—</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">الوجهة</div><div class="cd-info-value" id="infoDest">—</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">Buy CPM</div><div class="cd-info-value" id="infoBuyCpm">$0.00</div></div>
-            <div class="cd-info-item"><div class="cd-info-label">Sell CPM</div><div class="cd-info-value" id="infoSellCpm">$0.00</div></div>
+            <div class="cd-info-item">
+              <div class="cd-info-label">المصدر</div>
+              <div class="cd-info-value" id="infoSource">—</div>
+            </div>
+            <div class="cd-info-item">
+              <div class="cd-info-label">الوجهة</div>
+              <div class="cd-info-value" id="infoDest">—</div>
+            </div>
+            <div class="cd-info-item">
+              <div class="cd-info-label">Buy CPM</div>
+              <div class="cd-info-value" id="infoBuyCpm">$0.00</div>
+            </div>
+            <div class="cd-info-item">
+              <div class="cd-info-label">Sell CPM</div>
+              <div class="cd-info-value" id="infoSellCpm">$0.00</div>
+            </div>
+            <div class="cd-info-item">
+              <div class="cd-info-label">Bot Block Threshold</div>
+              <div class="cd-info-value" id="infoThreshold">—</div>
+            </div>
+            <div class="cd-info-item">
+              <div class="cd-info-label">Campaign Key</div>
+              <div class="cd-info-value" id="infoKey">—</div>
+            </div>
           </div>
         </div>
 
+        <!-- TRACKING CODE SECTION -->
         <div class="cd-section" id="trackingSection">
           <h3 class="cd-section-title" id="trackingTitle">🔗 كود التتبع / الرابط</h3>
           <div id="trackingBody"></div>
         </div>
 
+        <!-- ACTIONS -->
         <div class="cd-section">
           <h3 class="cd-section-title">🎬 الإجراءات</h3>
           <div class="cd-actions">
             <a href="/visits?campaign_id=" id="btnViewVisits" class="sh-btn sh-btn-ghost">👁 عرض الزيارات</a>
             <button class="sh-btn sh-btn-ghost" id="btnRotateKey">🔄 تجديد المفتاح</button>
             <button class="sh-btn sh-btn-danger" id="btnTogglePause">⏸ إيقاف</button>
-            <button class="sh-btn sh-btn-danger" id="btnDelete" style="background:rgba(244,63,94,0.15);border-color:rgba(244,63,94,0.3);">🗑 حذف الحملة</button>
           </div>
         </div>
+
+        <!-- DANGER ZONE -->
+        <div class="cd-danger-zone">
+          <h3 class="cd-danger-title">⚠️ حذف الحملة</h3>
+          <p class="cd-danger-desc">هتحذف الحملة وكل زياراتها نهائيًا. مفيش رجوع بعد التأكيد.</p>
+          <button class="sh-btn sh-btn-danger" id="btnDelete" style="background:rgba(244,63,94,0.15);border-color:rgba(244,63,94,0.3);">🗑 حذف الحملة</button>
+        </div>
+
       </div>
     </main>
   </div>
@@ -114,117 +247,313 @@
   <script>
     const CD = { campaignId: null, data: null };
 
-    function fmtMoney(n) { const v = Number(n || 0); if (Math.abs(v) < 0.005) return '$0.00'; return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2); }
+    function fmtMoney(n) {
+      const v = Number(n || 0);
+      if (Math.abs(v) < 0.005) return '$0.00';
+      return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2);
+    }
 
     function copyText(text, btn) {
       navigator.clipboard.writeText(text).then(() => {
-        const orig = btn.textContent; btn.textContent = '✓ تم'; btn.classList.add('copied');
-        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+        const orig = btn.textContent;
+        btn.textContent = '✓ تم';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.classList.remove('copied');
+        }, 1500);
       }).catch(() => Shell.toast('فشل النسخ', 'error'));
     }
 
+    // ============================================================
+    // RENDER TRACKING SECTION
+    // ============================================================
     async function renderTracking(c) {
       const body = document.getElementById('trackingBody');
-      
+
+      // ========== DIRECT LINK ==========
       if (c.type === 'direct') {
         document.getElementById('trackingTitle').textContent = '🔗 رابط التتبع المباشر (Direct Link)';
         const url = `${window.location.origin}/go/${c.campaign_key}`;
         body.innerHTML = `
-          <div style="font-size:12px;color:#CBD5E1;margin-bottom:8px;">استخدم هذا الرابط في حملة ${Shell.esc(c.traffic_source_slug)}. الزوار سيتم توجيههم إلى ${Shell.esc(c.destination_slug)} بعد الفحص.</div>
+          <div style="font-size:12px;color:#CBD5E1;margin-bottom:8px;">
+            استخدم هذا الرابط في حملة <strong>${Shell.esc(c.traffic_source_slug)}</strong>.
+            الزوار سيتم توجيههم إلى <strong>${Shell.esc(c.destination_slug)}</strong> بعد الفحص.
+          </div>
           <div class="cd-url-box">${Shell.esc(url)}</div>
-          <div style="margin-top:12px;"><button class="sh-btn sh-btn-primary" id="copyUrlBtn">📋 نسخ الرابط</button></div>
+          <div class="cd-warn-box">
+            💡 <b>مهم:</b> أضف <code style="color:#FCD34D;">?zone=XXXXX</code> في نهاية الرابط
+            عشان النظام يعرف الـ Zone الصحيح. مثال: <code style="color:#FCD34D;">${Shell.esc(url)}?zone=12345</code>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="sh-btn sh-btn-primary" id="copyUrlBtn">📋 نسخ الرابط</button>
+          </div>
         `;
         document.getElementById('copyUrlBtn').onclick = function() { copyText(url, this); };
-        
-      } else {
-        document.getElementById('trackingTitle').textContent = '🔧 كود التتبع (Tracking Code)';
-        body.innerHTML = `<div style="font-size:12px;color:#7B8496;text-align:center;padding:20px;">جاري جلب الكود...</div>`;
-        
-        try {
-          const codeData = await Shell.api(`/api/campaigns/${c.id}/tracker-code-v3`);
-          body.innerHTML = `
-            <div style="font-size:12px;color:#CBD5E1;margin-bottom:8px;">ضع هذا الكود في صفحة الهبوط (Landing Page) الخاصة بهذه الحملة.</div>
-            <div class="cd-code-box">
-              <button class="cd-copy-btn" id="copyCodeBtn">📋 نسخ الكود</button>
-              <pre id="codeBlock">${Shell.esc(codeData.full)}</pre>
+        return;
+      }
+
+      // ========== LANDING PAGE ==========
+      document.getElementById('trackingTitle').textContent = '🔧 كود التتبع (Tracking Code)';
+      body.innerHTML = `<div style="font-size:12px;color:#7B8496;text-align:center;padding:20px;">جاري جلب الكود...</div>`;
+
+      try {
+        const codeData = await Shell.api(`/api/campaigns/${c.id}/tracker-code-v3`);
+
+        body.innerHTML = `
+          <!-- DOWNLOAD HERO -->
+          <div class="cd-download-section">
+            <div class="cd-download-hero">
+              <div class="cd-download-icon">⬇️</div>
+              <div class="cd-download-text">
+                <div class="cd-download-title">تحميل كود التتبع كملف .txt</div>
+                <div class="cd-download-desc">
+                  الكود كبير (${Math.round(codeData.size_bytes / 1024)} KB · ${codeData.lines} سطر).
+                  الأسهل تحمّله كملف، تفتحه، وتنسخه كامل.
+                </div>
+              </div>
+              <button class="cd-download-btn" id="downloadBtn" type="button">
+                ⬇ تحميل الملف
+              </button>
             </div>
-            <div style="font-size:10px;color:#4A5263;margin-top:8px;">حجم الكود: ${Math.round(codeData.size_bytes / 1024)} KB · ${codeData.lines} سطر</div>
-          `;
-          document.getElementById('copyCodeBtn').onclick = function() { copyText(codeData.full, this); };
-        } catch (e) {
-          body.innerHTML = `<div style="color:#F43F5E;font-size:12px;">فشل جلب الكود: ${Shell.esc(e.message)}</div>`;
-        }
+          </div>
+
+          <!-- INFO -->
+          <div class="cd-info-box">
+            💡 <b>طريقة التركيب:</b> افتح صفحة الهبوط (Landing Page) بتاعتك، والصق الكود كامل
+            داخل <code>&lt;head&gt;</code> أو قبل <code>&lt;/body&gt;</code> مباشرة.
+          </div>
+
+          <!-- PREVIEW (PART 1 + PART 2) -->
+          <div style="margin-top:16px;">
+            <div style="font-size:11px;color:#7B8496;margin-bottom:8px;">📄 معاينة الكود (الجزء الأول):</div>
+            <div class="cd-code-box">
+              <button class="cd-copy-btn" id="copyPart1Btn" type="button">📋 نسخ</button>
+              <pre id="codePart1">${Shell.esc(codeData.part1 || '')}</pre>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <div style="font-size:11px;color:#7B8496;margin-bottom:8px;">📄 معاينة الكود (الجزء الثاني):</div>
+            <div class="cd-code-box">
+              <button class="cd-copy-btn" id="copyPart2Btn" type="button">📋 نسخ</button>
+              <pre id="codePart2">${Shell.esc(codeData.part2 || '')}</pre>
+            </div>
+          </div>
+
+          <!-- COPY PARTS -->
+          <div class="cd-copy-parts">
+            <button id="copyFullBtn" type="button">📋 نسخ الكود كامل</button>
+            <button id="downloadBtn2" type="button" style="background:rgba(16,185,129,0.15);border-color:#10B981;color:#10B981;">⬇ تحميل الملف</button>
+          </div>
+
+          <!-- FOOTER INFO -->
+          <div style="font-size:10px;color:#4A5263;margin-top:12px;">
+            نسخة الكود: ${Shell.esc(codeData.version || 'v7.1')}
+            · Campaign Key: ${Shell.esc(codeData.campaign_key || '')}
+            · الحجم: ${Math.round(codeData.size_bytes / 1024)} KB
+            · ${codeData.lines} سطر
+          </div>
+        `;
+
+        // ========== ATTACH HANDLERS ==========
+
+        // Copy part 1
+        document.getElementById('copyPart1Btn').onclick = function() {
+          copyText(codeData.part1, this);
+        };
+
+        // Copy part 2
+        document.getElementById('copyPart2Btn').onclick = function() {
+          copyText(codeData.part2, this);
+        };
+
+        // Copy full
+        document.getElementById('copyFullBtn').onclick = function() {
+          copyText(codeData.full, this);
+        };
+
+        // Download (both buttons do the same)
+        const downloadHandler = async function() {
+          try {
+            const btn = this;
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ جاري التحميل...';
+
+            // Use direct download endpoint
+            const downloadUrl = `/api/campaigns/${c.id}/tracker-code-v3/download`;
+            const response = await fetch(downloadUrl, {
+              method: 'GET',
+              credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+
+            // Get filename from Content-Disposition
+            let filename = `ovg-tracker-v3-${(c.campaign_key || '').substring(0, 8)}.txt`;
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition) {
+              const match = disposition.match(/filename="?([^";]+)"?/);
+              if (match) filename = match[1];
+            }
+
+            // Download the blob
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+            btn.textContent = '✓ تم التحميل';
+            setTimeout(() => {
+              btn.textContent = origText;
+              btn.disabled = false;
+            }, 1500);
+          } catch (err) {
+            Shell.toast('فشل التحميل: ' + err.message, 'error');
+            this.textContent = '⬇ تحميل الملف';
+            this.disabled = false;
+          }
+        };
+
+        document.getElementById('downloadBtn').onclick = downloadHandler;
+        document.getElementById('downloadBtn2').onclick = downloadHandler;
+
+      } catch (e) {
+        body.innerHTML = `<div style="color:#F43F5E;font-size:12px;">فشل جلب الكود: ${Shell.esc(e.message)}</div>`;
       }
     }
 
+    // ============================================================
+    // LOAD CAMPAIGN
+    // ============================================================
     async function loadCampaign() {
       try {
         CD.data = await Shell.api('/api/campaigns/' + CD.campaignId);
         const c = CD.data;
-        
+
         document.getElementById('cdTitle').textContent = c.name;
         const badge = document.getElementById('cdBadge');
         badge.className = 'cd-badge ' + c.status;
-        badge.textContent = c.status === 'active' ? 'نشطة' : c.status === 'paused' ? 'موقوفة' : 'مؤرشفة';
-        
-        document.getElementById('cdSub').innerHTML = `<span>${Shell.esc(c.type)}</span> · <span>${Shell.esc(c.traffic_source_slug)} → ${Shell.esc(c.destination_slug)}</span>`;
+        badge.textContent = c.status === 'active' ? 'نشطة'
+                          : c.status === 'paused' ? 'موقوفة'
+                          : 'مؤرشفة';
+
+        document.getElementById('cdSub').innerHTML =
+          `<span>${Shell.esc(c.type)}</span> · <span>${Shell.esc(c.traffic_source_slug)} → ${Shell.esc(c.destination_slug)}</span>`;
+
+        // Info
         document.getElementById('infoSource').textContent = c.traffic_source_slug;
         document.getElementById('infoDest').textContent = c.destination_slug;
         document.getElementById('infoBuyCpm').textContent = '$' + Number(c.buy_cpm).toFixed(2);
         document.getElementById('infoSellCpm').textContent = '$' + Number(c.sell_cpm).toFixed(2);
+        document.getElementById('infoThreshold').textContent = (c.bot_block_threshold || 100) + ' (score)';
+        document.getElementById('infoKey').textContent = c.campaign_key;
+
         document.getElementById('btnViewVisits').href = '/visits?campaign_id=' + c.id;
-        
-        const st = c.stats || {}; const pl = st.pl || { profit: 0, roi: 0 };
+
+        // P&L hero
+        const st = c.stats || {};
+        const pl = st.pl || { profit: 0, roi: 0 };
         document.getElementById('heroProfit').textContent = fmtMoney(pl.profit);
         document.getElementById('heroCost').textContent = '$' + Number(pl.cost || 0).toFixed(2);
         document.getElementById('heroRev').textContent = '$' + Number(pl.revenue || 0).toFixed(2);
         document.getElementById('heroTotal').textContent = Shell.fmtNum(st.total || 0);
-        
+
         const roiEl = document.getElementById('heroRoi');
         roiEl.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`;
         roiEl.className = 'cd-hero-roi ' + (pl.profit >= 0 ? 'pos' : 'neg');
-        
+
+        // Toggle pause button
+        const toggleBtn = document.getElementById('btnTogglePause');
+        toggleBtn.textContent = c.status === 'active' ? '⏸ إيقاف' : '▶ تشغيل';
+
+        // Render tracking
         await renderTracking(c);
-        
+
         document.getElementById('cdLoading').style.display = 'none';
         document.getElementById('cdContent').style.display = '';
       } catch (e) {
-        document.getElementById('cdLoading').innerHTML = `<span style="color:#F43F5E;">فشل التحميل: ${Shell.esc(e.message)}</span>`;
+        document.getElementById('cdLoading').innerHTML =
+          `<span style="color:#F43F5E;">فشل التحميل: ${Shell.esc(e.message)}</span>`;
       }
     }
 
+    // ============================================================
+    // ACTIONS
+    // ============================================================
     async function togglePause() {
       const newStatus = CD.data.status === 'active' ? 'paused' : 'active';
       try {
-        await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
-        Shell.toast('تم التحديث', 'success'); loadCampaign();
-      } catch (e) { Shell.toast('فشل', 'error'); }
+        await Shell.api('/api/campaigns/' + CD.campaignId, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: newStatus }),
+        });
+        Shell.toast('تم التحديث', 'success');
+        loadCampaign();
+      } catch (e) {
+        Shell.toast('فشل', 'error');
+      }
     }
 
     async function rotateKey() {
       if (!confirm('تجديد المفتاح هيبطّل الكود/الرابط القديم. متأكد؟')) return;
-      try { await Shell.api('/api/campaigns/' + CD.campaignId + '/rotate-key', { method: 'POST' }); Shell.toast('تم التجديد', 'success'); loadCampaign(); }
-      catch (e) { Shell.toast('فشل', 'error'); }
+      try {
+        await Shell.api('/api/campaigns/' + CD.campaignId + '/rotate-key', {
+          method: 'POST',
+        });
+        Shell.toast('تم التجديد — حدّث الكود في موقعك', 'success', 5000);
+        loadCampaign();
+      } catch (e) {
+        Shell.toast('فشل', 'error');
+      }
     }
 
     async function deleteCampaign() {
       if (!confirm('هتحذف الحملة وكل زياراتها. متأكد؟')) return;
-      try { await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'DELETE' }); Shell.toast('تم الحذف', 'success'); setTimeout(() => window.location.href = '/campaigns', 500); }
-      catch (e) { Shell.toast('فشل', 'error'); }
+      if (!confirm('تأكيد أخير: هل أنت متأكد 100%؟')) return;
+      try {
+        await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'DELETE' });
+        Shell.toast('تم الحذف', 'success');
+        setTimeout(() => window.location.href = '/campaigns', 500);
+      } catch (e) {
+        Shell.toast('فشل', 'error');
+      }
     }
 
+    // ============================================================
+    // BOOT
+    // ============================================================
     (async function boot() {
       try {
         CD.campaignId = parseInt(window.location.pathname.split('/').pop()) || 0;
-        await Shell.mount({ active: 'campaigns', lang: 'ar', breadcrumb: [{ label: 'الحملات', href: '/campaigns' }, { label: 'تفاصيل' }] });
-        document.getElementById('bootSkeleton').style.display = 'none'; document.getElementById('shAppRoot').style.display = '';
-        
+        await Shell.mount({
+          active: 'campaigns',
+          lang: 'ar',
+          breadcrumb: [
+            { label: 'الحملات', href: '/campaigns' },
+            { label: 'تفاصيل' },
+          ],
+        });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+
         document.getElementById('btnTogglePause').addEventListener('click', togglePause);
         document.getElementById('btnRotateKey').addEventListener('click', rotateKey);
-        document.getElementById('btnDelete').addEventListener('click', deleteCampaign);
-        
+        document.getElementById('btnDelete').addEventListener('click', deleteDelete => deleteCampaign());
+
         await loadCampaign();
-      } catch (e) { document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`; }
+      } catch (e) {
+        document.getElementById('bootSkeleton').innerHTML =
+          `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`;
+      }
     })();
   </script>
 </body>
