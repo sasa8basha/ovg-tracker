@@ -3,6 +3,7 @@ from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Index, Integ
 from sqlalchemy.orm import relationship
 from database import Base
 
+
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -16,6 +17,7 @@ class UserModel(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     campaigns = relationship("CampaignModel", back_populates="user", cascade="all, delete-orphan")
 
+
 class TrafficSource(Base):
     __tablename__ = "traffic_sources"
     id = Column(Integer, primary_key=True)
@@ -26,6 +28,7 @@ class TrafficSource(Base):
     is_builtin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 class Destination(Base):
     __tablename__ = "destinations"
     id = Column(Integer, primary_key=True)
@@ -35,6 +38,7 @@ class Destination(Base):
     notes = Column(String(500), default="")
     is_builtin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class CampaignModel(Base):
     __tablename__ = "campaigns"
@@ -49,11 +53,10 @@ class CampaignModel(Base):
     destination_url = Column(String(1000), default="")
     destination_zone_id = Column(String(100), default="")
     sell_cpm = Column(Float, default=0.0, nullable=False)
-    
-    # 🔴 Adsterra Integration
+
     adsterra_api_key = Column(String(255), nullable=True)
     adsterra_tracking_param = Column(String(50), default="sub_id")
-    
+
     campaign_key = Column(String(32), unique=True, index=True, nullable=False)
     redirect_delay_ms = Column(Integer, default=500, nullable=False)
     bot_block_threshold = Column(Integer, default=100, nullable=False)
@@ -69,6 +72,7 @@ class CampaignModel(Base):
         Index("ix_campaigns_user_status", "user_id", "status"),
         Index("ix_campaigns_user_type", "user_id", "type"),
     )
+
 
 class SessionModel(Base):
     __tablename__ = "sessions"
@@ -88,6 +92,8 @@ class SessionModel(Base):
     visit_id = Column(Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True, index=True)
     verdict = Column(String(20), nullable=True, index=True)
     score = Column(Integer, nullable=True)
+    confidence = Column(Float, nullable=True)              # ← جديد
+    bot_probability = Column(Float, nullable=True)         # ← جديد
     data_quality = Column(String(20), default="pending", nullable=False, index=True)
     clock_drift_ms = Column(Integer, default=0)
     is_honeypot_triggered = Column(Boolean, default=False)
@@ -99,7 +105,9 @@ class SessionModel(Base):
         Index("ix_sessions_ip_started", "ip", "started_at"),
         Index("ix_sessions_campaign_started", "campaign_id", "started_at"),
         Index("ix_sessions_user_started", "user_id", "started_at"),
+        Index("ix_sessions_pending", "visit_id", "started_at"),   # ← جديد — للـ stale finalizer
     )
+
 
 class VisitHeartbeatModel(Base):
     __tablename__ = "visit_heartbeats"
@@ -121,15 +129,16 @@ class VisitHeartbeatModel(Base):
         Index("ix_heartbeats_session_time", "session_id", "received_at"),
     )
 
+
 class VisitModel(Base):
     __tablename__ = "visits"
     id = Column(Integer, primary_key=True, index=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", ondelete="CASCADE"), index=True, nullable=False)
     session_id = Column(String(36), nullable=True, index=True)
-    
+
     click_id = Column(String(36), unique=True, index=True, nullable=True)
     filter_reason = Column(String(100), nullable=True, index=True)
-    
+
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     ip = Column(String, index=True)
     user_agent = Column(String)
@@ -137,19 +146,26 @@ class VisitModel(Base):
     score = Column(Integer)
     verdict = Column(String, index=True)
     evidence = Column(JSON)
-    
-    # 🔴 Adsterra Revenue (from API sync)
+
+    # ============ NEW ENGINE FIELDS (indexed for fast queries) ============
+    confidence = Column(Float, nullable=True, index=True)        # ← 0..1
+    bot_probability = Column(Float, nullable=True, index=True)   # ← 0..1
+    mode = Column(String(20), nullable=True, index=True)         # strict/balanced/permissive
+    reason = Column(String(100), nullable=True, index=True)      # human-readable reason code
+    data_quality_report = Column(JSON, nullable=True)            # full DataQualityReport
+    full_payload = Column(JSON, nullable=True)                   # raw engine output
+    # =====================================================================
+
     impressions = Column(Integer, default=0)
     revenue = Column(Float, default=0.0)
-    
-    # 🔴 PopAds Macros (from URL params)
-    bid = Column(Float, default=0.0)                     # [BID] - cost per visit
-    popads_impression_id = Column(String(100), nullable=True, index=True)  # [IMPRESSIONID]
-    popads_website_id = Column(String(100), nullable=True, index=True)     # [WEBSITEID]
-    popads_quality = Column(Integer, nullable=True)      # [QUALITY] 1-10
-    popads_adblock = Column(Boolean, default=False)      # [ADBLOCK]
-    popads_data = Column(JSON, nullable=True)            # باقي الماكروز
-    
+
+    bid = Column(Float, default=0.0)
+    popads_impression_id = Column(String(100), nullable=True, index=True)
+    popads_website_id = Column(String(100), nullable=True, index=True)
+    popads_quality = Column(Integer, nullable=True)
+    popads_adblock = Column(Boolean, default=False)
+    popads_data = Column(JSON, nullable=True)
+
     os = Column(String, default="Unknown")
     device = Column(String, default="Unknown")
     browser = Column(String, default="Unknown")
@@ -163,17 +179,17 @@ class VisitModel(Base):
     asn = Column(String, default="Unknown")
     is_vpn = Column(Boolean, default=False)
     webrtc_ip = Column(String, default="None")
-    
+
     time_on_page = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     scrolls = Column(Integer, default=0)
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
-    
+
     ground_truth = Column(String(10), nullable=True, index=True)
     ground_truth_at = Column(DateTime, nullable=True)
     ground_truth_by = Column(String(64), nullable=True)
-    
+
     data_quality = Column(String(20), nullable=True)
     counting_type = Column(String(20), nullable=True)
     is_honeypot_triggered = Column(Boolean, default=False)
@@ -183,7 +199,6 @@ class VisitModel(Base):
     milestones = Column(JSON, nullable=True)
     behavioral = Column(JSON, nullable=True)
     ad_events = Column(JSON, nullable=True)
-    full_payload = Column(JSON, nullable=True)
 
     __table_args__ = (
         Index("ix_visits_campaign_zone_verdict", "campaign_id", "zone_id", "verdict"),
@@ -194,7 +209,11 @@ class VisitModel(Base):
         Index("ix_visits_data_quality", "data_quality"),
         Index("ix_visits_counting_type", "counting_type"),
         Index("ix_visits_website_time", "popads_website_id", "timestamp"),
+        # Fast filter for high-confidence bot queries
+        Index("ix_visits_bot_prob_ts", "bot_probability", "timestamp"),
+        Index("ix_visits_confidence_ts", "confidence", "timestamp"),
     )
+
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
@@ -206,6 +225,7 @@ class PasswordResetToken(Base):
     ip = Column(String(45), default="")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
+
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
     id = Column(Integer, primary_key=True)
@@ -214,6 +234,7 @@ class EmailVerificationToken(Base):
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
 
 class BanRiskSnapshot(Base):
     __tablename__ = "ban_risk_snapshots"
@@ -232,6 +253,7 @@ class BanRiskSnapshot(Base):
 
     __table_args__ = (Index("ix_ban_risk_user_time", "user_id", "timestamp"),)
 
+
 class ZoneActionModel(Base):
     __tablename__ = "zone_actions"
     id = Column(Integer, primary_key=True, index=True)
@@ -248,6 +270,7 @@ class ZoneActionModel(Base):
         Index("ix_zone_actions_user_time", "user_id", "timestamp"),
         Index("ix_zone_actions_user_active", "user_id", "action", "reverted_at"),
     )
+
 
 class DecisionAuditModel(Base):
     __tablename__ = "decision_audit"
