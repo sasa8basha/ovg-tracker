@@ -1,6 +1,7 @@
 """
 routers/interstitial.py — Interstitial Precheck (Direct Links) v4.5
-- Removed the broken BROKEN_CANVAS_HASH check that was blocking real humans.
+- Receives full fingerprint from interstitial template
+- Uses vi-bot + BotD detections for instant blocking
 """
 import asyncio
 from datetime import datetime, timedelta
@@ -135,7 +136,7 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
     if not c or c.status != "active":
         return {"action": "block", "url": None, "score": 100, "reasons": ["CAMPAIGN_INACTIVE"]}
 
-    # 1) Base precheck
+    # 1) Base precheck (uses new fp.detections)
     result = quick_precheck(nav=payload.nav or {}, fp=payload.fp or {}, threshold=int(c.bot_block_threshold or 100))
     headers_dict = {str(k).lower(): str(v) for k, v in request.headers.items()}
     http_version = str(request.scope.get("http_version", "1.1"))
@@ -165,7 +166,6 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
     total_score = min(150, int(result["score"]) + int(extra_score) + int(velocity_score))
     threshold = int(c.bot_block_threshold or 100)
     
-    # بنعتمد بس على الـ Precheck Signals والـ Velocity
     is_blocked = total_score >= threshold or result["action"] == "block"
 
     # 4) Zone
