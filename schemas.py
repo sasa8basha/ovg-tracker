@@ -142,7 +142,7 @@ class InterstitialPrecheckPayload(BaseModel):
     t_ms: int = Field(default=0, ge=0)
     url: str = Field(default="", max_length=2000)
     nav: Dict[str, Any] = Field(default_factory=dict)
-    fp: Dict[str, Any] = Field(default_factory=dict)
+    fp: Dict[str, Any] = Field(default_factory=dict)  # 👈 ضيفنا دي
     tracking_params: Dict[str, Any] = Field(default_factory=dict)
 
 class InterstitialLogPayload(BaseModel):
