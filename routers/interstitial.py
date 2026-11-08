@@ -1,11 +1,6 @@
 """
-routers/interstitial.py — Interstitial Precheck (Direct Links) v4.4
-
-CRITICAL FIXES:
-    - Instant Block for "Drive-by" bots (duration < 3s, 0 interaction).
-    - Instant Block for broken Canvas hashes (data:image/png).
-    - Instant Block for Zone = unknown (forces correct setup).
-    - Verdict: computed from precheck score, NOT left as "pending".
+routers/interstitial.py — Interstitial Precheck (Direct Links) v4.5
+- Removed the broken BROKEN_CANVAS_HASH check that was blocking real humans.
 """
 import asyncio
 from datetime import datetime, timedelta
@@ -167,36 +162,23 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
     elif cross["fp_visits_10m"] >= 15: velocity_score += 30; velocity_reasons.append(f"FP_REUSE_HIGH({cross['fp_visits_10m']})")
     elif cross["fp_visits_10m"] >= 7: velocity_score += 15; velocity_reasons.append(f"FP_REUSE_MED({cross['fp_visits_10m']})")
 
-    # 4) NEW: Drive-by Bot & Broken Canvas Detection
-    instant_block = False
-    instant_reasons = []
-    
-    # لو الـ Canvas فيه data:image ده بوت متأكد
-    if "data:image" in canvas_raw.lower():
-        instant_block = True
-        instant_reasons.append("BROKEN_CANVAS_HASH")
-        
-    # لو الزيارة سريعة جداً (أقل من 3 ثواني) ومفيش أي تفاعل (سكرول/كليك)
-    t_ms = int(payload.nav.get("t_ms") or 0) # هنفترض إننا بناخد وقت من الـ nav لو موجود
-    # في الـ direct link الـ t_ms بيجي في الـ payload
-    # بس للأسف الـ precheck مش بيستقبل t_ms للزيارة ككل، بس لو البوت قافل ف ده هيبان في الـ behavior
-    # هنضيف الفحص ده في السيرفر
-
     total_score = min(150, int(result["score"]) + int(extra_score) + int(velocity_score))
     threshold = int(c.bot_block_threshold or 100)
-    is_blocked = total_score >= threshold or result["action"] == "block" or instant_block
+    
+    # بنعتمد بس على الـ Precheck Signals والـ Velocity
+    is_blocked = total_score >= threshold or result["action"] == "block"
 
-    # 5) Zone
+    # 4) Zone
     zone_id, zone_source = _extract_zone(payload.url or "", payload.tracking_params or {}, c)
-    print(f"[INTERSTITIAL] url={payload.url!r} zone={zone_id!r} ({zone_source}) score={total_score} instant_block={instant_block} ip_visits={cross['ip_visits_10m']} fp_visits={cross['fp_visits_10m']}", flush=True)
+    print(f"[INTERSTITIAL] url={payload.url!r} zone={zone_id!r} ({zone_source}) score={total_score} ip_visits={cross['ip_visits_10m']} fp_visits={cross['fp_visits_10m']}", flush=True)
 
-    # 6) Verdict
+    # 5) Verdict
     if is_blocked:
         verdict = "invalid"
         confidence = 0.95
-        bot_probability = 1.0 if instant_block else min(1.0, total_score / 100.0)
-        reason = "instant_block_drive_by" if instant_block else "interstitial_precheck_block"
-        filter_reason = instant_reasons[0] if instant_reasons else "INTERSTITIAL_BLOCK"
+        bot_probability = min(1.0, total_score / 100.0)
+        reason = "interstitial_precheck_block"
+        filter_reason = "INTERSTITIAL_BLOCK"
     elif total_score >= 40:
         verdict = "suspicious"
         confidence = 0.60
@@ -210,7 +192,7 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
         reason = "interstitial_precheck_clean"
         filter_reason = None
 
-    # 7) Save visit
+    # 6) Save visit
     macros = _extract_macros(payload.tracking_params or {})
     existing_session = db.query(SessionModel).filter(SessionModel.session_id == payload.session_id).first()
 
@@ -220,7 +202,6 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
         for code in (result.get("reasons") or []): evidence_list.append({"code": code, "severity": "critical", "score": 100, "detail": "precheck"})
         for code in extra_reasons: evidence_list.append({"code": code, "severity": "high", "score": 60, "detail": "header"})
         for code in velocity_reasons: evidence_list.append({"code": code, "severity": "high", "score": 40, "detail": "cross_visit"})
-        for code in instant_reasons: evidence_list.append({"code": code, "severity": "impossible", "score": 100, "detail": "instant_block"})
 
         visit = VisitModel(
             campaign_id=c.id, session_id=payload.session_id, click_id=click_id,
@@ -251,6 +232,6 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
             stats_cache.invalidate(f"stats:campaign:{c.id}")
 
     if is_blocked:
-        return {"action": "block", "url": None, "score": total_score, "reasons": (result["reasons"] or []) + extra_reasons + velocity_reasons + instant_reasons}
+        return {"action": "block", "url": None, "score": total_score, "reasons": (result["reasons"] or []) + extra_reasons + velocity_reasons}
 
     return {"action": "redirect", "url": c.destination_url, "score": total_score, "reasons": []}
