@@ -8,9 +8,10 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from config import ALLOWED_ORIGINS, ENV, DEBUG
-from database import engine, Base, run_data_seeding_and_backfills
+from database import engine, Base, run_data_seeding_and_backfills, apply_safe_migrations
 from auth import bootstrap_admin
 from adsterra_sync import sync_adsterra_loop
+from routers.collector_v3 import stale_session_finalizer_loop
 
 from routers import (
     auth as auth_router, settings as settings_router,
@@ -24,11 +25,14 @@ from routers import (
     sessions as sessions_router,
 )
 
+# Migrations FIRST — safe ALTER TABLE for existing DBs
+apply_safe_migrations()
+
 Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="9.1", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="9.2", docs_url="/docs" if DEBUG else None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -39,24 +43,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.middleware("http")
 async def tracker_cors_middleware(request: Request, call_next):
     if request.url.path.startswith(("/api/track", "/api/collect", "/api/interstitial")):
         if request.method == "OPTIONS":
-            return Response(status_code=200, headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "*"})
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                },
+            )
         response = await call_next(request)
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
     return await call_next(request)
 
+
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(sync_adsterra_loop())
+    asyncio.create_task(stale_session_finalizer_loop())
     print("=" * 60)
-    print(f"  OVG Tracker v9.1 — ENV={ENV}  DEBUG={DEBUG}")
+    print(f"  OVG Tracker v9.2 — ENV={ENV}  DEBUG={DEBUG}")
     print("  Security posture: P0-hardened (no wildcards)")
     print("  Adsterra Background Sync: Running (every 5 mins)")
+    print("  Stale Session Finalizer: Running (every 60 sec)")
     print("=" * 60)
+
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
