@@ -1,13 +1,12 @@
 """
-collector/tracker_v3_template.py — V3 tracker (v7.0 — Ultimate Suite)
+collector/tracker_v3_template.py — V3 tracker (v8.0 — Ultimate Suite)
 
 Integrated:
-    - BotD (18 detectors)
-    - vi-bot (28 detectors)
-    - Flagon (element tracking, rage clicks, intervals, mutations)
-    - BehaviorTracker (mouse, keys, scroll, touch, interaction)
-    - Stack Trace Traps
-    - Honeypot Traps
+    - BotD (18 detectors from FingerprintJS)
+    - vi-bot (28 detectors + Stack Traps + Honeypots)
+    - Flagon (rage clicks, intervals, mutations, detailed events)
+    - rebrowser-bot-detector (10 modern tests — catches Patchright/Puppeteer/Playwright)
+    - BehaviorTracker (mouse/keys/scroll/touch/interaction)
 """
 TRACKER_V3_JS = r"""(function () {
   'use strict';
@@ -73,42 +72,28 @@ TRACKER_V3_JS = r"""(function () {
   var milestones = {};
   var trapTriggers = {};
 
-  // =========================================================
-  // FLAGON: Rage Click Detector state
-  // =========================================================
-  var rageClickBuffer = [];   // array of { target, timestamp, x, y }
-  var rageClickEvents = [];   // confirmed rage clicks
+  // Flagon: Rage Click state
+  var rageClickBuffer = [];
+  var rageClickEvents = [];
 
-  // =========================================================
-  // FLAGON: IntervalLog state
-  // =========================================================
+  // Flagon: Interval Log state
   var intervalLogState = {
-    id: null,
-    type: null,
-    path: null,
-    startTimer: null,
-    counter: 0,
-    lastEvent: null,
-    intervalLogs: []
+    id: null, type: null, path: null,
+    startTimer: null, counter: 0, intervalLogs: []
   };
 
-  // =========================================================
-  // FLAGON: MutationObserver state
-  // =========================================================
+  // Flagon: Mutation Observer state
   var domMutationObserver = null;
   var mutationSummary = {
-    added: 0,
-    removed: 0,
-    attributes: 0,
-    targets: [],
-    totalEvents: 0
+    added: 0, removed: 0, attributes: 0,
+    targets: [], totalEvents: 0
   };
-  var mutationTimer = null;
 
-  // =========================================================
-  // FLAGON: Tracked event details
-  // =========================================================
-  var detailedEvents = [];   // array of { type, target, path, rect, details, time }
+  // Flagon: Detailed Events
+  var detailedEvents = [];
+
+  // rebrowser test state
+  var rbTests = {};
 
   var trackingParams = {};
   try {
@@ -118,12 +103,8 @@ TRACKER_V3_JS = r"""(function () {
         trackingParams[key] = String(value).substring(0, 500);
       }
     });
-    if (!trackingParams.impressionid && trackingParams.impid) {
-      trackingParams.impressionid = trackingParams.impid;
-    }
-    if (!trackingParams.website_id && trackingParams.websiteid) {
-      trackingParams.website_id = trackingParams.websiteid;
-    }
+    if (!trackingParams.impressionid && trackingParams.impid) trackingParams.impressionid = trackingParams.impid;
+    if (!trackingParams.website_id && trackingParams.websiteid) trackingParams.website_id = trackingParams.websiteid;
   } catch (e) {}
 
   // =========================================================
@@ -146,7 +127,7 @@ TRACKER_V3_JS = r"""(function () {
     try { bodyStr = JSON.stringify(body); } catch (e) { return Promise.reject(e); }
     if (useBeacon && navigator.sendBeacon) {
       try {
-        var blob = new Blob([bodyStr], { type: 'text/plain;charset=UTF-8' });
+        var blob = new Blob([bodyStr], { type: 'application/json;charset=UTF-8' });
         if (navigator.sendBeacon(url, blob)) return Promise.resolve({ ok: true });
       } catch (e) {}
     }
@@ -154,9 +135,7 @@ TRACKER_V3_JS = r"""(function () {
       return fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: bodyStr,
-        keepalive: true,
-        credentials: 'omit'
+        body: bodyStr, keepalive: true, credentials: 'omit'
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (d) {
           return { ok: r.ok, data: d };
@@ -176,14 +155,10 @@ TRACKER_V3_JS = r"""(function () {
 
   function checkIdle() {
     var gap = Date.now() - lastActivityTime;
-    if (gap >= 30000 && currentIdleStart === null) {
-      currentIdleStart = lastActivityTime + 1000;
-    }
+    if (gap >= 30000 && currentIdleStart === null) currentIdleStart = lastActivityTime + 1000;
   }
 
-  function safeString(v) {
-    try { return String(v); } catch (e) { return ''; }
-  }
+  function safeStr(v) { try { return String(v); } catch (e) { return ''; } }
 
   function isNativeFn(fnStr) {
     try { return /\(\)\s*{\s+\[native code\]\s+}\s*$/.test(String(fnStr)); }
@@ -191,23 +166,16 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // FLAGON: ELEMENT SELECTOR + PATH + RECT
+  // FLAGON: SELECTOR / PATH / RECT
   // =========================================================
   function getSelector(ele) {
     try {
       if (ele instanceof HTMLElement || ele instanceof Element) {
-        var rawClass = typeof ele.className === 'string'
-          ? ele.className
-          : (ele.getAttribute ? ele.getAttribute('class') : '');
+        var rawClass = typeof ele.className === 'string' ? ele.className : (ele.getAttribute ? ele.getAttribute('class') : '');
         var tag = ele.localName || ele.nodeName;
-        if (tag) {
-          return tag + (ele.id ? '#' + ele.id : '') + (rawClass ? '.' + rawClass : '');
-        }
-      } else if (ele instanceof Document) {
-        return '#document';
-      } else if (ele === globalThis) {
-        return 'Window';
-      }
+        if (tag) return tag + (ele.id ? '#' + ele.id : '') + (rawClass ? '.' + rawClass : '');
+      } else if (ele instanceof Document) return '#document';
+      else if (ele === globalThis) return 'Window';
     } catch (e) {}
     return 'Unknown';
   }
@@ -216,9 +184,7 @@ TRACKER_V3_JS = r"""(function () {
     try {
       var path = [];
       var composed = (typeof e.composedPath === 'function') ? e.composedPath() : [];
-      for (var i = 0; i < composed.length && i < 10; i++) {
-        path.push(getSelector(composed[i]));
-      }
+      for (var i = 0; i < composed.length && i < 10; i++) path.push(getSelector(composed[i]));
       return path;
     } catch (err) { return []; }
   }
@@ -226,56 +192,13 @@ TRACKER_V3_JS = r"""(function () {
   function getTargetRect(target) {
     try {
       if (target && typeof target.getBoundingClientRect === 'function') {
-        var rect = target.getBoundingClientRect();
-        if (rect &&
-            isFinite(rect.x) && isFinite(rect.y) &&
-            isFinite(rect.width) && isFinite(rect.height)) {
-          return {
-            x: Math.round(rect.x),
-            y: Math.round(rect.y),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height)
-          };
+        var r = target.getBoundingClientRect();
+        if (r && isFinite(r.x) && isFinite(r.y) && isFinite(r.width) && isFinite(r.height)) {
+          return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
         }
       }
     } catch (e) {}
     return null;
-  }
-
-  // =========================================================
-  // FLAGON: EVENT DETAIL EXTRACTORS
-  // =========================================================
-  function extractMouseDetails(e) {
-    return {
-      clicks: e.detail,
-      ctrl: !!e.ctrlKey,
-      alt: !!e.altKey,
-      shift: !!e.shiftKey,
-      meta: !!e.metaKey
-    };
-  }
-
-  function extractKeyboardDetails(e) {
-    return {
-      key: safeString(e.key).substring(0, 10),
-      code: safeString(e.code).substring(0, 20),
-      ctrl: !!e.ctrlKey,
-      alt: !!e.altKey,
-      shift: !!e.shiftKey,
-      meta: !!e.metaKey
-    };
-  }
-
-  function extractWheelDetails(e) {
-    return {
-      deltaX: e.deltaX,
-      deltaY: e.deltaY,
-      deltaZ: e.deltaZ
-    };
-  }
-
-  function extractScrollDetails() {
-    return { x: window.scrollX, y: window.scrollY };
   }
 
   // =========================================================
@@ -285,40 +208,24 @@ TRACKER_V3_JS = r"""(function () {
     try {
       var nowTs = Date.now();
       var targetSel = getSelector(target);
-      rageClickBuffer.push({
-        target: targetSel,
-        timestamp: nowTs,
-        x: x,
-        y: y
-      });
+      rageClickBuffer.push({ target: targetSel, timestamp: nowTs, x: x, y: y });
       var cutoff = nowTs - 1000;
-      rageClickBuffer = rageClickBuffer.filter(function (c) {
-        return c.timestamp >= cutoff;
-      });
+      rageClickBuffer = rageClickBuffer.filter(function (c) { return c.timestamp >= cutoff; });
       var matching = rageClickBuffer.filter(function (c) {
         if (c.target !== targetSel) return false;
-        var dx = c.x - x;
-        var dy = c.y - y;
+        var dx = c.x - x, dy = c.y - y;
         return Math.sqrt(dx*dx + dy*dy) <= 30;
       });
       if (matching.length >= 3) {
-        rageClickEvents.push({
-          target: targetSel,
-          count: matching.length,
-          t: now(),
-          x: x,
-          y: y
-        });
+        rageClickEvents.push({ target: targetSel, count: matching.length, t: now(), x: x, y: y });
         if (rageClickEvents.length > 20) rageClickEvents.shift();
-        rageClickBuffer = rageClickBuffer.filter(function (c) {
-          return c.target !== targetSel;
-        });
+        rageClickBuffer = rageClickBuffer.filter(function (c) { return c.target !== targetSel; });
       }
     } catch (e) {}
   }
 
   // =========================================================
-  // FLAGON: INTERVAL LOG (aggregated rapid events)
+  // FLAGON: INTERVAL LOG
   // =========================================================
   function packageIntervalEvent(e) {
     try {
@@ -333,7 +240,6 @@ TRACKER_V3_JS = r"""(function () {
         intervalLogState.path = path;
         intervalLogState.startTimer = ts;
         intervalLogState.counter = 0;
-        intervalLogState.lastEvent = e;
       }
 
       if (intervalLogState.id !== targetSel || intervalLogState.type !== type) {
@@ -344,15 +250,9 @@ TRACKER_V3_JS = r"""(function () {
             type: intervalLogState.type,
             count: intervalLogState.counter,
             duration: ts - intervalLogState.startTimer,
-            startTime: intervalLogState.startTimer,
-            endTime: ts,
-            targetChange: intervalLogState.id !== targetSel,
-            typeChange: intervalLogState.type !== type,
             t: now()
           });
-          if (intervalLogState.intervalLogs.length > 50) {
-            intervalLogState.intervalLogs.shift();
-          }
+          if (intervalLogState.intervalLogs.length > 30) intervalLogState.intervalLogs.shift();
         }
         intervalLogState.id = targetSel;
         intervalLogState.type = type;
@@ -368,43 +268,30 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // FLAGON: MUTATION OBSERVER (DOM changes)
+  // FLAGON: MUTATION OBSERVER
   // =========================================================
   function setupMutationObserver() {
     if (!window.MutationObserver) return;
     try {
       domMutationObserver = new MutationObserver(function (records) {
-        try {
-          for (var i = 0; i < records.length; i++) {
-            var rec = records[i];
-            if (rec.type === 'childList') {
-              mutationSummary.added += rec.addedNodes ? rec.addedNodes.length : 0;
-              mutationSummary.removed += rec.removedNodes ? rec.removedNodes.length : 0;
-            } else if (rec.type === 'attributes') {
-              mutationSummary.attributes += 1;
-            }
-            mutationSummary.totalEvents += 1;
-            if (rec.target && mutationSummary.targets.length < 15) {
-              var sel = getSelector(rec.target);
-              if (sel && sel !== 'Unknown') {
-                mutationSummary.targets.push(sel);
-              }
-            }
+        for (var i = 0; i < records.length; i++) {
+          var rec = records[i];
+          if (rec.type === 'childList') {
+            mutationSummary.added += rec.addedNodes ? rec.addedNodes.length : 0;
+            mutationSummary.removed += rec.removedNodes ? rec.removedNodes.length : 0;
+          } else if (rec.type === 'attributes') {
+            mutationSummary.attributes += 1;
           }
-
-          if (mutationTimer === null) {
-            mutationTimer = setTimeout(function () {
-              mutationTimer = null;
-            }, RESOLUTION_MS);
+          mutationSummary.totalEvents += 1;
+          if (rec.target && mutationSummary.targets.length < 15) {
+            var sel = getSelector(rec.target);
+            if (sel && sel !== 'Unknown') mutationSummary.targets.push(sel);
           }
-        } catch (err) {}
+        }
       });
-
       if (document.documentElement) {
         domMutationObserver.observe(document.documentElement, {
-          childList: true,
-          subtree: true,
-          attributes: true,
+          childList: true, subtree: true, attributes: true,
           attributeFilter: ['class', 'id', 'hidden', 'disabled', 'style', 'aria-expanded']
         });
       }
@@ -419,15 +306,9 @@ TRACKER_V3_JS = r"""(function () {
   function isAdElement(el) {
     try {
       if (!el) return false;
-      var src = (el.src || '') + ' ' + (el.href || '') + ' ' + (el.data || '');
-      var cls = (el.className && typeof el.className === 'string') ? el.className : '';
-      var id = el.id || '';
-      var combined = (src + ' ' + cls + ' ' + id).toLowerCase();
-      for (var i = 0; i < AD_DOMAINS.length; i++) {
-        if (combined.indexOf(AD_DOMAINS[i]) !== -1) return true;
-      }
+      var combined = ((el.src || '') + ' ' + (el.href || '') + ' ' + ((typeof el.className === 'string') ? el.className : '') + ' ' + (el.id || '')).toLowerCase();
+      for (var i = 0; i < AD_DOMAINS.length; i++) if (combined.indexOf(AD_DOMAINS[i]) !== -1) return true;
       if (el.tagName === 'IFRAME' && (el.width >= 300 || el.style.width)) return true;
-      if (el.tagName === 'INS' && el.getAttribute('data-ad-client')) return true;
       return false;
     } catch (e) { return false; }
   }
@@ -440,32 +321,15 @@ TRACKER_V3_JS = r"""(function () {
         mutations.forEach(function (m) {
           if (m.type === 'childList') {
             m.addedNodes.forEach(function (n) {
-              if (n.nodeType === 1 && isAdElement(n)) {
-                if (!adSeenLoaded) {
-                  adSeenLoaded = true;
-                  adEvents.push({ event: 'loaded', t: now() });
-                }
+              if (n.nodeType === 1 && isAdElement(n) && !adSeenLoaded) {
+                adSeenLoaded = true;
+                adEvents.push({ event: 'loaded', t: now() });
               }
             });
           }
         });
       });
-      adObserver.observe(document.documentElement || document.body, {
-        childList: true, subtree: true,
-        attributes: true, attributeFilter: ['style', 'class']
-      });
-      setTimeout(function () {
-        try {
-          var ads = document.querySelectorAll('iframe, ins, [id*="ad"], [class*="ad"]');
-          for (var i = 0; i < ads.length; i++) {
-            if (isAdElement(ads[i])) {
-              adEvents.push({ event: 'loaded', t: now() });
-              adSeenLoaded = true;
-              break;
-            }
-          }
-        } catch (e) {}
-      }, 2000);
+      adObserver.observe(document.documentElement || document.body, { childList: true, subtree: true });
     } catch (e) {}
   }
 
@@ -483,11 +347,7 @@ TRACKER_V3_JS = r"""(function () {
       }
       try {
         var paints = performance.getEntriesByType('paint');
-        for (var i = 0; i < paints.length; i++) {
-          if (paints[i].name === 'first-paint') {
-            milestones.t_first_paint = Math.round(paints[i].startTime);
-          }
-        }
+        for (var i = 0; i < paints.length; i++) if (paints[i].name === 'first-paint') milestones.t_first_paint = Math.round(paints[i].startTime);
       } catch (e) {}
       if (firstInteractionTime) milestones.t_first_interaction = firstInteractionTime - startTime;
       if (firstMoveTime) milestones.t_first_move = firstMoveTime - startTime;
@@ -498,7 +358,7 @@ TRACKER_V3_JS = r"""(function () {
   }
 
   // =========================================================
-  // STACK TRACE TRAPS (vi-bot)
+  // STACK TRACE TRAPS
   // =========================================================
   function installTrap(obj, method) {
     try {
@@ -514,24 +374,23 @@ TRACKER_V3_JS = r"""(function () {
           disabled = false;
           var stackStr = (e && e.stack) ? String(e.stack).toLowerCase() : '';
           if (stackStr) {
-            var signatures = {
+            var sigs = {
               errorTrapPhantomJS: ['phantomjs'],
               errorTrapPuppeteer: ['puppeteer', '__puppeteer'],
               errorTrapPlaywrightChrome: ['playwright', '__playwright'],
               errorTrapPlaywrightFirefox: ['juggler', 'playwright'],
-              errorTrapPlaywrightWebKit: ['playwright', 'webkit'],
               errorTrapSeleniumChrome: ['selenium', 'webdriver'],
               errorTrapNightmare: ['nightmare', '__nightmare'],
               errorTrapCypress: ['cypress', '__cypress'],
               errorTrapPatchright: ['patchright'],
-              errorTrapBotd: ['botd'],
-              errorTrapFingerprintJS: ['fingerprintjs']
+              errorTrapPptrUrl: ['pptr:'],
+              errorTrapUtilityScript: ['utilityscript']
             };
-            for (var key in signatures) {
-              var sigs = signatures[key];
+            for (var key in sigs) {
+              var sigList = sigs[key];
               var allMatched = true;
-              for (var i = 0; i < sigs.length; i++) {
-                if (stackStr.indexOf(sigs[i]) === -1) { allMatched = false; break; }
+              for (var i = 0; i < sigList.length; i++) {
+                if (stackStr.indexOf(sigList[i]) === -1) { allMatched = false; break; }
               }
               if (allMatched) trapTriggers[key] = true;
             }
@@ -554,13 +413,9 @@ TRACKER_V3_JS = r"""(function () {
   // =========================================================
   // HONEYPOTS
   // =========================================================
-  var honeypotFields = [];
-  var honeypotDecoys = [];
-
   function randomFieldName() {
     var prefixes = ['email', 'username', 'name', 'phone', 'address', 'zip', 'city', 'website', 'company', 'comment'];
-    var prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    return prefix + '_' + Math.random().toString(36).slice(2, 6);
+    return prefixes[Math.floor(Math.random() * prefixes.length)] + '_' + Math.random().toString(36).slice(2, 6);
   }
 
   function injectHoneypots() {
@@ -578,43 +433,17 @@ TRACKER_V3_JS = r"""(function () {
       field.addEventListener('input', function () { if (field.value.length > 0) honeypotTriggered = true; });
       field.addEventListener('change', function () { if (field.value.length > 0) honeypotTriggered = true; });
       container.appendChild(field);
-      honeypotFields.push(field);
 
       var link = document.createElement('a');
       link.href = '#hp-' + Math.random();
       link.textContent = 'info';
       link.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;';
       link.setAttribute('aria-hidden', 'true');
-      link.setAttribute('tabindex', '-1');
-      link.addEventListener('click', function (e) {
-        e.preventDefault();
-        honeypotTriggered = true;
-      });
+      link.addEventListener('click', function (e) { e.preventDefault(); honeypotTriggered = true; });
       container.appendChild(link);
 
-      var decoy = document.createElement('input');
-      decoy.type = 'text';
-      decoy.name = randomFieldName();
-      decoy.style.cssText = 'display:block;visibility:visible;opacity:1;';
-      decoy.readOnly = true;
-      decoy.tabIndex = -1;
-      decoy.setAttribute('aria-hidden', 'true');
-      try {
-        Object.defineProperty(decoy, 'value', {
-          get: function () { return ''; },
-          set: function () {}
-        });
-      } catch (e) {}
-      container.appendChild(decoy);
-      honeypotDecoys.push(decoy);
-
-      if (document.body) {
-        document.body.appendChild(container);
-      } else {
-        document.addEventListener('DOMContentLoaded', function () {
-          document.body.appendChild(container);
-        });
-      }
+      if (document.body) document.body.appendChild(container);
+      else document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(container); });
     } catch (e) {}
   }
 
@@ -673,8 +502,7 @@ TRACKER_V3_JS = r"""(function () {
     var variance = 0;
     for (var j = 0; j < keyIntervals.length; j++) variance += Math.pow(keyIntervals[j] - mean, 2);
     variance = variance / keyIntervals.length;
-    var stdDev = Math.sqrt(variance);
-    var cv = stdDev / Math.max(mean, 0.001);
+    var cv = Math.sqrt(variance) / Math.max(mean, 0.001);
     if (keyIntervals.length < 10) return 0;
     var identicalCount = 0;
     for (var k = 0; k < keyIntervals.length - 1; k++) {
@@ -729,33 +557,22 @@ TRACKER_V3_JS = r"""(function () {
       var wdGetter = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver');
       if (wdGetter && wdGetter.get && !isNativeFn(wdGetter.get.toString())) det.webdriverSpoofed = 1;
     } catch (e) {}
-
-    try {
-      if (d.hasFocus && d.hasFocus() && w.outerWidth === 0 && w.outerHeight === 0) det.windowSize = 1;
-    } catch (e) {}
-
+    try { if (d.hasFocus && d.hasFocus() && w.outerWidth === 0 && w.outerHeight === 0) det.windowSize = 1; } catch (e) {}
     try {
       if (n.appVersion) {
         if (/headless/i.test(n.appVersion)) det.appVersionHeadless = 1;
         if (/electron/i.test(n.appVersion)) det.appVersionElectron = 1;
-        if (/slimerjs/i.test(n.appVersion)) det.appVersionSlimer = 1;
       }
     } catch (e) {}
-
     try {
       if (n.userAgent) {
         if (/PhantomJS/i.test(n.userAgent)) det.userAgentPhantom = 1;
         if (/Headless/i.test(n.userAgent)) det.userAgentHeadless = 1;
         if (/Electron/i.test(n.userAgent)) det.userAgentElectron = 1;
-        if (/slimerjs/i.test(n.userAgent)) det.userAgentSlimer = 1;
       }
     } catch (e) {}
-
     try { if (!Array.isArray(n.plugins)) det.pluginsArray = 1; } catch (e) {}
-    try {
-      if (n.languages && n.languages.length === 0) det.languagesEmpty = 1;
-    } catch (e) {}
-
+    try { if (n.languages && n.languages.length === 0) det.languagesEmpty = 1; } catch (e) {}
     try {
       var c = d.createElement('canvas');
       var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
@@ -768,37 +585,28 @@ TRACKER_V3_JS = r"""(function () {
         }
       }
     } catch (e) {}
-
     try {
       if (w.process) {
         if (w.process.type === 'renderer') det.processRenderer = 1;
         if (w.process.versions && w.process.versions.electron) det.processElectron = 1;
       }
     } catch (e) {}
-
     try {
       var err = new Error();
       throw err;
     } catch (e) {
       if (/PhantomJS/i.test(e.stack || '')) det.errorTracePhantom = 1;
     }
-
     try { if (typeof Function.prototype.bind === 'undefined') det.functionBind = 1; } catch (e) {}
-
     try {
       if (w.callPhantom || w._phantom || w.phantom) det.distinctivePhantom = 1;
       if (w.__nightmare) det.distinctiveNightmare = 1;
     } catch (e) {}
-
     try {
       var docKeys = Object.getOwnPropertyNames(d.documentElement);
       if (docKeys.indexOf('selenium') !== -1 || docKeys.indexOf('webdriver') !== -1) det.documentAttributes = 1;
     } catch (e) {}
-
-    try {
-      if (w.external && /Sequentum/i.test(String(w.external))) det.windowExternal = 1;
-    } catch (e) {}
-
+    try { if (w.external && /Sequentum/i.test(String(w.external))) det.windowExternal = 1; } catch (e) {}
     try {
       var ua = n.userAgent.toLowerCase();
       var bk = 'unknown';
@@ -806,18 +614,12 @@ TRACKER_V3_JS = r"""(function () {
       else if (ua.indexOf('firefox') !== -1) bk = 'firefox';
       else if (ua.indexOf('chrome') !== -1) bk = 'chrome';
       else if (ua.indexOf('safari') !== -1) bk = 'safari';
-      if ((bk === 'chrome' || bk === 'safari' || bk === 'opera' || bk === 'wechat') && n.productSub !== '20030107') {
-        det.productSub = 1;
-      }
+      if ((bk === 'chrome' || bk === 'safari') && n.productSub !== '20030107') det.productSub = 1;
     } catch (e) {}
-
     try {
       var isChrome = n.userAgent.indexOf('Chrome') !== -1 && n.userAgent.indexOf('Edg/') === -1;
-      if (isChrome && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        det.notificationPermissions = 1;
-      }
+      if (isChrome && typeof Notification !== 'undefined' && Notification.permission === 'granted') det.notificationPermissions = 1;
     } catch (e) {}
-
     try {
       var evalLen = eval.toString().length;
       var isChromium = (n.vendor && n.vendor.indexOf('Google') === 0);
@@ -844,67 +646,45 @@ TRACKER_V3_JS = r"""(function () {
         }
       }
     } catch (e) {}
-
     try {
       if (w.__puppeteer_evaluation_script__ !== undefined) det.puppeteer = 1;
       if (w.__playwright__ !== undefined) det.playwright = 1;
       if (w.__nightmare !== undefined) det.nightmare = 1;
       if (w.callPhantom !== undefined) det.phantom = 1;
     } catch (e) {}
-
     try {
-      var docKeys2 = Object.keys(d);
-      for (var j = 0; j < docKeys2.length; j++) {
-        var val = d[docKeys2[j]];
-        if (typeof val === 'object' && val !== null && 'cache_' in val) {
-          det.chromeDriver = 1;
-          break;
-        }
+      var docKeys = Object.keys(d);
+      for (var j = 0; j < docKeys.length; j++) {
+        var val = d[docKeys[j]];
+        if (typeof val === 'object' && val !== null && 'cache_' in val) { det.chromeDriver = 1; break; }
       }
     } catch (e) {}
-
     try {
       var createStr = Document.prototype.createElement.toString();
       var docCreateStr = document.createElement.toString();
-      if (isNativeFn(createStr) && isNativeFn(docCreateStr) &&
-          Document.prototype.createElement !== document.createElement) {
+      if (isNativeFn(createStr) && isNativeFn(docCreateStr) && Document.prototype.createElement !== document.createElement) {
         det.fakeCreateElement = 1;
       }
     } catch (e) {}
-
-    try {
-      var fnToStr = Function.prototype.toString;
-      if (!isNativeFn(fnToStr.toString())) det.toStringSpoofed = 1;
-    } catch (e) {}
-
+    try { if (!isNativeFn(Function.prototype.toString.toString())) det.toStringSpoofed = 1; } catch (e) {}
     try {
       var notifGetter = Object.getOwnPropertyDescriptor(Notification.prototype, 'permission');
-      if (notifGetter && notifGetter.get && !isNativeFn(notifGetter.get.toString())) {
-        det.stealthNotification = 1;
-      }
+      if (notifGetter && notifGetter.get && !isNativeFn(notifGetter.get.toString())) det.stealthNotification = 1;
     } catch (e) {}
-
     try {
       var pluginsGetter = Object.getOwnPropertyDescriptor(Navigator.prototype, 'plugins');
-      if (pluginsGetter && pluginsGetter.get && !isNativeFn(pluginsGetter.get.toString())) {
-        det.stealthPlugins = 1;
-      }
+      if (pluginsGetter && pluginsGetter.get && !isNativeFn(pluginsGetter.get.toString())) det.stealthPlugins = 1;
     } catch (e) {}
-
     try {
       var gcsStr = HTMLCanvasElement.prototype.getContext.toString();
       if (!isNativeFn(gcsStr) && gcsStr.length > 200) det.stealthCanvas = 1;
     } catch (e) {}
-
     try {
       if (w.chrome && typeof w.chrome === 'object') {
         var chromeKeys = Object.keys(w.chrome);
-        if (chromeKeys.indexOf('loadTimes') !== -1 && chromeKeys[0] !== 'loadTimes') {
-          det.wrongChromeOrder = 1;
-        }
+        if (chromeKeys.indexOf('loadTimes') !== -1 && chromeKeys[0] !== 'loadTimes') det.wrongChromeOrder = 1;
       }
     } catch (e) {}
-
     try {
       var isChromium3 = n.vendor && n.vendor.indexOf('Google') === 0;
       if (isChromium3 && s.orientation && s.orientation.type === 'landscape-primary' && s.orientation.angle === 90) {
@@ -912,7 +692,6 @@ TRACKER_V3_JS = r"""(function () {
         if (!hasChromeRt && 'SharedWorker' in w) det.playwrightOrientation = 1;
       }
     } catch (e) {}
-
     try {
       var iframe = d.createElement('iframe');
       iframe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;';
@@ -920,41 +699,30 @@ TRACKER_V3_JS = r"""(function () {
       var ifWin = iframe.contentWindow;
       if (ifWin) {
         if (ifWin.chrome && ifWin.chrome.runtime) {
-          if (ifWin.chrome.runtime.connect || ifWin.chrome.runtime.sendMessage) {
-            det.iframeChromeRuntime = 1;
-          }
+          if (ifWin.chrome.runtime.connect || ifWin.chrome.runtime.sendMessage) det.iframeChromeRuntime = 1;
         }
       }
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
     } catch (e) {}
-
     try {
       if (s.width === 0 || s.height === 0) det.screenZero = 1;
       if (s.availWidth > s.width || s.availHeight > s.height) det.screenAvail = 1;
       if (s.colorDepth !== s.pixelDepth) det.colorMismatch = 1;
     } catch (e) {}
-
     try {
       if (!n.languages || n.languages.length === 0) det.navLanguages = 1;
       if (!n.plugins || n.plugins.length === 0) det.navPlugins = 1;
       if (n.hardwareConcurrency === undefined || n.hardwareConcurrency === 0) det.navCores = 1;
     } catch (e) {}
-
     try {
       var hc = n.hardwareConcurrency;
       if (hc === undefined || hc === 0) det.hardwareZero = 1;
       if (hc > 64) det.hardwareAbsurd = 1;
     } catch (e) {}
-
     try {
       var p = w.performance;
-      if (p && p.timing) {
-        if (p.timing.navigationStart === 0 && p.timing.fetchStart === 0) {
-          det.performanceZero = 1;
-        }
-      }
+      if (p && p.timing && p.timing.navigationStart === 0 && p.timing.fetchStart === 0) det.performanceZero = 1;
     } catch (e) {}
-
     try {
       var t0 = performance.now();
       var t1 = performance.now();
@@ -964,7 +732,6 @@ TRACKER_V3_JS = r"""(function () {
         if (t3 - t2 === 0) det.timingZero = 1;
       }
     } catch (e) {}
-
     try {
       var baseFonts = ['Arial', 'Calibri', 'Cambria', 'Consolas', 'Courier New', 'Georgia', 'Helvetica', 'Impact', 'Tahoma', 'Times New Roman'];
       var fcanvas = d.createElement('canvas');
@@ -981,7 +748,6 @@ TRACKER_V3_JS = r"""(function () {
         if (found <= 3) det.fontFew = 1;
       }
     } catch (e) {}
-
     try {
       var isTouch = ('ontouchstart' in w) || n.maxTouchPoints > 0;
       if (!isTouch && d.body) {
@@ -995,7 +761,6 @@ TRACKER_V3_JS = r"""(function () {
         d.body.removeChild(div);
       }
     } catch (e) {}
-
     try {
       var isTouch2 = ('ontouchstart' in w) || n.maxTouchPoints > 0;
       if (!isTouch2) {
@@ -1006,7 +771,6 @@ TRACKER_V3_JS = r"""(function () {
         } catch (e) {}
       }
     } catch (e) {}
-
     try {
       var wglCanvas = d.createElement('canvas');
       var wglCtx = wglCanvas.getContext('webgl') || wglCanvas.getContext('experimental-webgl');
@@ -1016,6 +780,308 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
 
     return det;
+  }
+
+  // =========================================================
+  // REBROWSER-BOT-DETECTOR TESTS (10 critical tests)
+  // =========================================================
+  function runRebrowserTests() {
+    var rb = {};
+    var w = window, n = navigator, d = document;
+
+    // 1) pwInitScripts — Playwright's __pwInitScripts
+    try {
+      if (typeof w.__pwInitScripts !== 'undefined') rb.pwInitScripts = 1;
+      if (typeof w.__playwright__binding__ !== 'undefined') rb.pwBinding = 1;
+    } catch (e) {}
+
+    // 2) documentInterception — Patchright signature
+    try {
+      var navEntries = performance.getEntriesByType('navigation');
+      if (navEntries && navEntries.length > 0) {
+        var navEntry = navEntries[0];
+        var nextHop = navEntry.nextHopProtocol || '';
+        var transferSize = navEntry.transferSize || 0;
+        var workerStart = navEntry.workerStart || 0;
+        if (nextHop === '' && transferSize > 0 && workerStart === 0) {
+          rb.documentInterception = 1;
+        }
+      }
+    } catch (e) {}
+
+    // 3) runtimeEnableLeak — CDP Runtime.enable detection
+    try {
+      var stackLookupCount = 0;
+      var prepareStackTraceCount = 0;
+      var nameGetterCount = 0;
+      var rounds = 3;
+
+      for (var ri = 0; ri < rounds; ri++) {
+        var testErr = new Error();
+        Object.defineProperty(testErr, 'stack', {
+          configurable: false, enumerable: false,
+          get: function () { stackLookupCount += 1; return ''; }
+        });
+        try { console.debug(testErr); } catch (e) {}
+
+        var origDesc = Object.getOwnPropertyDescriptor(Error, 'prepareStackTrace');
+        if (!origDesc || origDesc.configurable) {
+          var origPrepare = Error.prepareStackTrace;
+          var probeErr;
+          try {
+            Object.defineProperty(Error, 'prepareStackTrace', {
+              configurable: true, writable: true,
+              value: function (err, frames) {
+                if (err === probeErr) prepareStackTraceCount += 1;
+                return origPrepare ? origPrepare(err, frames) : String(err);
+              }
+            });
+            probeErr = new Error('runtimeEnableLeak');
+            try { console.debug(probeErr); } catch (e) {}
+          } finally {
+            if (origDesc) Object.defineProperty(Error, 'prepareStackTrace', origDesc);
+            else delete Error.prepareStackTrace;
+          }
+        }
+
+        class RLE extends Error {
+          get name() { nameGetterCount += 1; return 'RuntimeEnableLeakError'; }
+        }
+        try { console.debug(new RLE('runtimeEnableLeak')); } catch (e) {}
+      }
+
+      if (prepareStackTraceCount > 0 || nameGetterCount / rounds > 1.5) rb.runtimeEnableLeak = 1;
+      else if (stackLookupCount > 0) rb.runtimeEnableLeak = 0.7;
+    } catch (e) {}
+
+    // 4) sourceUrlLeak — detect pptr: / UtilityScript. / bare app.js
+    try {
+      var srcErr = new Error('Detection Error');
+      var stackStr = srcErr.stack ? srcErr.stack.toString() : '';
+      if (stackStr.indexOf('pptr:') !== -1) { rb.sourceUrlLeak = 1; rb.sourceUrlKind = 'puppeteer'; }
+      else if (stackStr.indexOf('UtilityScript.') !== -1) { rb.sourceUrlLeak = 1; rb.sourceUrlKind = 'playwright'; }
+      else {
+        // Check for bare file names (injected via //# sourceURL=app.js without a URL)
+        var bareFiles = [];
+        var lines = stackStr.split('\n');
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li];
+          if (!/^\s*at /.test(line)) continue;
+          var m = line.match(/([^\s(),]*):(\d+):(\d+)/g);
+          if (m) {
+            for (var mi = 0; mi < m.length; mi++) {
+              var fp = m[mi].split(':')[0];
+              if (fp === '' || fp === '<anonymous>' || /^[a-z][a-z0-9+.-]*:/i.test(fp)) continue;
+              bareFiles.push(fp);
+            }
+          }
+        }
+        if (bareFiles.length > 0) { rb.sourceUrlLeak = 0.5; rb.bareFiles = bareFiles.slice(0, 5); }
+      }
+    } catch (e) {}
+
+    // 5) nativeTampering — Proxy cyclic __proto__ detection
+    try {
+      var tampered = [];
+      var automationFrames = [];
+      var targets = {
+        'Navigator.webdriver': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver'); return d && d.get; })(),
+        'Navigator.userAgent': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent'); return d && d.get; })(),
+        'Navigator.platform': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'platform'); return d && d.get; })(),
+        'Navigator.languages': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'languages'); return d && d.get; })(),
+        'Navigator.plugins': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'plugins'); return d && d.get; })(),
+        'Navigator.hardwareConcurrency': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'hardwareConcurrency'); return d && d.get; })(),
+        'Navigator.deviceMemory': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'deviceMemory'); return d && d.get; })(),
+        'Navigator.maxTouchPoints': (function () { var d = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints'); return d && d.get; })(),
+        'Screen.width': (function () { var d = Object.getOwnPropertyDescriptor(Screen.prototype, 'width'); return d && d.get; })(),
+        'Screen.height': (function () { var d = Object.getOwnPropertyDescriptor(Screen.prototype, 'height'); return d && d.get; })(),
+        'Permissions.query': w.Permissions && w.Permissions.prototype && w.Permissions.prototype.query,
+        'WebGLRenderingContext.getParameter': w.WebGLRenderingContext && w.WebGLRenderingContext.prototype && w.WebGLRenderingContext.prototype.getParameter,
+        'HTMLCanvasElement.toDataURL': HTMLCanvasElement.prototype.toDataURL,
+        'HTMLIFrameElement.contentWindow': (function () { var d = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow'); return d && d.get; })(),
+        'Function.toString': Function.prototype.toString,
+        'Date.getTimezoneOffset': Date.prototype.getTimezoneOffset,
+        'Intl.DateTimeFormat.resolvedOptions': Intl.DateTimeFormat.prototype.resolvedOptions
+      };
+
+      for (var tname in targets) {
+        var fn = targets[tname];
+        if (typeof fn !== 'function') continue;
+        var reasons = [];
+
+        // Check 1: Native source code
+        var src = Function.prototype.toString.call(fn);
+        if (!/^function [^(]*\(\) \{\s*\[native code\]\s*\}$/.test(src)) {
+          reasons.push('toString mismatch');
+        }
+
+        // Check 2: own prototype
+        if (Object.prototype.hasOwnProperty.call(fn, 'prototype')) {
+          reasons.push('has own prototype');
+        }
+
+        // Check 3: Proxy detection via cyclic __proto__
+        var origProto = Object.getPrototypeOf(fn);
+        try {
+          Object.setPrototypeOf(fn, Object.create(fn));
+          reasons.push('proxy detected (cyclic __proto__ accepted)');
+        } catch (ce) {
+          // Expected for native functions
+        } finally {
+          try {
+            if (Object.getPrototypeOf(fn) !== origProto) Object.setPrototypeOf(fn, origProto);
+          } catch (re) {
+            reasons.push('prototype restore threw');
+          }
+        }
+
+        // Check 4: Call the function and look for automation stack frames
+        try {
+          var callResult = fn.call(Object.create(null));
+          if (callResult && typeof callResult.then === 'function') {
+            // Skip async - would need setTimeout
+          }
+        } catch (ce) {
+          var errStack = String(ce && ce.stack).split('\n').slice(1);
+          for (var ei = 0; ei < errStack.length; ei++) {
+            if (/pptr:|UtilityScript\.|newHandler\.<computed>/.test(errStack[ei])) {
+              automationFrames.push(tname);
+              break;
+            }
+          }
+        }
+
+        if (reasons.length > 0) tampered.push({ name: tname, reasons: reasons });
+      }
+
+      // Check for navigator own properties (stealth plugins do this)
+      try {
+        var ownNav = Object.getOwnPropertyNames(navigator);
+        if (ownNav.length > 0) {
+          rb.navOwnProps = ownNav.slice(0, 10);
+        }
+      } catch (e) {}
+
+      // Check iframe.contentWindow evasion (puppeteer-extra-plugin-stealth)
+      try {
+        var ifr = d.createElement('iframe');
+        ifr.srcdoc = '<p></p>';
+        ifr.style.display = 'none';
+        d.body.appendChild(ifr);
+        setTimeout(function () {
+          try {
+            if (ifr.contentWindow && ifr.contentWindow.Navigator === window.Navigator) {
+              rb.iframeRealmShared = 1;
+            }
+          } catch (e) {}
+          try { ifr.remove(); } catch (e) {}
+        }, 100);
+      } catch (e) {}
+
+      if (tampered.length > 0) rb.nativeTampered = tampered.slice(0, 5);
+      if (automationFrames.length > 0) rb.automationFrames = automationFrames.slice(0, 5);
+    } catch (e) {}
+
+    // 6) exposeFunctionLeak — puppeteer_* / __playwright__binding__
+    try {
+      var keyList = Object.keys(window);
+      for (var ki = 0; ki < keyList.length; ki++) {
+        var kname = keyList[ki];
+        if (kname.indexOf('puppeteer_') === 0) { rb.exposeFunctionLeak = 1; rb.exposeKind = 'puppeteer'; break; }
+        if (kname === '__playwright__binding__') { rb.exposeFunctionLeak = 1; rb.exposeKind = 'playwright'; break; }
+        try {
+          if (typeof window[kname] === 'function' && window[kname].__installed === true) {
+            rb.exposeFunctionLeak = 1; rb.exposeKind = 'playwright_installed'; break;
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    // 7) cdpBindingGlobals — unnamed native functions on window
+    try {
+      var unnamed = [];
+      var props = Object.getOwnPropertyNames(window);
+      for (var pi = 0; pi < props.length; pi++) {
+        try {
+          var desc = Object.getOwnPropertyDescriptor(window, props[pi]);
+          if (!desc || !('value' in desc)) continue;
+          if (typeof desc.value === 'function' && desc.value.name === '' && /\{\s*\[native code\]\s*\}\s*$/.test(Function.prototype.toString.call(desc.value))) {
+            unnamed.push(props[pi]);
+          }
+        } catch (e) {}
+      }
+      if (unnamed.length >= 2) rb.cdpBindingGlobals = unnamed.slice(0, 5);
+    } catch (e) {}
+
+    // 8) headless — chrome-headless-shell indicators
+    try {
+      var isDesktop = !(navigator.userAgentData && navigator.userAgentData.mobile) && !/Android|iPhone|iPad|Mobile/.test(navigator.userAgent);
+      var isChromium = n.vendor && n.vendor.indexOf('Google') === 0;
+      if (isChromium && isDesktop && typeof window.chrome === 'undefined') {
+        rb.headlessNoChrome = 1;
+      }
+      if (window.Notification && Notification.permission === 'denied') {
+        rb.headlessNotificationDenied = 0.5;
+      }
+      if (screen.width === 800 && screen.height === 600) {
+        rb.headless800x600 = 0.5;
+      }
+      if (navigator.userAgent.indexOf('HeadlessChrome') !== -1) {
+        rb.headlessUA = 1;
+      }
+    } catch (e) {}
+
+    // 9) mobileEmulation — maxTouchPoints=1 on mobile
+    try {
+      var isMobileUA = /Android|iPhone|iPad|iPod|Mobile/.test(navigator.userAgent);
+      if (isMobileUA) {
+        if (navigator.maxTouchPoints === 1) rb.mobileTouch1 = 0.5;
+        if (navigator.maxTouchPoints === 0) rb.mobileTouch0 = 0.5;
+        var uaIsIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        if (uaIsIOS && navigator.vendor === 'Google Inc.') rb.mobileIOSChromium = 0.5;
+      }
+    } catch (e) {}
+
+    // 10) workerConsistency — navigator values differ in worker
+    // (Simplified: we skip the async worker check to avoid delaying the payload.
+    //  The server-side check uses the fingerprint values we already send.)
+
+    // 11) platformMismatch — UA vs platform
+    try {
+      var uaLower = navigator.userAgent.toLowerCase();
+      var platformLower = (navigator.platform || '').toLowerCase();
+      var uaOS = 'unknown';
+      if (uaLower.indexOf('windows') !== -1) uaOS = 'windows';
+      else if (uaLower.indexOf('mac os') !== -1 || uaLower.indexOf('macintosh') !== -1) uaOS = 'macos';
+      else if (uaLower.indexOf('linux') !== -1) uaOS = 'linux';
+      else if (uaLower.indexOf('android') !== -1) uaOS = 'android';
+      else if (uaLower.indexOf('iphone') !== -1 || uaLower.indexOf('ipad') !== -1) uaOS = 'ios';
+
+      var platOS = 'unknown';
+      if (platformLower.indexOf('win') === 0) platOS = 'windows';
+      else if (platformLower.indexOf('mac') === 0) platOS = 'macos';
+      else if (platformLower.indexOf('linux') === 0) platOS = 'linux';
+      else if (platformLower.indexOf('iphone') === 0 || platformLower.indexOf('ipad') === 0) platOS = 'ios';
+
+      if (uaOS !== 'unknown' && platOS !== 'unknown' && uaOS !== platOS) {
+        rb.platformMismatch = { ua: uaOS, platform: platOS };
+      }
+
+      // ActiveText color trick (Chrome 138+)
+      try {
+        var el = d.createElement('div');
+        el.style.setProperty('color-scheme', 'light', 'important');
+        el.style.setProperty('color', 'ActiveText', 'important');
+        d.body.appendChild(el);
+        var activeColor = window.getComputedStyle(el).color;
+        el.remove();
+        if (uaOS === 'windows' && activeColor === 'rgb(255, 0, 0)') {
+          rb.activeTextMismatch = 0.5;
+        }
+      } catch (e) {}
+    } catch (e) {}
+
+    return rb;
   }
 
   // =========================================================
@@ -1032,8 +1098,7 @@ TRACKER_V3_JS = r"""(function () {
         if (counters.mousemove > 5) first30s.has_interaction_30s = true;
       }
       markActivity();
-      var t = Date.now();
-      var x = e.clientX, y = e.clientY;
+      var t = Date.now(), x = e.clientX, y = e.clientY;
       if (lastMouseX && lastMouseY) {
         var dx = x - lastMouseX, dy = y - lastMouseY;
         mouseTotalDistance += Math.sqrt(dx*dx + dy*dy);
@@ -1052,37 +1117,27 @@ TRACKER_V3_JS = r"""(function () {
       counters.clicks++;
       if (firstClickTime === null) firstClickTime = Date.now();
       if (firstInteractionTime === null) firstInteractionTime = Date.now();
-      if (now() <= 30000) {
-        first30s.clicks_30s++;
-        first30s.has_interaction_30s = true;
-      }
+      if (now() <= 30000) { first30s.clicks_30s++; first30s.has_interaction_30s = true; }
 
-      var cx = Math.round(e.clientX);
-      var cy = Math.round(e.clientY);
+      var cx = Math.round(e.clientX), cy = Math.round(e.clientY);
       clicksPoints.push({ x: cx, y: cy, t: now() });
       if (clicksPoints.length > 20) clicksPoints.shift();
 
-      // FLAGON: rage click detection
       recordRageClick(e.target, cx, cy);
-
-      // FLAGON: interval log
       packageIntervalEvent(e);
 
-      // FLAGON: detailed event with target rect
       try {
         var rect = getTargetRect(e.target);
         var path = buildPath(e);
         detailedEvents.push({
           type: 'click',
           target: e.target ? getSelector(e.target) : 'Unknown',
-          path: path,
-          rect: rect,
-          details: extractMouseDetails(e),
+          path: path, rect: rect,
+          details: { clicks: e.detail, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey },
           t: now()
         });
         if (detailedEvents.length > 50) detailedEvents.shift();
       } catch (err) {}
-
       markActivity();
     }, { passive: true });
 
@@ -1090,16 +1145,10 @@ TRACKER_V3_JS = r"""(function () {
       counters.scrolls++;
       if (firstScrollTime === null) firstScrollTime = Date.now();
       markActivity();
-      if (now() <= 30000) {
-        first30s.scrolls_30s++;
-        first30s.has_interaction_30s = true;
-      }
-
-      // FLAGON: interval log
+      if (now() <= 30000) { first30s.scrolls_30s++; first30s.has_interaction_30s = true; }
       packageIntervalEvent({ type: 'scroll', target: document.body });
 
-      var t = Date.now();
-      var y = window.pageYOffset || 0;
+      var t = Date.now(), y = window.pageYOffset || 0;
       try {
         var docH = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
         var pct = Math.min(100, (y / docH) * 100);
@@ -1146,18 +1195,12 @@ TRACKER_V3_JS = r"""(function () {
       if (firstKeyTime === null) firstKeyTime = Date.now();
       if (firstInteractionTime === null) firstInteractionTime = Date.now();
       markActivity();
-      if (now() <= 30000) {
-        first30s.keys_30s++;
-        first30s.has_interaction_30s = true;
-      }
+      if (now() <= 30000) { first30s.keys_30s++; first30s.has_interaction_30s = true; }
       if (e.key === 'Backspace') counters.backspace++;
       var t = Date.now();
       if (window._ovgLastKeyTime) {
         var interval = t - window._ovgLastKeyTime;
-        if (interval > 0 && interval < 5000) {
-          keyIntervals.push(interval);
-          if (keyIntervals.length > 100) keyIntervals.shift();
-        }
+        if (interval > 0 && interval < 5000) { keyIntervals.push(interval); if (keyIntervals.length > 100) keyIntervals.shift(); }
       }
       window._ovgLastKeyTime = t;
       if (lastKeyTime && (t - lastKeyTime) < 1000) {} else if (lastKeyTime) typingBursts++;
@@ -1166,31 +1209,23 @@ TRACKER_V3_JS = r"""(function () {
     }, { passive: true });
 
     window.addEventListener('blur', function () { markActivity(); });
-
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'hidden') finalize('hidden');
-    });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') finalize('hidden'); });
     window.addEventListener('pagehide', function () { finalize('pagehide'); });
     window.addEventListener('beforeunload', function () { finalize('beforeunload'); });
-
     setInterval(checkIdle, 5000);
   }
 
   // =========================================================
-  // FINGERPRINT
+  // FINGERPRINT BUILDERS
   // =========================================================
   function getCanvasHash() {
     try {
-      var c = document.createElement('canvas');
-      c.width = 220; c.height = 40;
+      var c = document.createElement('canvas'); c.width = 220; c.height = 40;
       var ctx = c.getContext('2d');
       if (!ctx) return 'blocked';
-      ctx.textBaseline = 'top';
-      ctx.font = '15px Arial';
-      ctx.fillStyle = '#f60';
-      ctx.fillRect(120, 1, 62, 20);
-      ctx.fillStyle = '#069';
-      ctx.fillText('OVG-v3', 2, 15);
+      ctx.textBaseline = 'top'; ctx.font = '15px Arial';
+      ctx.fillStyle = '#f60'; ctx.fillRect(120, 1, 62, 20);
+      ctx.fillStyle = '#069'; ctx.fillText('OVG-v3', 2, 15);
       var data = c.toDataURL();
       var h = 5381;
       for (var i = 0; i < data.length; i++) h = ((h << 5) + h + data.charCodeAt(i)) | 0;
@@ -1219,18 +1254,12 @@ TRACKER_V3_JS = r"""(function () {
       if (!gl) return { high_float: -1, medium_float: -1 };
       var hf = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
       var mf = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT);
-      return {
-        high_float: hf ? hf.precision : -1,
-        medium_float: mf ? mf.precision : -1
-      };
+      return { high_float: hf ? hf.precision : -1, medium_float: mf ? mf.precision : -1 };
     } catch (e) { return { high_float: -1, medium_float: -1 }; }
   }
 
   function getAutomation() {
-    var out = {
-      puppeteer: false, playwright: false, selenium: false,
-      nightmare: false, phantom: false, cdc: false
-    };
+    var out = { puppeteer: false, playwright: false, selenium: false, nightmare: false, phantom: false, cdc: false };
     try {
       if (window.__puppeteer_evaluation_script__ !== undefined) out.puppeteer = true;
       if (window.__playwright__ !== undefined) out.playwright = true;
@@ -1238,9 +1267,7 @@ TRACKER_V3_JS = r"""(function () {
       if (window.callPhantom !== undefined) out.phantom = true;
       var keys = Object.keys(window);
       for (var i = 0; i < keys.length; i++) {
-        if (keys[i].indexOf('$cdc_') === 0 || keys[i].indexOf('cdc_') === 0) {
-          out.cdc = true; out.selenium = true; break;
-        }
+        if (keys[i].indexOf('$cdc_') === 0 || keys[i].indexOf('cdc_') === 0) { out.cdc = true; out.selenium = true; break; }
       }
     } catch (e) {}
     return out;
@@ -1250,9 +1277,7 @@ TRACKER_V3_JS = r"""(function () {
     try {
       var detected = false;
       var err = new Error();
-      Object.defineProperty(err, 'stack', {
-        get: function () { detected = true; return ''; }
-      });
+      Object.defineProperty(err, 'stack', { get: function () { detected = true; return ''; } });
       if (console.debug) console.debug(err);
       return detected;
     } catch (e) { return false; }
@@ -1265,8 +1290,7 @@ TRACKER_V3_JS = r"""(function () {
       var v = window.speechSynthesis.getVoices();
       if (v && v.length > 0) { _speechVoices = v.length; return; }
       window.speechSynthesis.onvoiceschanged = function () {
-        var v2 = window.speechSynthesis.getVoices();
-        _speechVoices = v2 ? v2.length : 0;
+        _speechVoices = window.speechSynthesis.getVoices().length;
       };
       _speechVoices = v ? v.length : 0;
     } catch (e) { _speechVoices = -1; }
@@ -1276,19 +1300,11 @@ TRACKER_V3_JS = r"""(function () {
     try {
       if (navigator.userAgentData && navigator.userAgentData.brands) {
         return navigator.userAgentData.brands.map(function (b) {
-          return {
-            brand: String(b.brand || ''),
-            version: String(b.version || '')
-          };
+          return { brand: String(b.brand || ''), version: String(b.version || '') };
         });
       }
     } catch (e) {}
     return [];
-  }
-
-  function getIntlLocale() {
-    try { return Intl.DateTimeFormat().resolvedOptions().locale || 'Unknown'; }
-    catch (e) { return 'Unknown'; }
   }
 
   function getConnection() {
@@ -1298,8 +1314,7 @@ TRACKER_V3_JS = r"""(function () {
       return {
         rtt: typeof c.rtt === 'number' ? c.rtt : -1,
         downlink: typeof c.downlink === 'number' ? c.downlink : -1,
-        effective_type: String(c.effectiveType || 'Unknown'),
-        save_data: c.saveData === true
+        effective_type: String(c.effectiveType || 'Unknown')
       };
     } catch (e) { return { rtt: -1, downlink: -1, effective_type: 'Unknown' }; }
   }
@@ -1328,10 +1343,7 @@ TRACKER_V3_JS = r"""(function () {
     var pluginsCount = -1;
     try { pluginsCount = navigator.plugins ? navigator.plugins.length : -1; } catch (e) {}
     var langs = [];
-    try {
-      var l = navigator.languages;
-      if (l) for (var i = 0; i < l.length && i < 5; i++) langs.push(String(l[i]));
-    } catch (e) {}
+    try { var l = navigator.languages; if (l) for (var i = 0; i < l.length && i < 5; i++) langs.push(String(l[i])); } catch (e) {}
     var tz = 'Unknown';
     try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown'; } catch (e) {}
     var chromeCheck = 'error';
@@ -1340,6 +1352,8 @@ TRACKER_V3_JS = r"""(function () {
       else if (typeof window.chrome.runtime === 'undefined') chromeCheck = 'window_chrome_no_runtime';
       else chromeCheck = 'full';
     } catch (e) {}
+    var intlLocale = 'Unknown';
+    try { intlLocale = Intl.DateTimeFormat().resolvedOptions().locale || 'Unknown'; } catch (e) {}
 
     return {
       timezone: tz,
@@ -1357,26 +1371,22 @@ TRACKER_V3_JS = r"""(function () {
       pdf_viewer: (navigator.pdfViewerEnabled === true),
       speech_voices: _speechVoices,
       ua_brands: getUABrands(),
-      intl_locale: getIntlLocale(),
+      intl_locale: intlLocale,
       connection: getConnection(),
       botd: runBotDDetectors(),
       vib: runVIBotDetectors(),
+      rebrowser: runRebrowserTests(),
       trap_triggers: trapTriggers,
-      honeypot_triggered: honeypotTriggered,
-      rage_clicks: rageClickEvents.slice(-10)
+      honeypot_triggered: honeypotTriggered
     };
   }
 
   function buildScreen() {
     return {
-      width: screen.width,
-      height: screen.height,
-      availWidth: screen.availWidth,
-      availHeight: screen.availHeight,
-      colorDepth: screen.colorDepth,
-      pixelRatio: window.devicePixelRatio || 1,
-      innerWidth: window.innerWidth || 0,
-      innerHeight: window.innerHeight || 0
+      width: screen.width, height: screen.height,
+      availWidth: screen.availWidth, availHeight: screen.availHeight,
+      colorDepth: screen.colorDepth, pixelRatio: window.devicePixelRatio || 1,
+      innerWidth: window.innerWidth || 0, innerHeight: window.innerHeight || 0
     };
   }
 
@@ -1397,12 +1407,9 @@ TRACKER_V3_JS = r"""(function () {
       for (var j = 0; j < mouseVelocities.length; j++) sum += mouseVelocities[j];
       meanVel = sum / mouseVelocities.length;
       var sqSum = 0;
-      for (var k = 0; k < mouseVelocities.length; k++) {
-        sqSum += Math.pow(mouseVelocities[k] - meanVel, 2);
-      }
+      for (var k = 0; k < mouseVelocities.length; k++) sqSum += Math.pow(mouseVelocities[k] - meanVel, 2);
       variance = sqSum / mouseVelocities.length;
     }
-
     return {
       mouse_distance_total: Math.round(mouseTotalDistance),
       mouse_velocity_variance: Math.round(variance * 100) / 100,
@@ -1427,11 +1434,8 @@ TRACKER_V3_JS = r"""(function () {
       idle_periods_count: idlePeriods.length,
       longest_idle_ms: idlePeriods.length ? Math.max.apply(null, idlePeriods.map(function(p){return p.dur;})) : 0,
       events: {
-        mousemove: counters.mousemove,
-        touchstart: counters.touchstart,
-        clicks: counters.clicks,
-        scrolls: counters.scrolls,
-        keydown: counters.keydown
+        mousemove: counters.mousemove, touchstart: counters.touchstart,
+        clicks: counters.clicks, scrolls: counters.scrolls, keydown: counters.keydown
       },
       mouse_points: mousePoints.slice(-100),
       behavior_scores: {
@@ -1440,7 +1444,6 @@ TRACKER_V3_JS = r"""(function () {
         scroll: analyzeScrollBehavior(),
         interaction: analyzeInteractionBehavior()
       },
-      // FLAGON additions
       rage_clicks: rageClickEvents.slice(-20),
       interval_logs: intervalLogState.intervalLogs.slice(-30),
       mutation_summary: {
@@ -1460,18 +1463,11 @@ TRACKER_V3_JS = r"""(function () {
   function doHandshake() {
     if (handshakeDone) return;
     handshakeDone = true;
-    var navObj = buildNav();
     var body = {
-      v: 3,
-      session_id: sessionId,
-      click_id: clickId,
-      campaign_key: CAMPAIGN_KEY,
-      url: location.href,
-      t_ms: Math.round(now()),
-      nav: navObj,
-      fp: buildFingerprint(),
-      consent_state: 'unknown',
-      tracking_params: trackingParams
+      v: 3, session_id: sessionId, click_id: clickId,
+      campaign_key: CAMPAIGN_KEY, url: location.href, t_ms: Math.round(now()),
+      nav: buildNav(), fp: buildFingerprint(),
+      consent_state: 'unknown', tracking_params: trackingParams
     };
     safeSend(ENDPOINT + '/api/collect/handshake', body, false).then(function (r) {
       if (r && r.data && r.data.hide) {
@@ -1488,19 +1484,13 @@ TRACKER_V3_JS = r"""(function () {
   function sendHeartbeat() {
     if (finalSent) return;
     seq++;
-    var body = {
-      v: 3,
-      session_id: sessionId,
-      seq: seq,
-      t_ms: Math.round(now()),
-      clicks: counters.clicks,
-      scrolls: counters.scrolls,
-      mousemoves: counters.mousemove,
-      keydowns: counters.keydown,
+    safeSend(ENDPOINT + '/api/collect/heartbeat', {
+      v: 3, session_id: sessionId, seq: seq, t_ms: Math.round(now()),
+      clicks: counters.clicks, scrolls: counters.scrolls,
+      mousemoves: counters.mousemove, keydowns: counters.keydown,
       is_visible: document.visibilityState === 'visible',
       is_focused: document.hasFocus()
-    };
-    safeSend(ENDPOINT + '/api/collect/heartbeat', body, false).catch(function () {});
+    }, false).catch(function () {});
   }
 
   function startHeartbeatTimer() {
@@ -1511,11 +1501,10 @@ TRACKER_V3_JS = r"""(function () {
   function scheduleNextHeartbeat() {
     if (finalSent) return;
     var jitter = (Math.random() - 0.5) * 2 * HEARTBEAT_JITTER_MS;
-    var wait = HEARTBEAT_INTERVAL_MS + jitter;
     heartbeatTimer = setTimeout(function () {
       sendHeartbeat();
       scheduleNextHeartbeat();
-    }, wait);
+    }, HEARTBEAT_INTERVAL_MS + jitter);
   }
 
   function finalize(reason) {
@@ -1534,37 +1523,24 @@ TRACKER_V3_JS = r"""(function () {
     try { screenObj = buildScreen(); } catch (e) { screenObj = {}; }
 
     var body = {
-      v: 3,
-      session_id: sessionId,
-      click_id: clickId,
-      campaign_key: CAMPAIGN_KEY,
-      seq: 999,
-      t_ms: Math.round(now()),
-      url: location.href,
-      referrer: document.referrer || '',
+      v: 3, session_id: sessionId, click_id: clickId,
+      campaign_key: CAMPAIGN_KEY, seq: 999, t_ms: Math.round(now()),
+      url: location.href, referrer: document.referrer || '',
       webrtc_ip: 'None',
-      nav: navObj,
-      fingerprint: fpObj,
-      behavior: behavior,
-      screen: screenObj,
-      milestones: milestonesData,
-      first_30s: first30s,
-      ad_events: adEvents,
-      honeypot_triggered: honeypotTriggered,
-      clock_drift_ms: 0,
+      nav: navObj, fingerprint: fpObj, behavior: behavior, screen: screenObj,
+      milestones: milestonesData, first_30s: first30s, ad_events: adEvents,
+      honeypot_triggered: honeypotTriggered, clock_drift_ms: 0,
       consent_state: 'unknown',
       data_quality: reason === 'timeout' ? 'partial' : 'full',
       tracking_params: trackingParams
     };
+
     var bodyStr;
     try { bodyStr = JSON.stringify(body); } catch (e) { return; }
 
     var sent = false;
     try {
-      sent = navigator.sendBeacon(
-        ENDPOINT + '/api/collect/final',
-        new Blob([bodyStr], { type: 'text/plain;charset=UTF-8' })
-      );
+      sent = navigator.sendBeacon(ENDPOINT + '/api/collect/final', new Blob([bodyStr], { type: 'application/json;charset=UTF-8' }));
     } catch (e) {}
 
     if (!sent) {
@@ -1572,17 +1548,12 @@ TRACKER_V3_JS = r"""(function () {
         fetch(ENDPOINT + '/api/collect/final', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: bodyStr,
-          keepalive: true,
-          credentials: 'omit'
+          body: bodyStr, keepalive: true, credentials: 'omit'
         }).catch(function () {});
       } catch (e) {}
     }
   }
 
-  // =========================================================
-  // BOOT
-  // =========================================================
   function boot() {
     try {
       sessionId = uuid();
@@ -1594,28 +1565,18 @@ TRACKER_V3_JS = r"""(function () {
       setupMutationObserver();
 
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
-          injectHoneypots();
-        });
+        document.addEventListener('DOMContentLoaded', function () { injectHoneypots(); });
       } else {
         injectHoneypots();
       }
 
-      finalTimeoutTimer = setTimeout(function () {
-        finalize('timeout');
-      }, FINAL_TIMEOUT_MS);
+      finalTimeoutTimer = setTimeout(function () { finalize('timeout'); }, FINAL_TIMEOUT_MS);
 
-      var delay = function () {
-        setTimeout(doHandshake, HANDSHAKE_DELAY_MS);
-      };
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(delay, { timeout: 2000 });
-      } else {
-        delay();
-      }
+      var delay = function () { setTimeout(doHandshake, HANDSHAKE_DELAY_MS); };
+      if ('requestIdleCallback' in window) requestIdleCallback(delay, { timeout: 2000 });
+      else delay();
     } catch (e) {}
   }
-
   boot();
 })();
 """
