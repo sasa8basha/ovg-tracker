@@ -11,6 +11,7 @@ Fixes over v3.2:
   - Corrected indentation bug in return dict (v3.2 had syntax error)
   - Signals now carry direction + base_strength for consistency
   - Reasons preserved as list of codes (backward compat)
+  - INTEGRATED BotD client-side detections
 """
 from collector.signals import SIGNAL_REGISTRY
 
@@ -112,9 +113,18 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
     if "headlesschrome" in ua or "headless" in ua:
         reasons.append("HEADLESS_UA")
 
+    # 7) BotD Client-Side Detections (أقوى وأسرع كشف)
+    botd = fp.get("botd") or {}
+    if isinstance(botd, dict):
+        for detector_name, bot_kind in botd.items():
+            if bot_kind:  # لو فيه أي كشف
+                # تحويل اسم الدالة لحاجة تشبه الكود (detectWebDriver -> BOTD_WEBDRIVER)
+                code = f"BOTD_{detector_name.replace('detect', '').upper()}"
+                reasons.append(code)
+
     # Build score
     score = 100 if reasons else 0
-    signals = [_make_reason(code) for code in reasons if code in CRITICAL_RULES]
+    signals = [_make_reason(code) for code in reasons if code in CRITICAL_RULES or code.startswith("BOTD_")]
 
     should_block = score > 0 and score >= threshold
 

@@ -2,7 +2,7 @@
 collector/signals.py — Signal Registry & Normalization.
 
 Every signal — from any source (analysis, headers, temporal, behavior,
-contradiction, fingerprint cache) — MUST be normalized through this
+contradiction, fingerprint cache, botd) — MUST be normalized through this
 module before it enters the fusion layer.
 
 Canonical signal shape (produced by normalize_signal):
@@ -18,14 +18,6 @@ Canonical signal shape (produced by normalize_signal):
         "strength": float,            # final = base * quality * multiplier
         "detail": str,                # human-readable explanation
     }
-
-Design notes:
-    * `base_strength` is fixed per signal code (the registry below).
-    * `evidence_quality` is determined from data depth (mouse points,
-      duration, header presence) — passed by the caller.
-    * `context_multiplier` is applied from outside (data quality, IP,
-      fingerprint strikes).
-    * `strength` is what the fusion layer actually consumes.
 """
 from __future__ import annotations
 
@@ -42,7 +34,7 @@ SEVERITY_BASE = {
     "high":       0.75,
     "medium":     0.50,
     "low":        0.25,
-    "human":      0.65,   # human signals can also be strong — see below
+    "human":      0.65,
 }
 
 
@@ -50,8 +42,6 @@ SEVERITY_BASE = {
 # SIGNAL REGISTRY
 # Every known signal code → {base_strength, direction, severity, category}
 # =========================================================
-# NOTE: This is the SINGLE SOURCE OF TRUTH for how strong each signal is.
-# Adding a new signal MUST start here.
 SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # ============ AUTOMATION / BOT FLAGS (impossible 100%) ============
     "WEBDRIVER_FLAG":            {"base": 0.99, "dir": "bot", "sev": "impossible", "cat": "automation"},
@@ -82,6 +72,26 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "CLICK_NO_MOUSE_DESKTOP":     {"base": 0.92, "dir": "bot", "sev": "impossible", "cat": "behavior"},
     "INTERACTION_BEFORE_PAINT":   {"base": 0.90, "dir": "bot", "sev": "impossible", "cat": "temporal"},
     "CHROME_LOW_WITH_UA_DATA":    {"base": 0.94, "dir": "bot", "sev": "impossible", "cat": "browser"},
+
+    # ============ BOTD CLIENT-SIDE DETECTIONS (FingerprintJS) ============
+    "BOTD_WEBDRIVER":               {"base": 0.99, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "BOTD_WINDOW_SIZE":             {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "automation"},
+    "BOTD_APP_VERSION":             {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "ua"},
+    "BOTD_USER_AGENT":              {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "ua"},
+    "BOTD_PLUGINS_ARRAY":           {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "fingerprint"},
+    "BOTD_LANGUAGES_INCONSISTENCY": {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "fingerprint"},
+    "BOTD_WEBGL":                   {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "webgl"},
+    "BOTD_PROCESS":                 {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "BOTD_ERROR_TRACE":             {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "automation"},
+    "BOTD_FUNCTION_BIND":           {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "automation"},
+    "BOTD_DISTINCTIVE_PROPS":       {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "BOTD_DOCUMENT_ATTRIBUTES":     {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "BOTD_PRODUCT_SUB":             {"base": 0.90, "dir": "bot", "sev": "critical",   "cat": "ua"},
+    "BOTD_NOTIFICATION_PERM":       {"base": 0.90, "dir": "bot", "sev": "critical",   "cat": "automation"},
+    "BOTD_EVAL_LENGTH":             {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "automation"},
+    "BOTD_WINDOW_EXTERNAL":         {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "BOTD_MIME_TYPES":              {"base": 0.90, "dir": "bot", "sev": "critical",   "cat": "fingerprint"},
+    "BOTD_RTT":                     {"base": 0.85, "dir": "bot", "sev": "high",       "cat": "network"},
 
     # ============ CRITICAL ============
     "CHROME_MISSING_SEC_CH_UA":   {"base": 0.85, "dir": "bot", "sev": "critical", "cat": "headers"},
@@ -260,46 +270,28 @@ def normalize_signal(
     context_multiplier: float = 1.0,
     source_override: Optional[str] = None,
 ) -> dict:
-    """
-    Take a raw signal dict (any format) and normalize it.
-
-    Accepted raw forms:
-        {"code", "severity", "score", "detail"}           — legacy
-        {"code", "severity", "base_strength", "detail"}   — new
-        {"code", "direction", "strength", "detail"}       — pre-normalized
-
-    `evidence_quality` (0..1) is supplied by the orchestrator and reflects
-    how trustworthy the underlying data is for THIS signal.
-    `context_multiplier` (>= 0) is supplied when context amplifies the
-    signal (e.g. fingerprint cache strikes).
-    """
     if not isinstance(raw, dict):
         raw = {}
 
     code = str(raw.get("code") or "UNKNOWN").strip().upper()
     detail = str(raw.get("detail") or "")[:200]
 
-    # Direction
     direction = str(raw.get("direction") or "").lower().strip()
     if direction not in ("bot", "human"):
         direction = _direction_from_registry(code, "bot")
 
-    # Severity
     severity = str(raw.get("severity") or "").lower().strip()
     if not severity:
         severity = _severity_from_registry(code, "medium")
     if severity not in ("impossible", "critical", "high", "medium", "low", "human"):
         severity = "medium"
 
-    # Category
     category = str(raw.get("category") or "").strip()
     if not category:
         category = _category_from_registry(code, "unknown")
 
-    # Source
     source = source_override or str(raw.get("source") or "").strip() or "unknown"
 
-    # Base strength
     base = raw.get("base_strength")
     try:
         base_f = float(base) if base is not None else _base_from_registry(code)
@@ -310,25 +302,22 @@ def normalize_signal(
     elif base_f > 1.0:
         base_f = 1.0
 
-    # Legacy "score" → derive base if missing
     if base is None and "score" in raw:
         try:
             sc = float(raw.get("score", 0))
             if direction == "human":
-                base_f = min(1.0, abs(sc) / 40.0)  # human score -40 → 1.0
+                base_f = min(1.0, abs(sc) / 40.0)
             else:
-                base_f = min(1.0, abs(sc) / 100.0)  # bot score 100 → 1.0
+                base_f = min(1.0, abs(sc) / 100.0)
         except (ValueError, TypeError):
             pass
 
-    # Evidence quality
     try:
         eq = float(evidence_quality)
     except (ValueError, TypeError):
         eq = 0.7
     eq = max(0.05, min(1.0, eq))
 
-    # Context multiplier
     try:
         cm = float(context_multiplier)
     except (ValueError, TypeError):
@@ -338,7 +327,6 @@ def normalize_signal(
     elif cm > 2.5:
         cm = 2.5
 
-    # Final strength (bounded)
     strength = base_f * eq * cm
     strength = max(0.0, min(1.0, strength))
 
@@ -363,7 +351,6 @@ def normalize_signals(
     context_multiplier: float = 1.0,
     source_override: Optional[str] = None,
 ) -> List[dict]:
-    """Normalize a list; skip invalid entries; de-dupe by code keeping the strongest."""
     if not raw_signals:
         return []
     seen: Dict[str, dict] = {}
