@@ -153,7 +153,7 @@ TRACKER_V3_JS = r"""(function () {
     try {
       return fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        headers: { 'Content-Type': 'application/json' },
         body: bodyStr,
         keepalive: true,
         credentials: 'omit'
@@ -1571,7 +1571,7 @@ TRACKER_V3_JS = r"""(function () {
       try {
         fetch(ENDPOINT + '/api/collect/final', {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          headers: { 'Content-Type': 'application/json' },
           body: bodyStr,
           keepalive: true,
           credentials: 'omit'
