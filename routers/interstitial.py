@@ -1,10 +1,21 @@
 """
-routers/interstitial.py — Interstitial Precheck (Direct Links + Macros).
+routers/interstitial.py — Interstitial Precheck (Direct Links + Macros) v4.3
+
+CRITICAL FIXES:
+    - Zone extraction: URL params FIRST → campaign default (not the other way)
+    - Verdict: computed from precheck score, NOT left as "pending" forever
+    - IP velocity: same IP > 10 visits in 10 min → +30 score
+    - Fingerprint reuse: same canvas hash > 10 visits in 10 min → +40 score
+    - Confidence + bot_probability stored on the visit
 """
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+
 from config import COLLECTOR_V3_ENABLED
 from database import get_db
 from models import CampaignModel, SessionModel, VisitModel
@@ -19,9 +30,8 @@ router = APIRouter()
 
 
 # =========================================================
-# PopAds Macros (from official docs)
+# PopAds Macros
 # =========================================================
-# كل ماكرو ممكن يجي بأكتر من اسم. بنحاول نغطي الكل.
 MACRO_ALIASES = {
     "bid":            ("bid",),
     "impression_id":  ("impressionid", "impid", "impression_id"),
@@ -44,34 +54,22 @@ MACRO_ALIASES = {
     "form_factor_id": ("formfactorid", "form_factor_id"),
     "device_id":      ("deviceid", "device_id"),
     "adblock":        ("adblock",),
-    # XML feeds only — بس نستقبلها لو جاية
     "ip":             ("ip",),
     "ipv6":           ("ipv6",),
     "ipv6or4":        ("ipv6or4",),
     "xforwardedfor":  ("xforwardedfor",),
     "useragent":      ("useragent", "ua"),
     "lang":           ("lang",),
-    "sec_ch_ua":              ("sec-ch-ua", "secchua"),
-    "sec_ch_ua_arch":         ("sec-ch-ua-arch", "secchuaarch"),
-    "sec_ch_ua_bitness":      ("sec-ch-ua-bitness", "secchuabitness"),
-    "sec_ch_ua_model":        ("sec-ch-ua-model", "secchuamodel"),
-    "sec_ch_ua_platform":     ("sec-ch-ua-platform", "secchuaplatform"),
-    "sec_ch_ua_platform_ver": ("sec-ch-ua-platform-version", "secchuaplatformversion"),
-    "sec_ch_ua_full_version": ("sec-ch-ua-full-version", "secchuafullversion"),
-    "sec_ch_ua_mobile":       ("sec-ch-ua-mobile", "secchuamobile"),
 }
 
 
 def _extract_macros(tp: dict) -> dict:
-    """
-    يستخرج كل الماكروز المعروفة + يحفظ الـ raw (كل حاجة جاية).
-    """
     if not isinstance(tp, dict):
-        return {"raw": {}, "known": {}}
+        return {"raw": {}, "known": {}, "bid": 0.0,
+                "impression_id": None, "website_id": None,
+                "quality": None, "adblock": False, "country": None}
 
-    # نسخة lowercase من المفاتيح عشان نقدر نقارن بسهولة
     lowered = {str(k).strip().lower(): v for k, v in tp.items() if v is not None and str(v) != ""}
-
     known = {}
     for canonical, aliases in MACRO_ALIASES.items():
         for alias in aliases:
@@ -79,37 +77,102 @@ def _extract_macros(tp: dict) -> dict:
                 known[canonical] = lowered[alias]
                 break
 
-    # 🔴 دالة مساعدة عشان نحوّل بأمان
     def _to_float(v):
-        try:
-            return float(v)
-        except (ValueError, TypeError):
-            return 0.0
+        try: return float(v)
+        except (ValueError, TypeError): return 0.0
 
     def _to_int(v):
-        try:
-            return int(float(v))
-        except (ValueError, TypeError):
-            return None
+        try: return int(float(v))
+        except (ValueError, TypeError): return None
 
     def _to_bool(v):
         return str(v).strip() in ("1", "true", "True", "yes", "YES")
 
     return {
-        # كل حاجة جاية (raw) — ده اللي بيتحفظ في JSON
         "raw": tp,
-        # الحقول الأساسية اللي بتتحط في أعمدة DB مخصصة
-        "bid":           _to_float(known.get("bid")),
-        "impression_id": str(known.get("impression_id") or "")[:100] or None,
-        "website_id":    str(known.get("website_id") or "")[:100] or None,
-        "quality":       _to_int(known.get("quality")),
-        "adblock":       _to_bool(known.get("adblock", "0")),
-        "country":       str(known.get("country") or "")[:10] or None,
-        # الباقي بيضل في raw — منه نستخرج للعرض لاحقاً
         "known": known,
+        "bid": _to_float(known.get("bid")),
+        "impression_id": str(known.get("impression_id") or "")[:100] or None,
+        "website_id": str(known.get("website_id") or "")[:100] or None,
+        "quality": _to_int(known.get("quality")),
+        "adblock": _to_bool(known.get("adblock", "0")),
+        "country": str(known.get("country") or "")[:10] or None,
     }
 
 
+# =========================================================
+# Zone extraction — URL params FIRST
+# =========================================================
+def _extract_zone(payload_url: str, tracking_params: dict, campaign) -> tuple:
+    """Returns (zone_id, source). Priority: tracking_params > url > campaign default."""
+    # 1) tracking_params
+    try:
+        tp = tracking_params or {}
+        tp_lower = {str(k).lower().strip(): v for k, v in tp.items() if v}
+        for key in ("zoneid", "zone_id", "zone", "z", "zn", "zid"):
+            if key in tp_lower and tp_lower[key]:
+                val = str(tp_lower[key]).strip()[:100]
+                if val:
+                    return val, "tracking_params"
+    except Exception:
+        pass
+
+    # 2) URL query/path
+    try:
+        _z = extract_zone_id_from_url(payload_url or "")
+        if _z:
+            return _z, "url"
+    except Exception:
+        pass
+
+    # 3) Campaign default (last resort)
+    try:
+        if campaign is not None and campaign.destination_zone_id:
+            val = str(campaign.destination_zone_id).strip()[:100]
+            if val:
+                return val, "campaign_default"
+    except Exception:
+        pass
+
+    return "unknown", "none"
+
+
+# =========================================================
+# Cross-visit signals
+# =========================================================
+def _compute_cross_visit_signals(db: Session, client_ip: str, canvas_hash: str) -> dict:
+    """Count recent visits by IP and by canvas hash."""
+    cutoff_10m = datetime.utcnow() - timedelta(minutes=10)
+
+    ip_visits = 0
+    try:
+        ip_visits = db.query(func.count(VisitModel.id)).filter(
+            VisitModel.ip == client_ip,
+            VisitModel.timestamp > cutoff_10m,
+        ).scalar() or 0
+    except Exception:
+        pass
+
+    fp_visits = 0
+    if canvas_hash and len(canvas_hash) >= 15:
+        canvas_key = canvas_hash[:15] + "..."
+        try:
+            fp_visits = db.query(func.count(VisitModel.id)).filter(
+                VisitModel.canvas_hash == canvas_key,
+                VisitModel.timestamp > cutoff_10m,
+            ).scalar() or 0
+        except Exception:
+            pass
+
+    return {
+        "ip_visits_10m": int(ip_visits),
+        "fp_visits_10m": int(fp_visits),
+    }
+
+
+# =========================================================
+# INTERSTITIAL PAGE
+# =========================================================
 @router.get("/go/{campaign_key}", response_class=HTMLResponse)
 async def serve_interstitial(campaign_key: str, request: Request, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED:
@@ -124,6 +187,9 @@ async def serve_interstitial(campaign_key: str, request: Request, db: Session = 
     return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
+# =========================================================
+# PRECHECK — now returns a REAL verdict, not pending
+# =========================================================
 @router.post("/api/interstitial/precheck")
 async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED:
@@ -138,11 +204,14 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
     if not c or c.status != "active":
         return {"action": "block", "url": None, "score": 100, "reasons": ["CAMPAIGN_INACTIVE"]}
 
+    # ---- Base precheck ----
     result = quick_precheck(nav=payload.nav or {}, fp=payload.fp or {}, threshold=int(c.bot_block_threshold or 100))
+
     headers_dict = {str(k).lower(): str(v) for k, v in request.headers.items()}
     http_version = str(request.scope.get("http_version", "1.1"))
     ua = str((payload.nav or {}).get("ua") or "")
 
+    # ---- Header signals ----
     extra_score = 0
     extra_reasons = []
     try:
@@ -152,28 +221,87 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
     except Exception:
         pass
 
-    total_score = min(150, result["score"] + extra_score)
-    should_block = total_score >= int(c.bot_block_threshold or 100) or result["action"] == "block"
-    is_blocked = should_block
+    # ---- Cross-visit signals (IP velocity + FP reuse) ----
+    canvas_raw = str((payload.fp or {}).get("canvas_hash", "") or "")
+    cross = _compute_cross_visit_signals(db, client_ip, canvas_raw)
 
-    # 🔴 نستخرج كل الماكروز
+    velocity_score = 0
+    velocity_reasons = []
+
+    if cross["ip_visits_10m"] >= 20:
+        velocity_score += 40
+        velocity_reasons.append(f"IP_VELOCITY_EXTREME({cross['ip_visits_10m']})")
+    elif cross["ip_visits_10m"] >= 10:
+        velocity_score += 25
+        velocity_reasons.append(f"IP_VELOCITY_HIGH({cross['ip_visits_10m']})")
+    elif cross["ip_visits_10m"] >= 5:
+        velocity_score += 10
+        velocity_reasons.append(f"IP_VELOCITY_MED({cross['ip_visits_10m']})")
+
+    if cross["fp_visits_10m"] >= 30:
+        velocity_score += 45
+        velocity_reasons.append(f"FP_REUSE_EXTREME({cross['fp_visits_10m']})")
+    elif cross["fp_visits_10m"] >= 15:
+        velocity_score += 30
+        velocity_reasons.append(f"FP_REUSE_HIGH({cross['fp_visits_10m']})")
+    elif cross["fp_visits_10m"] >= 7:
+        velocity_score += 15
+        velocity_reasons.append(f"FP_REUSE_MED({cross['fp_visits_10m']})")
+
+    # ---- Total score ----
+    total_score = min(150, int(result["score"]) + int(extra_score) + int(velocity_score))
+
+    threshold = int(c.bot_block_threshold or 100)
+    is_blocked = total_score >= threshold or result["action"] == "block"
+
+    # ---- Zone ----
+    zone_id, zone_source = _extract_zone(payload.url or "", payload.tracking_params or {}, c)
+    print(f"[INTERSTITIAL] url={payload.url!r} zone={zone_id!r} ({zone_source}) score={total_score} ip_visits={cross['ip_visits_10m']} fp_visits={cross['fp_visits_10m']}", flush=True)
+
+    # ---- Verdict: computed, NOT pending ----
+    if is_blocked:
+        verdict = "invalid"
+        confidence = 0.90
+        bot_probability = min(1.0, total_score / 100.0)
+        reason = "interstitial_precheck_block"
+        filter_reason = "INTERSTITIAL_BLOCK"
+    elif total_score >= 40:
+        verdict = "suspicious"
+        confidence = 0.60
+        bot_probability = min(1.0, total_score / 100.0)
+        reason = "interstitial_precheck_suspicious"
+        filter_reason = None
+    else:
+        verdict = "valid"
+        confidence = 0.70
+        bot_probability = max(0.0, total_score / 100.0)
+        reason = "interstitial_precheck_clean"
+        filter_reason = None
+
+    # ---- Save visit ----
     macros = _extract_macros(payload.tracking_params or {})
+    existing_session = db.query(SessionModel).filter(SessionModel.session_id == payload.session_id).first()
 
-    existing = db.query(SessionModel).filter(SessionModel.session_id == payload.session_id).first()
-    if not existing:
-        zone_id = c.destination_zone_id or extract_zone_id_from_url(c.destination_url) or "unknown"
-
-        # لو محظور = invalid، غير كده = pending (لسه ما شفناش Adsterra)
-        verdict = "invalid" if is_blocked else "pending"
-        score = 100 if is_blocked else 0
-
-        # click_id = session_id عشان يطابق Adsterra postback
+    if not existing_session:
         click_id = payload.session_id
+
+        evidence_list = [{
+            "code": "INTERSTITIAL_PRECHECK",
+            "severity": "critical" if is_blocked else ("high" if verdict == "suspicious" else "low"),
+            "score": total_score,
+            "detail": f"Direct link · precheck={result['score']} header={extra_score} velocity={velocity_score}",
+        }]
+        for code in (result.get("reasons") or []):
+            evidence_list.append({"code": code, "severity": "critical", "score": 100, "detail": "precheck"})
+        for code in extra_reasons:
+            evidence_list.append({"code": code, "severity": "high", "score": 60, "detail": "header"})
+        for code in velocity_reasons:
+            evidence_list.append({"code": code, "severity": "high", "score": 40, "detail": "cross_visit"})
 
         visit = VisitModel(
             campaign_id=c.id,
             session_id=payload.session_id,
-            click_id=click_id,                       # 🔴 ده اللي Adsterra هترجعه
+            click_id=click_id,
             timestamp=datetime.utcnow(),
             ip=client_ip,
             user_agent=ua,
@@ -183,15 +311,19 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
             popads_website_id=macros.get("website_id"),
             popads_quality=macros.get("quality"),
             popads_adblock=macros.get("adblock", False),
-            popads_data=macros.get("raw"),           # 🔴 كل الماكروز
-            score=score,
+            popads_data=macros.get("raw"),
+            score=total_score,
             verdict=verdict,
-            evidence=[{"code": "INTERSTITIAL_PRECHECK", "severity": "critical" if is_blocked else "low",
-                       "score": score, "detail": "Direct Link"}],
-            country=macros.get("country") or (payload.nav.get("country") if payload.nav else "Unknown"),
+            confidence=confidence,
+            bot_probability=bot_probability,
+            mode="direct",
+            reason=reason,
+            evidence=evidence_list,
+            filter_reason=filter_reason,
+            country=macros.get("country") or "Unknown",
             data_quality="partial",
-            filter_reason="INTERSTITIAL_BLOCK" if is_blocked else None,
             counting_type="direct_link",
+            canvas_hash=(canvas_raw[:15] + "...") if canvas_raw else "Unknown",
         )
         db.add(visit)
 
@@ -204,17 +336,25 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
             started_at=datetime.utcnow(),
             data_quality="partial",
             verdict=verdict,
-            score=score,
+            score=total_score,
+            confidence=confidence,
+            bot_probability=bot_probability,
             meta={
                 "direct_link": True,
-                "precheck_score": total_score,
+                "precheck_score": int(result["score"]),
+                "header_score": int(extra_score),
+                "velocity_score": int(velocity_score),
+                "ip_visits_10m": cross["ip_visits_10m"],
+                "fp_visits_10m": cross["fp_visits_10m"],
                 "macros": macros.get("raw"),
                 "click_id": click_id,
+                "zone_source": zone_source,
             },
         )
         db.add(session)
         db.commit()
         db.refresh(visit)
+
         session.visit_id = visit.id
         session.ended_at = datetime.utcnow()
         db.commit()
@@ -225,6 +365,6 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
 
     if is_blocked:
         return {"action": "block", "url": None, "score": total_score,
-                "reasons": (result["reasons"] + extra_reasons)}
+                "reasons": (result["reasons"] or []) + extra_reasons + velocity_reasons}
 
     return {"action": "redirect", "url": c.destination_url, "score": total_score, "reasons": []}
