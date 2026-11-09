@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · لوحة التحكم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .dash-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .dash-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: dash-spin 0.8s linear infinite;
+    }
+    @keyframes dash-spin { to { transform: rotate(360deg); } }
+
+    /* Header */
+    .dash-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-6);
+      flex-wrap: wrap;
+    }
+    .dash-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .dash-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-3);
+      flex-wrap: wrap;
+    }
+    .dash-header-actions {
+      display: flex;
+      gap: var(--neo-sp-2);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .dash-period-tabs {
+      display: inline-flex;
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: 2px;
+    }
+    .dash-period-btn {
+      padding: 5px 14px;
+      border-radius: var(--neo-r-sm);
+      background: transparent;
+      border: none;
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .dash-period-btn:hover { color: var(--neo-fg-primary); }
+    .dash-period-btn.active {
+      background: var(--neo-accent-subtle);
+      color: var(--neo-accent-hover);
+    }
+
+    /* Alerts */
+    .dash-alerts {
+      display: flex;
+      flex-direction: column;
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-6);
+    }
+
+    /* KPI Grid */
+    .dash-kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-6);
+    }
+    @media (max-width: 1024px) { .dash-kpis { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .dash-kpis { grid-template-columns: 1fr; } }
+
+    .dash-kpi-card {
+      position: relative;
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-4) var(--neo-sp-5);
+      overflow: hidden;
+    }
+    .dash-kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--kpi-accent, var(--neo-accent));
+      opacity: 0.7;
+    }
+    .dash-kpi-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--neo-sp-2);
+    }
+    .dash-kpi-label {
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .dash-kpi-delta {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .dash-kpi-delta.up { background: var(--neo-success-bg); color: var(--neo-success); }
+    .dash-kpi-delta.down { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .dash-kpi-delta.flat { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    .dash-kpi-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: var(--neo-fv-numeric);
+      font-size: 28px;
+      font-weight: var(--neo-fw-black);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--neo-fg-primary);
+    }
+    .dash-kpi-value.pos { color: var(--neo-success); }
+    .dash-kpi-value.neg { color: var(--neo-danger); }
+
+    .dash-kpi-integrity {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: var(--neo-sp-2);
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-warning);
+      cursor: help;
+    }
+
+    .dash-kpi-sparkline {
+      width: 100%;
+      height: 28px;
+      margin-top: var(--neo-sp-2);
+    }
+
+    /* Chart + glance grid */
+    .dash-main-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-6);
+    }
+    @media (max-width: 1024px) { .dash-main-grid { grid-template-columns: 1fr; } }
+
+    .dash-chart-wrap {
+      position: relative;
+      height: 260px;
+      margin-top: var(--neo-sp-2);
+    }
+
+    /* Today at a glance */
+    .dash-glance-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--neo-sp-2);
+      padding: var(--neo-sp-2) 0;
+    }
+    .dash-glance-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--neo-sp-2) 0;
+      border-bottom: 1px solid var(--neo-border-subtle);
+    }
+    .dash-glance-row:last-child { border-bottom: none; }
+    .dash-glance-label {
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+    }
+    .dash-glance-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+    }
+
+    /* Top/Worst campaigns */
+    .dash-camp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-6);
+    }
+    @media (max-width: 1024px) { .dash-camp-grid { grid-template-columns: 1fr; } }
+
+    .dash-camp-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--neo-sp-3);
+      padding: var(--neo-sp-3);
+      background: var(--neo-bg-elevated);
+      border-radius: var(--neo-r-md);
+      text-decoration: none;
+      color: inherit;
+      transition: background var(--neo-dur-fast);
+      margin-bottom: var(--neo-sp-2);
+    }
+    .dash-camp-row:hover { background: var(--neo-bg-raised); }
+    .dash-camp-row:last-child { margin-bottom: 0; }
+    .dash-camp-name {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+      margin-bottom: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dash-camp-meta {
+      font-size: var(--neo-fs-2xs);
+      color: var(--neo-fg-tertiary);
+      font-family: var(--neo-font-mono);
+    }
+    .dash-camp-val {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: var(--neo-fs-md);
+      font-weight: var(--neo-fw-extrabold);
+      white-space: nowrap;
+    }
+    .dash-camp-val.pos { color: var(--neo-success); }
+    .dash-camp-val.neg { color: var(--neo-danger); }
+
+    /* Top zones table */
+    .dash-zone-zone {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dash-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل لوحة التحكم…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="dash-header">
+        <div>
+          <h1 class="dash-header-title">لوحة التحكم</h1>
+          <div class="dash-header-sub">
+            <span id="dashUpdated">—</span>
+            <span>·</span>
+            <span id="dashSummary">—</span>
+          </div>
+        </div>
+        <div class="dash-header-actions">
+          <div class="dash-period-tabs">
+            <button class="dash-period-btn active" data-period="7d">7 أيام</button>
+            <button class="dash-period-btn" data-period="30d">30 يوم</button>
+            <button class="dash-period-btn" data-period="90d">90 يوم</button>
+          </div>
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="dashRefreshBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+            تحديث
+          </button>
+        </div>
+      </div>
+
+      <!-- Alerts -->
+      <div class="dash-alerts" id="dashAlerts"></div>
+
+      <!-- KPI Cards -->
+      <div class="dash-kpis" id="dashKpis">
+        <div class="dash-kpi-card"><div class="dash-kpi-label">جاري...</div></div>
+        <div class="dash-kpi-card"><div class="dash-kpi-label">جاري...</div></div>
+        <div class="dash-kpi-card"><div class="dash-kpi-label">جاري...</div></div>
+        <div class="dash-kpi-card"><div class="dash-kpi-label">جاري...</div></div>
+      </div>
+
+      <!-- Chart + Glance -->
+      <div class="dash-main-grid">
+        <div class="neo-chart-card">
+          <div class="neo-chart-head">
+            <div class="neo-chart-head-main">
+              <h3 class="neo-chart-title">الإيراد مقابل التكلفة</h3>
+              <p class="neo-chart-subtitle" id="dashChartSubtitle">—</p>
+            </div>
+          </div>
+          <div class="neo-chart-body">
+            <div class="dash-chart-wrap"><canvas id="dashChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="neo-chart-card">
+          <div class="neo-chart-head">
+            <div class="neo-chart-head-main">
+              <h3 class="neo-chart-title">نظرة سريعة على اليوم</h3>
+              <p class="neo-chart-subtitle">ملخص اللحظة الحالية</p>
+            </div>
+          </div>
+          <div class="neo-chart-body">
+            <div class="dash-glance-list" id="dashGlance"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top/Worst campaigns -->
+      <div class="dash-camp-grid">
+        <div class="neo-card neo-card-lg">
+          <div class="neo-flex neo-justify-between neo-items-center neo-mb-4">
+            <h3 style="font-size: var(--neo-fs-md); font-weight: var(--neo-fw-bold); color: var(--neo-fg-primary); margin: 0;">🔥 أفضل الحملات</h3>
+            <a href="/campaigns" class="neo-btn neo-btn-ghost neo-btn-xs" style="text-decoration: none;">عرض الكل ←</a>
+          </div>
+          <div id="dashTopCampaigns"></div>
+        </div>
+
+        <div class="neo-card neo-card-lg">
+          <div class="neo-flex neo-justify-between neo-items-center neo-mb-4">
+            <h3 style="font-size: var(--neo-fs-md); font-weight: var(--neo-fw-bold); color: var(--neo-fg-primary); margin: 0;">⚠️ حملات بتخسر</h3>
+          </div>
+          <div id="dashWorstCampaigns"></div>
+        </div>
+      </div>
+
+      <!-- Top zones -->
+      <div class="neo-table-wrap">
+        <div style="padding: var(--neo-sp-4) var(--neo-sp-5); border-bottom: 1px solid var(--neo-border-subtle); display: flex; align-items: center; justify-content: space-between;">
+          <h3 style="font-size: var(--neo-fs-md); font-weight: var(--neo-fw-bold); color: var(--neo-fg-primary); margin: 0;">🎯 أفضل الزونات</h3>
+          <a href="/smart-reports" class="neo-btn neo-btn-ghost neo-btn-xs" style="text-decoration: none;">كل الزونات ←</a>
+        </div>
+        <table class="neo-table">
+          <thead>
+            <tr>
+              <th>Zone</th>
+              <th class="neo-cell-center">Visits</th>
+              <th class="neo-cell-center">Bot Rate</th>
+              <th>الربح</th>
+              <th class="neo-cell-center">Grade</th>
+            </tr>
+          </thead>
+          <tbody id="dashTopZones">
+            <tr><td colspan="5" class="neo-table-empty">جاري التحميل…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const DASH = { period: '7d', data: null, chart: null };
+
+    // =========================================================
+    // FORMATTERS
+    // =========================================================
+    function fmtMoney(n) {
+      const v = Number(n || 0);
+      if (Math.abs(v) < 0.005) return '$0.00';
+      const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+      return sign + '$' + Math.abs(v).toFixed(2);
+    }
+    function fmtMoneyAbs(n) {
+      const v = Number(n || 0);
+      return '$' + Math.abs(v).toFixed(2);
+    }
+    function fmtInt(n) {
+      return Number(n || 0).toLocaleString('en-US');
+    }
+    function fmtPct(n) {
+      return Number(n || 0).toFixed(1) + '%';
+    }
+
+    // =========================================================
+    // SPARKLINE SVG (tiny, no chart.js)
+    // =========================================================
+    function buildSparkline(values, color) {
+      if (!values || values.length < 2) return '';
+      const max = Math.max(...values.map(v => Math.abs(v)), 0.001);
+      const W = 100, H = 28, PAD = 2;
+      const stepX = (W - PAD * 2) / (values.length - 1);
+      const points = values.map((v, i) => {
+        const x = PAD + i * stepX;
+        const norm = v / max;
+        const y = H - PAD - (norm + 1) / 2 * (H - PAD * 2);
+        return [x, y];
+      });
+      const path = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const area = path + ` L ${W - PAD} ${H - PAD} L ${PAD} ${H - PAD} Z`;
+      return `
+        <svg class="dash-kpi-sparkline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <path d="${area}" fill="${color}" opacity="0.12"/>
+          <path d="${path}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+    }
+
+    // =========================================================
+    // RENDER ALERTS
+    // =========================================================
+    function renderAlerts(alerts) {
+      const container = document.getElementById('dashAlerts');
+      if (!alerts || !alerts.length) { container.innerHTML = ''; return; }
+
+      container.innerHTML = alerts.map(a => {
+        const cls = a.severity === 'critical' ? 'neo-alert-danger'
+          : a.severity === 'warning' ? 'neo-alert-warning'
+          : 'neo-alert-info';
+        return `
+          <div class="neo-alert ${cls}">
+            <span class="neo-alert-icon">${a.icon}</span>
+            <div class="neo-alert-body">
+              <div class="neo-alert-title">${Neo.escape(a.title)}</div>
+              <div>${Neo.escape(a.message)}</div>
+            </div>
+            ${a.action_href ? `<a href="${Neo.escape(a.action_href)}" class="neo-btn neo-btn-sm neo-btn-ghost" style="text-decoration:none;margin-left:auto;">${Neo.escape(a.action_label)}</a>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    // =========================================================
+    // RENDER KPI CARDS
+    // =========================================================
+    function renderKpis(kpis) {
+      const container = document.getElementById('dashKpis');
+      if (!kpis || !kpis.length) return;
+
+      container.innerHTML = kpis.map(k => {
+        const delta = Number(k.delta_pct || 0);
+        const deltaCls = delta > 0.5 ? 'up' : delta < -0.5 ? 'down' : 'flat';
+        const deltaArrow = delta > 0.5 ? '↑' : delta < -0.5 ? '↓' : '→';
+        const deltaText = Math.abs(delta) > 0.5 ? `${deltaArrow} ${Math.abs(delta).toFixed(0)}%` : '→ ثابت';
+
+        // Value formatting
+        let display;
+        if (k.format === 'money') display = fmtMoneyAbs(k.value);
+        else if (k.format === 'money_signed') display = fmtMoney(k.value);
+        else display = fmtInt(k.value);
+
+        // Value color
+        let valueCls = '';
+        if (k.id === 'profit') {
+          valueCls = Number(k.value) >= 0 ? 'pos' : 'neg';
+        }
+
+        // Integrity note (for cost/profit)
+        let integrityNote = '';
+        if (k.integrity && k.integrity.integrity !== 'exact') {
+          integrityNote = `<div class="dash-kpi-integrity" title="${Neo.escape(k.integrity.message)}">
+            ⚠️ BID ${k.integrity.bid_coverage_pct}%
+          </div>`;
+        }
+
+        // Sparkline
+        const sparkline = buildSparkline(k.sparkline || [], k.color);
+
+        return `
+          <div class="dash-kpi-card" style="--kpi-accent: ${k.color};">
+            <div class="dash-kpi-head">
+              <span class="dash-kpi-label">${Neo.escape(k.label)}</span>
+              <span class="dash-kpi-delta ${deltaCls}">${deltaText}</span>
+            </div>
+            <div class="dash-kpi-value ${valueCls}">${display}</div>
+            ${integrityNote}
+            ${sparkline}
+          </div>`;
+      }).join('');
+    }
+
+    // =========================================================
+    // RENDER MAIN CHART
+    // =========================================================
+    function renderChart(series, period) {
+      const canvas = document.getElementById('dashChart');
+      if (!canvas || !series || series.length < 1) return;
+
+      if (DASH.chart) { try { DASH.chart.destroy(); } catch (e) {} DASH.chart = null; }
+
+      const labels = series.map(s => {
+        const d = s.date;
+        if (!d) return '';
+        const parts = d.split('-');
+        if (parts.length === 3) return `${parseInt(parts[2])}/${parseInt(parts[1])}`;
+        return d;
+      });
+      const costs = series.map(s => s.cost);
+      const revenues = series.map(s => s.revenue);
+
+      DASH.chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'الإيراد',
+              data: revenues,
+              borderColor: '#10B981',
+              backgroundColor: 'rgba(16,185,129,0.10)',
+              tension: 0.35,
+              fill: true,
+              pointRadius: 2,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+            },
+            {
+              label: 'التكلفة',
+              data: costs,
+              borderColor: '#EF4444',
+              backgroundColor: 'rgba(239,68,68,0.08)',
+              tension: 0.35,
+              fill: true,
+              pointRadius: 2,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: {
+              labels: {
+                color: '#B0B8C4',
+                font: { family: 'Inter', size: 11 },
+                usePointStyle: true,
+                padding: 16,
+              },
+            },
+            tooltip: {
+              backgroundColor: '#1A1D26',
+              borderColor: '#232734',
+              borderWidth: 1,
+              titleColor: '#F5F7FA',
+              bodyColor: '#B0B8C4',
+              padding: 10,
+              cornerRadius: 6,
+              callbacks: {
+                label: function(ctx) {
+                  return ctx.dataset.label + ': $' + Number(ctx.parsed.y).toFixed(2);
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#7B8496', font: { size: 10 }, maxTicksLimit: 10 },
+              grid: { color: 'rgba(255,255,255,0.04)' },
+            },
+            y: {
+              ticks: {
+                color: '#7B8496',
+                font: { size: 10 },
+                callback: (v) => '$' + v,
+              },
+              grid: { color: 'rgba(255,255,255,0.04)' },
+            },
+          },
+        },
+      });
+
+      document.getElementById('dashChartSubtitle').textContent =
+        `آخر ${period === '7d' ? '7 أيام' : period === '30d' ? '30 يوم' : '90 يوم'}`;
+    }
+
+    // =========================================================
+    // RENDER TODAY AT A GLANCE
+    // =========================================================
+    function renderGlance(g) {
+      const container = document.getElementById('dashGlance');
+      if (!g) return;
+
+      const rows = [
+        { label: 'زيارات اليوم', value: fmtInt(g.visits) },
+        { label: 'نسبة صالحة', value: fmtPct(g.valid_pct), color: 'var(--neo-success)' },
+        { label: 'نسبة بوت', value: fmtPct(g.bot_pct), color: g.bot_pct > 30 ? 'var(--neo-danger)' : g.bot_pct > 15 ? 'var(--neo-warning)' : 'var(--neo-fg-primary)' },
+        { label: 'CPM', value: '$' + Number(g.cpm || 0).toFixed(2) },
+        { label: 'ربح اليوم', value: fmtMoney(g.profit), color: Number(g.profit) >= 0 ? 'var(--neo-success)' : 'var(--neo-danger)' },
+      ];
+
+      if (g.top_zone) {
+        rows.push({
+          label: 'أعلى زون',
+          value: g.top_zone.zone + ' (' + g.top_zone.visits + ')',
+          mono: true,
+        });
+      }
+
+      container.innerHTML = rows.map(r => `
+        <div class="dash-glance-row">
+          <span class="dash-glance-label">${Neo.escape(r.label)}</span>
+          <span class="dash-glance-value" style="${r.color ? 'color:' + r.color : ''}${r.mono ? 'font-family:var(--neo-font-mono);' : ''}">${Neo.escape(r.value)}</span>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================
+    // RENDER CAMPAIGNS
+    // =========================================================
+    function renderCampaignList(containerId, campaigns, emptyText, emptyIcon) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+
+      if (!campaigns || !campaigns.length) {
+        el.innerHTML = `
+          <div class="neo-empty" style="padding: var(--neo-sp-6) var(--neo-sp-2);">
+            <div class="neo-empty-icon" style="font-size:32px;">${emptyIcon}</div>
+            <div class="neo-empty-msg" style="font-size:var(--neo-fs-sm);">${Neo.escape(emptyText)}</div>
+          </div>`;
+        return;
+      }
+
+      el.innerHTML = campaigns.map(c => {
+        const cls = c.profit >= 0 ? 'pos' : 'neg';
+        const display = fmtMoney(c.profit);
+        return `
+          <a href="/campaigns/${c.id}" class="dash-camp-row">
+            <div style="min-width:0;flex:1;">
+              <div class="dash-camp-name">${Neo.escape(c.name)}</div>
+              <div class="dash-camp-meta">${Neo.escape(c.traffic_source)} · ${fmtInt(c.visits)} زيارة</div>
+            </div>
+            <div class="dash-camp-val ${cls}">${display}</div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    // =========================================================
+    // RENDER TOP ZONES
+    // =========================================================
+    function renderTopZones(zones) {
+      const tbody = document.getElementById('dashTopZones');
+      if (!tbody) return;
+
+      if (!zones || !zones.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="neo-table-empty">مفيش زونات كفاية — محتاج 5 زيارات على الأقل</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = zones.map(z => {
+        const gradeCls = `sh-grade-${z.grade === '?' ? 'C' : z.grade}`;
+        const botColor = z.bot_rate > 30 ? 'var(--neo-danger)' : z.bot_rate > 15 ? 'var(--neo-warning)' : 'var(--neo-success)';
+        const profitCls = z.profit >= 0 ? 'neo-fg-success' : 'neo-fg-danger';
+        return `
+          <tr data-zone-id="${Neo.escape(z.zone)}" data-zone-grade="${z.grade}" style="cursor:pointer;">
+            <td class="dash-zone-zone">${Neo.escape(z.zone)}</td>
+            <td class="neo-cell-center neo-mono">${fmtInt(z.visits)}</td>
+            <td class="neo-cell-center neo-mono" style="color:${botColor};font-weight:700;">${z.bot_rate.toFixed(1)}%</td>
+            <td class="neo-cell-num ${profitCls}" style="font-weight:700;">${fmtMoney(z.profit)}</td>
+            <td class="neo-cell-center">
+              <span class="neo-badge neo-badge-${z.grade === 'A' ? 'success' : z.grade === 'B' ? 'info' : z.grade === 'C' ? 'warning' : 'danger'}">${z.grade}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // =========================================================
+    // MAIN LOADER
+    // =========================================================
+    async function loadDashboard() {
+      try {
+        const data = await Neo.api('/api/dashboard/overview?period=' + DASH.period);
+        DASH.data = data;
+
+        // Header
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('dashUpdated').textContent = 'آخر تحديث: ' + timeStr;
+
+        const s = data.summary || {};
+        document.getElementById('dashSummary').innerHTML =
+          `<b>${fmtInt(s.total_visits)}</b> زيارة · <b style="color:var(--neo-danger)">${fmtPct(s.bot_rate)}</b> بوت`;
+
+        // Alerts
+        renderAlerts(data.alerts);
+
+        // KPIs
+        renderKpis(data.kpis);
+
+        // Chart
+        renderChart(data.chart_series, DASH.period);
+
+        // Today at a glance
+        renderGlance(data.today_glance);
+
+        // Campaigns
+        renderCampaignList('dashTopCampaigns', data.top_campaigns, 'مفيش حملات رابحة في الفترة دي', '📊');
+        renderCampaignList('dashWorstCampaigns', data.worst_campaigns, 'مفيش حملات خسرانة — ممتاز!', '✅');
+
+        // Top zones
+        renderTopZones(data.top_zones);
+
+      } catch (e) {
+        console.error('[Dashboard] load failed:', e);
+        Neo.toast('فشل تحميل الداشبورد: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // PERIOD SWITCHING
+    // =========================================================
+    function bindPeriod() {
+      document.querySelectorAll('.dash-period-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          DASH.period = btn.dataset.period;
+          document.querySelectorAll('.dash-period-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.period === DASH.period);
+          });
+          loadDashboard();
+        });
+      });
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'dashboard',
+          lang: 'ar',
+          breadcrumb: [{ label: 'لوحة التحكم' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindPeriod();
+
+        document.getElementById('dashRefreshBtn').addEventListener('click', () => {
+          loadDashboard();
+          Neo.toast('جاري التحديث…', 'info', 1500);
+        });
+
+        await loadDashboard();
+
+        // Auto-refresh every 60s
+        setInterval(loadDashboard, 60000);
+
+      } catch (e) {
+        console.error('[Dashboard Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : e.message || 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
