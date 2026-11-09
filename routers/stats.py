@@ -1,27 +1,26 @@
 """
-routers/stats.py — Stats, visits listing, visit detail, CSV export.
+routers/stats.py — Stats, visits, visit detail (with IP intelligence), CSV export.
 """
-import io, csv
+import io
+import csv
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from database import get_db
-from models import UserModel, VisitModel, CampaignModel
+from models import UserModel, VisitModel, CampaignModel, IPIntelligence
 from auth import current_user
 from analysis import calc_confidence, count_categories, normalize_stored_evidence, build_explainability_trace
 from helpers import _apply_date_filter, _parse_date, _safe_filename, csv_safe
 from utils import stats_cache
+from ip_intelligence import classify_ip
 
 router = APIRouter()
 
 
 @router.get("/stats")
 def get_stats(campaign_id: int = Query(None), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
-    if campaign_id:
-        cache_key = f"stats:campaign:{campaign_id}"
-    else:
-        cache_key = f"stats:user:{user.id}:all"
+    cache_key = f"stats:campaign:{campaign_id}" if campaign_id else f"stats:user:{user.id}:all"
     cached = stats_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -46,6 +45,7 @@ def get_stats(campaign_id: int = Query(None), user: UserModel = Depends(current_
     invalid = int(agg.invalid or 0)
     suspicious = int(agg.suspicious or 0)
     recent = _build().order_by(VisitModel.id.desc()).limit(15).all()
+
     recent_visits = [
         {
             "id": v.id,
@@ -64,6 +64,7 @@ def get_stats(campaign_id: int = Query(None), user: UserModel = Depends(current_
         }
         for v in recent
     ]
+
     result = {"total": total, "valid": valid, "invalid": invalid, "suspicious": suspicious, "recent": recent_visits}
     stats_cache.set(cache_key, result)
     return result
@@ -119,7 +120,6 @@ def get_visits(
             "clicks": v.clicks,
             "scrolls": v.scrolls,
             "ground_truth": v.ground_truth,
-            # 🔴 المالية والماكروز
             "bid": float(v.bid or 0),
             "revenue": float(v.revenue or 0),
             "popads_website_id": v.popads_website_id,
@@ -130,7 +130,11 @@ def get_visits(
 
 
 @router.get("/visits/{visit_id}")
-def get_visit_detail(visit_id: int, user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+async def get_visit_detail(
+    visit_id: int,
+    user: UserModel = Depends(current_user),
+    db: Session = Depends(get_db),
+):
     v = db.query(VisitModel).join(CampaignModel).filter(
         VisitModel.id == visit_id, CampaignModel.user_id == user.id
     ).first()
@@ -141,7 +145,6 @@ def get_visit_detail(visit_id: int, user: UserModel = Depends(current_user), db:
     signals = normalize_stored_evidence(evidence)
     trace = build_explainability_trace(evidence)
 
-    # 🔴 استخراج الماكروز المنظمة من popads_data
     popads_data = v.popads_data or {}
     popads_known = {}
     if isinstance(popads_data, dict):
@@ -183,6 +186,46 @@ def get_visit_detail(visit_id: int, user: UserModel = Depends(current_user), db:
                     popads_known[canonical] = lowered[alias]
                     break
 
+    # Classify IP (cached after first time)
+    ip_intel = None
+    try:
+        ip_intel = await classify_ip(v.ip or "", db=db)
+    except Exception as e:
+        print(f"[Visit Detail] classify_ip failed for {v.ip}: {e}")
+        ip_intel = {
+            "classification": "unknown", "risk_score": 0, "reasons": [],
+            "asn": None, "asn_description": None, "country": None, "isp": None,
+            "rtt_gap_ms": None, "last_checked": None,
+        }
+
+    # Mismatch detection: our IP intel vs PopAds macros
+    mismatches = []
+    if ip_intel and popads_known:
+        our_country = (ip_intel.get("country") or "").upper().strip()
+        popads_country = str(popads_known.get("country") or "").upper().strip()
+        if our_country and popads_country and our_country != popads_country:
+            mismatches.append({
+                "field": "country",
+                "ours": our_country,
+                "popads": popads_country,
+                "severity": "high",
+                "detail": f"PopAds says {popads_country}, our IP lookup says {our_country}",
+            })
+
+        our_isp_raw = ip_intel.get("isp") or ""
+        popads_isp_raw = popads_known.get("ispname") or popads_known.get("isp") or ""
+        if our_isp_raw and popads_isp_raw:
+            a = our_isp_raw.strip().lower()
+            b = str(popads_isp_raw).strip().lower()
+            if a and b and a != b and a not in b and b not in a:
+                mismatches.append({
+                    "field": "isp",
+                    "ours": our_isp_raw,
+                    "popads": str(popads_isp_raw),
+                    "severity": "medium",
+                    "detail": f"PopAds says '{popads_isp_raw}', ours says '{our_isp_raw}'",
+                })
+
     return {
         "id": v.id,
         "timestamp": v.timestamp.strftime("%Y-%m-%d %H:%M:%S") if v.timestamp else "",
@@ -214,7 +257,6 @@ def get_visit_detail(visit_id: int, user: UserModel = Depends(current_user), db:
         "ground_truth": v.ground_truth,
         "ground_truth_at": v.ground_truth_at.isoformat() if v.ground_truth_at else None,
         "ground_truth_by": v.ground_truth_by,
-        # 🔴 بيانات PopAds الكاملة
         "bid": float(v.bid or 0),
         "revenue": float(v.revenue or 0),
         "popads_impression_id": v.popads_impression_id,
@@ -223,6 +265,8 @@ def get_visit_detail(visit_id: int, user: UserModel = Depends(current_user), db:
         "popads_adblock": bool(v.popads_adblock),
         "popads_data": popads_data,
         "popads_known": popads_known,
+        "ip_intel": ip_intel,
+        "mismatches": mismatches,
     }
 
 
@@ -267,8 +311,7 @@ def export_visits(
                 "Ground Truth", "BID", "Revenue", "Website ID",
             ])
             yield out.getvalue()
-            out.seek(0)
-            out.truncate(0)
+            out.seek(0); out.truncate(0)
             for v in q.yield_per(500):
                 row = [
                     v.id,
@@ -284,8 +327,7 @@ def export_visits(
                 ]
                 w.writerow([csv_safe(x) for x in row])
                 yield out.getvalue()
-                out.seek(0)
-                out.truncate(0)
+                out.seek(0); out.truncate(0)
         except GeneratorExit:
             return
         except Exception as e:
