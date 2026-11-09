@@ -202,13 +202,34 @@ def system_health_page(request: Request, db: Session = Depends(get_db)):
 
 
 # =========================================================
-# Phase 4 — Design System Preview (Neo)
+# Neo V2 — Redesigned Pages
 # =========================================================
 @router.get("/v2/components", response_class=HTMLResponse)
 def components_v2_page(request: Request, db: Session = Depends(get_db)):
     if not _optional_user(request, db):
         return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/components.html"))
+
+
+@router.get("/v2/dashboard", response_class=HTMLResponse)
+def dashboard_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/dashboard.html"))
+
+
+@router.get("/v2/reports", response_class=HTMLResponse)
+def reports_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/reports.html"))
+
+
+@router.get("/v2/visits", response_class=HTMLResponse)
+def visits_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/visits.html"))
 
 
 @router.get("/404", response_class=HTMLResponse)
@@ -219,4 +240,4 @@ def page_404():
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "10.0-neo"}
+    return {"status": "ok", "version": "10.2-neo"}
