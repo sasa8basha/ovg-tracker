@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · Ban Risk Radar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .rd-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .rd-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: rd-spin 0.8s linear infinite;
+    }
+    @keyframes rd-spin { to { transform: rotate(360deg); } }
+
+    /* Header */
+    .rd-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .rd-header-title {
+      font-size: var(--neo-fs-2xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .rd-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-3);
+      flex-wrap: wrap;
+    }
+    .rd-last-updated {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-2xs);
+      color: var(--neo-fg-muted);
+    }
+
+    /* Gauge hero */
+    .rd-hero {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-6);
+      margin-bottom: var(--neo-sp-4);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--neo-sp-6);
+      align-items: center;
+    }
+    @media (max-width: 900px) { .rd-hero { grid-template-columns: 1fr; } }
+
+    .rd-gauge-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--neo-sp-4);
+    }
+    .rd-gauge {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+      display: block;
+    }
+    #rdProgressArc {
+      transition: stroke-dashoffset 1000ms cubic-bezier(0.16, 1, 0.3, 1),
+                  stroke 400ms ease;
+    }
+    @keyframes rd-pulse-critical {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+    .rd-critical-pulse {
+      animation: rd-pulse-critical 2s ease-in-out infinite;
+    }
+
+    .rd-level-desc {
+      text-align: center;
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-secondary);
+      line-height: 1.6;
+      max-width: 320px;
+    }
+
+    .rd-quick-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--neo-sp-3);
+    }
+    @media (max-width: 500px) { .rd-quick-metrics { grid-template-columns: 1fr; } }
+
+    .rd-qm {
+      background: var(--neo-bg-elevated);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3) var(--neo-sp-4);
+    }
+    .rd-qm-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .rd-qm-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 22px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      line-height: 1.1;
+    }
+
+    /* Factors grid */
+    .rd-factors {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-5);
+    }
+    .rd-factor {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-4);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+      position: relative;
+      overflow: hidden;
+    }
+    .rd-factor:hover {
+      border-color: var(--neo-border-strong);
+      transform: translateY(-1px);
+    }
+    .rd-factor-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .rd-factor-title {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .rd-factor-weight {
+      font-family: var(--neo-font-mono);
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      padding: 1px 6px;
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-xs);
+      font-weight: var(--neo-fw-bold);
+    }
+    .rd-factor-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 22px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      margin-bottom: 4px;
+    }
+    .rd-factor-threshold {
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .rd-factor-bar {
+      height: 6px;
+      background: var(--neo-bg-elevated);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .rd-factor-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 900ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .rd-factor-score {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+    }
+
+    /* Recommendations */
+    .rd-recs {
+      display: flex;
+      flex-direction: column;
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-5);
+    }
+
+    /* History chart */
+    .rd-history-wrap {
+      height: 240px;
+      position: relative;
+      margin-top: var(--neo-sp-3);
+    }
+
+    /* Empty/insufficient */
+    .rd-empty-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-10) var(--neo-sp-6);
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .rd-empty-icon { font-size: 64px; margin-bottom: var(--neo-sp-3); opacity: 0.7; }
+    .rd-empty-title { font-size: var(--neo-fs-xl); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin-bottom: var(--neo-sp-2); }
+    .rd-empty-msg { font-size: var(--neo-fs-sm); color: var(--neo-fg-secondary); line-height: 1.7; margin-bottom: var(--neo-sp-5); }
+
+    /* Loading pulse for factors */
+    .rd-factor-skel {
+      height: 140px;
+      background: linear-gradient(90deg, var(--neo-bg-elevated) 0%, var(--neo-bg-raised) 50%, var(--neo-bg-elevated) 100%);
+      background-size: 1000px 100%;
+      animation: rd-shimmer 1.5s infinite linear;
+      border-radius: var(--neo-r-md);
+    }
+    @keyframes rd-shimmer {
+      0% { background-position: -1000px 0; }
+      100% { background-position: 1000px 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="rd-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل Radar…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="rd-header">
+        <div>
+          <h1 class="rd-header-title">🎯 Ban Risk Radar</h1>
+          <div class="rd-header-sub">
+            <span>مؤشر خطر حظر Adsterra — 6 عوامل</span>
+            <span class="rd-last-updated" id="rdLastUpdated">—</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="rdSnapshotBtn">📸 حفظ لقطة</button>
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="rdRefreshBtn">🔄 تحديث</button>
+        </div>
+      </div>
+
+      <!-- Gauge Hero -->
+      <div class="rd-hero" id="rdHero" style="display:none;">
+        <div class="rd-gauge-wrap">
+          <svg class="rd-gauge" viewBox="0 0 280 280" aria-label="Ban Risk Gauge">
+            <g id="rdTicks"></g>
+            <circle cx="140" cy="140" r="128" fill="none" stroke="var(--neo-border-default)" stroke-width="3" opacity="0.35"/>
+            <g id="rdZoneSegments"></g>
+            <circle cx="140" cy="140" r="108" fill="none" stroke="var(--neo-border-default)" stroke-width="14"/>
+            <circle id="rdProgressArc" cx="140" cy="140" r="108" fill="none"
+                    stroke="var(--neo-success)" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="678.58" stroke-dashoffset="678.58"
+                    transform="rotate(-90 140 140)"/>
+            <text id="rdScoreText" x="140" y="138" text-anchor="middle"
+                  fill="var(--neo-fg-primary)" font-size="60" font-weight="800"
+                  font-family="Inter, monospace">—</text>
+            <text x="140" y="162" text-anchor="middle"
+                  fill="var(--neo-fg-tertiary)" font-size="10" font-weight="700"
+                  letter-spacing="2" font-family="Inter, sans-serif">BAN RISK</text>
+            <text id="rdLevelText" x="140" y="198" text-anchor="middle"
+                  fill="var(--neo-success)" font-size="13" font-weight="700"
+                  font-family="IBM Plex Sans Arabic, sans-serif">—</text>
+          </svg>
+          <p class="rd-level-desc" id="rdLevelDesc">—</p>
+        </div>
+
+        <div class="rd-quick-metrics">
+          <div class="rd-qm">
+            <div class="rd-qm-label">زيارات 24س</div>
+            <div class="rd-qm-value" id="rdQmTotal">—</div>
+          </div>
+          <div class="rd-qm">
+            <div class="rd-qm-label">Bot Rate</div>
+            <div class="rd-qm-value" id="rdQmBot" style="color: var(--neo-danger);">—</div>
+          </div>
+          <div class="rd-qm">
+            <div class="rd-qm-label">Human Quality</div>
+            <div class="rd-qm-value" id="rdQmHuman" style="color: var(--neo-success);">—</div>
+          </div>
+          <div class="rd-qm">
+            <div class="rd-qm-label">Zones</div>
+            <div class="rd-qm-value" id="rdQmZones">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Insufficient data -->
+      <div id="rdInsufficient" style="display:none;">
+        <div class="rd-empty-card">
+          <div class="rd-empty-icon">🛰️</div>
+          <h2 class="rd-empty-title">الرادار لسه بيجمع بيانات</h2>
+          <p class="rd-empty-msg" id="rdInsufficientMsg">—</p>
+          <button class="neo-btn neo-btn-primary" onclick="RD.load(true)">🔄 تحديث</button>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div id="rdContent" style="display:none;">
+
+        <!-- Factors -->
+        <div style="margin-bottom: var(--neo-sp-3);">
+          <h2 style="font-size: var(--neo-fs-md); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin: 0 0 4px 0;">🧮 العوامل الستة</h2>
+          <p style="font-size: var(--neo-fs-xs); color: var(--neo-fg-tertiary); margin: 0;">كل عامل بيأثر على المؤشر بوزن مختلف — اضغط على أي عامل للتفاصيل</p>
+        </div>
+        <div class="rd-factors" id="rdFactors"></div>
+
+        <!-- Recommendations -->
+        <div style="margin-bottom: var(--neo-sp-3);">
+          <h2 style="font-size: var(--neo-fs-md); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin: 0 0 4px 0;">💡 التوصيات</h2>
+          <p style="font-size: var(--neo-fs-xs); color: var(--neo-fg-tertiary); margin: 0;">إيه اللي محتاج تعمله عشان تحمي حسابك</p>
+        </div>
+        <div class="rd-recs" id="rdRecs"></div>
+
+        <!-- History -->
+        <div class="neo-card neo-card-lg">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--neo-sp-3);flex-wrap:wrap;gap:8px;">
+            <div>
+              <h2 style="font-size: var(--neo-fs-md); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin: 0 0 2px 0;">📊 تطور المؤشر</h2>
+              <p style="font-size: var(--neo-fs-xs); color: var(--neo-fg-tertiary); margin: 0;">آخر 30 يوم</p>
+            </div>
+            <span id="rdHistoryCount" style="font-size: var(--neo-fs-xs); color: var(--neo-fg-muted); font-family: var(--neo-font-mono);"></span>
+          </div>
+          <div id="rdHistoryEmpty" style="display:none;text-align:center;padding: var(--neo-sp-6); color: var(--neo-fg-muted); font-size: var(--neo-fs-sm);">
+            مفيش تاريخ كافي بعد. سيب الأداة شغالة يومين وهتلاقي بيانات هنا.
+          </div>
+          <div class="rd-history-wrap" id="rdHistoryWrap">
+            <canvas id="rdHistoryChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Factor drawer -->
+  <div class="neo-drawer-wrap" id="rdFactorDrawer">
+    <div class="neo-drawer neo-drawer-sm">
+      <div class="neo-drawer-head">
+        <div style="min-width:0;flex:1;">
+          <h3 class="neo-drawer-title" id="rdDrawerTitle">—</h3>
+          <p class="neo-drawer-subtitle" id="rdDrawerSub">—</p>
+        </div>
+        <button class="neo-modal-close" onclick="Neo.closeDrawer('rdFactorDrawer')">✕</button>
+      </div>
+      <div class="neo-drawer-body" id="rdDrawerBody"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const RD = {
+      radar: null,
+      history: null,
+      chart: null,
+    };
+
+    const LEVELS = {
+      low:      { label: 'منخفض', desc: 'حسابك آمن. استمر في المراقبة.', color: 'var(--neo-success)' },
+      medium:   { label: 'متوسط', desc: 'في بعض المؤشرات اللي محتاجة انتباه.', color: 'var(--neo-warning)' },
+      high:     { label: 'عالي',  desc: 'خطر حظر مرتفع. راجع العوامل فوراً.', color: 'var(--neo-orange)' },
+      critical: { label: 'حرج',   desc: 'خطر حظر حرج. تصرف دلوقتي.', color: 'var(--neo-danger)' },
+      unknown:  { label: 'غير معروف', desc: 'بيانات غير كافية.', color: 'var(--neo-fg-muted)' },
+    };
+
+    const FACTOR_ICONS = {
+      bot_rate: '🤖',
+      wasted_rate: '💸',
+      human_quality: '🧑',
+      zone_diversity: '🎯',
+      source_diversity: '🔗',
+      volume_stability: '📈',
+    };
+
+    const FACTOR_LABELS = {
+      bot_rate: 'Bot Rate',
+      wasted_rate: 'Wasted Rate',
+      human_quality: 'Human Quality',
+      zone_diversity: 'Zone Diversity',
+      source_diversity: 'Source Diversity',
+      volume_stability: 'Volume Stability',
+    };
+
+    const FACTOR_DESCRIPTIONS = {
+      bot_rate: 'نسبة الزيارات اللي اتحددت كـ bot. لازم تكون أقل من 15% عشان تبقى آمن.',
+      wasted_rate: 'نسبة الزيارات اللي راحت على Brave أو AdBlock. مش بتدفع من Adsterra.',
+      human_quality: 'نسبة الزيارات اللي فيها إشارات بشرية قوية (ماوس طبيعي، تفاعل حقيقي).',
+      zone_diversity: 'عدد الـ zones المختلفة اللي بتستقبل ترافيك. Adsterra بتحب التنويع.',
+      source_diversity: 'عدد المصادر (PopAds / Propeller / Galaksion...). مصدر واحد = خطر.',
+      volume_stability: 'مقارنة حجم اليوم vs أمس. تقلبات كبيرة = red flag.',
+    };
+
+    function fmtNum(n) { return Number(n || 0).toLocaleString('en-US'); }
+    function fmtPct(n) { return Number(n || 0).toFixed(1) + '%'; }
+
+    // =========================================================
+    // GAUGE
+    // =========================================================
+    function buildGaugeTicks() {
+      const g = document.getElementById('rdTicks');
+      if (!g) return;
+      g.innerHTML = '';
+      const cx = 140, cy = 140, rOuter = 128, rInner = 118;
+      for (let i = 0; i < 60; i++) {
+        const angle = (i * 6) * Math.PI / 180 - Math.PI / 2;
+        const isMajor = i % 5 === 0;
+        const r1 = isMajor ? rInner - 3 : rInner;
+        const r2 = rOuter;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', (cx + Math.cos(angle) * r1).toFixed(2));
+        line.setAttribute('y1', (cy + Math.sin(angle) * r1).toFixed(2));
+        line.setAttribute('x2', (cx + Math.cos(angle) * r2).toFixed(2));
+        line.setAttribute('y2', (cy + Math.sin(angle) * r2).toFixed(2));
+        line.setAttribute('stroke', isMajor ? 'var(--neo-border-strong)' : 'var(--neo-border-subtle)');
+        line.setAttribute('stroke-width', isMajor ? '1.5' : '1');
+        line.setAttribute('stroke-linecap', 'round');
+        g.appendChild(line);
+      }
+    }
+
+    function buildGaugeZones() {
+      const g = document.getElementById('rdZoneSegments');
+      if (!g) return;
+      g.innerHTML = '';
+      const r = 128;
+      const c = 2 * Math.PI * r;
+      const zones = [
+        { from: 0.00, to: 0.20, color: 'var(--neo-success)' },
+        { from: 0.20, to: 0.45, color: 'var(--neo-warning)' },
+        { from: 0.45, to: 0.70, color: 'var(--neo-orange)' },
+        { from: 0.70, to: 1.00, color: 'var(--neo-danger)' },
+      ];
+      zones.forEach(z => {
+        const dashLen = (z.to - z.from) * c;
+        const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circ.setAttribute('cx', 140);
+        circ.setAttribute('cy', 140);
+        circ.setAttribute('r', r);
+        circ.setAttribute('fill', 'none');
+        circ.setAttribute('stroke', z.color);
+        circ.setAttribute('stroke-width', '4');
+        circ.setAttribute('stroke-dasharray', dashLen.toFixed(2) + ' ' + c.toFixed(2));
+        circ.setAttribute('stroke-dashoffset', (-(z.from * c)).toFixed(2));
+        circ.setAttribute('transform', 'rotate(-90 140 140)');
+        circ.setAttribute('opacity', '0.55');
+        g.appendChild(circ);
+      });
+    }
+
+    function animateScore(target) {
+      const el = document.getElementById('rdScoreText');
+      if (!el) return;
+      if (target === null || target === undefined) {
+        el.textContent = '—';
+        return;
+      }
+      const start = performance.now();
+      const duration = 900;
+      function tick(now) {
+        const p = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(eased * target);
+        if (p < 1) requestAnimationFrame(tick);
+        else el.textContent = target;
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function animateArc(score, color) {
+      const arc = document.getElementById('rdProgressArc');
+      if (!arc) return;
+      const c = 2 * Math.PI * 108;
+      const offset = c * (1 - score / 100);
+
+      arc.style.stroke = color;
+      arc.style.strokeDasharray = c.toFixed(2);
+      arc.style.strokeDashoffset = c.toFixed(2);
+
+      void arc.getBoundingClientRect();
+
+      requestAnimationFrame(() => {
+        arc.style.strokeDashoffset = offset.toFixed(2);
+      });
+    }
+
+    // =========================================================
+    // RENDER GAUGE
+    // =========================================================
+    function renderGauge(score, level) {
+      const L = LEVELS[level] || LEVELS.unknown;
+      const levelEl = document.getElementById('rdLevelText');
+      levelEl.textContent = L.label;
+      levelEl.setAttribute('fill', L.color);
+      document.getElementById('rdLevelDesc').textContent = L.desc;
+
+      const arc = document.getElementById('rdProgressArc');
+      arc.classList.toggle('rd-critical-pulse', level === 'critical');
+
+      animateScore(score);
+      setTimeout(() => animateArc(score, L.color), 80);
+    }
+
+    function renderMetrics(m) {
+      if (!m) return;
+      document.getElementById('rdQmTotal').textContent = fmtNum(m.total_24h);
+      document.getElementById('rdQmBot').textContent = fmtPct(m.bot_rate);
+      document.getElementById('rdQmHuman').textContent = fmtPct(m.human_quality);
+      document.getElementById('rdQmZones').textContent = m.zone_diversity;
+    }
+
+    // =========================================================
+    // RENDER FACTORS
+    // =========================================================
+    function renderFactors(factors) {
+      const grid = document.getElementById('rdFactors');
+      if (!factors || !factors.length) { grid.innerHTML = ''; return; }
+
+      grid.innerHTML = factors.map(f => {
+        const icon = FACTOR_ICONS[f.name] || '•';
+        const score = Number(f.score);
+        const barColor = score >= 80 ? 'var(--neo-success)' : score >= 50 ? 'var(--neo-warning)' : 'var(--neo-danger)';
+        const label = FACTOR_LABELS[f.name] || f.label;
+        const displayValue = typeof f.value === 'number' ? f.value.toFixed(1) : f.value;
+
+        return `
+          <div class="rd-factor" data-factor="${Neo.escape(f.name)}">
+            <div class="rd-factor-head">
+              <div class="rd-factor-title">
+                <span>${icon}</span>
+                <span>${Neo.escape(label)}</span>
+              </div>
+              <span class="rd-factor-weight">${f.weight}%</span>
+            </div>
+            <div class="rd-factor-value">${displayValue}${f.unit || ''}</div>
+            <div class="rd-factor-threshold">الهدف: ${Neo.escape(f.threshold || '—')}</div>
+            <div class="rd-factor-bar">
+              <div class="rd-factor-bar-fill" style="width: ${score}%; background: ${barColor};"></div>
+            </div>
+            <div class="rd-factor-score">
+              <span style="color: var(--neo-fg-tertiary);">Safety</span>
+              <span style="font-family: var(--neo-font-mono); font-weight: 800; color: ${barColor};">${score}%</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Bind click
+      grid.querySelectorAll('.rd-factor').forEach(el => {
+        el.addEventListener('click', () => openFactorDrawer(el.dataset.factor));
+      });
+    }
+
+    function openFactorDrawer(factorName) {
+      const factor = (RD.radar.factors || []).find(f => f.name === factorName);
+      if (!factor) return;
+
+      const icon = FACTOR_ICONS[factorName] || '•';
+      const label = FACTOR_LABELS[factorName] || factor.label;
+      const desc = FACTOR_DESCRIPTIONS[factorName] || '';
+
+      document.getElementById('rdDrawerTitle').textContent = icon + ' ' + label;
+      document.getElementById('rdDrawerSub').textContent = `الوزن: ${factor.weight}%`;
+
+      const barColor = factor.score >= 80 ? 'var(--neo-success)' : factor.score >= 50 ? 'var(--neo-warning)' : 'var(--neo-danger)';
+
+      document.getElementById('rdDrawerBody').innerHTML = `
+        <div class="neo-card neo-card-md neo-mb-4">
+          <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mb-2">القيمة الحالية</div>
+          <div class="neo-mono" style="font-size: 32px; font-weight: 900; color: var(--neo-fg-primary);">
+            ${typeof factor.value === 'number' ? factor.value.toFixed(1) : factor.value}${factor.unit || ''}
+          </div>
+          <div class="neo-text-xs neo-fg-tertiary neo-mt-1">الهدف: ${Neo.escape(factor.threshold || '—')}</div>
+        </div>
+
+        <div class="neo-mb-4">
+          <div class="neo-flex neo-justify-between neo-mb-1">
+            <span class="neo-text-xs neo-fg-tertiary">Safety Score</span>
+            <span class="neo-mono neo-font-extrabold" style="color: ${barColor};">${factor.score}%</span>
+          </div>
+          <div style="height: 8px; background: var(--neo-bg-elevated); border-radius: 4px; overflow: hidden;">
+            <div style="width: ${factor.score}%; height: 100%; background: ${barColor}; border-radius: 4px;"></div>
+          </div>
+        </div>
+
+        <div class="neo-alert neo-alert-info">
+          <span class="neo-alert-icon">ℹ️</span>
+          <div class="neo-alert-body">
+            <div class="neo-alert-title">إيه هو العامل ده؟</div>
+            <div>${Neo.escape(desc)}</div>
+          </div>
+        </div>
+      `;
+
+      Neo.openDrawer('rdFactorDrawer');
+    }
+
+    // =========================================================
+    // RENDER RECOMMENDATIONS
+    // =========================================================
+    function renderRecs(recs) {
+      const list = document.getElementById('rdRecs');
+      if (!recs || !recs.length) { list.innerHTML = ''; return; }
+
+      const sevStyles = {
+        high:   { cls: 'neo-alert-danger',  icon: '🚨' },
+        medium: { cls: 'neo-alert-warning', icon: '⚠️' },
+        low:    { cls: 'neo-alert-info',    icon: 'ℹ️' },
+        good:   { cls: 'neo-alert-success', icon: '✅' },
+      };
+
+      list.innerHTML = recs.map(r => {
+        const style = sevStyles[r.severity] || sevStyles.low;
+        const action = r.link
+          ? `<a href="${Neo.escape(r.link)}" class="neo-btn neo-btn-sm neo-btn-ghost" style="margin-right:auto;text-decoration:none;">${Neo.escape(r.action || 'راجع')} ←</a>`
+          : '';
+        return `
+          <div class="neo-alert ${style.cls}" style="display:flex;align-items:center;">
+            <span class="neo-alert-icon">${style.icon}</span>
+            <div class="neo-alert-body">
+              <div class="neo-alert-title">${Neo.escape(r.title)}</div>
+              <div>${Neo.escape(r.text)}</div>
+            </div>
+            ${action}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // =========================================================
+    // HISTORY CHART
+    // =========================================================
+    function renderHistory(history) {
+      const empty = document.getElementById('rdHistoryEmpty');
+      const canvas = document.getElementById('rdHistoryChart');
+      const wrap = document.getElementById('rdHistoryWrap');
+      const countEl = document.getElementById('rdHistoryCount');
+
+      if (!history || !history.series || history.series.length < 2) {
+        empty.style.display = '';
+        wrap.style.display = 'none';
+        countEl.textContent = '';
+        return;
+      }
+
+      empty.style.display = 'none';
+      wrap.style.display = 'block';
+      countEl.textContent = history.series.length + ' نقطة';
+
+      if (RD.chart) { try { RD.chart.destroy(); } catch (e) {} RD.chart = null; }
+
+      const labels = history.series.map(s => {
+        try {
+          const d = new Date(s.t);
+          return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        } catch (e) { return ''; }
+      });
+      const data = history.series.map(s => s.score);
+
+      RD.chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Ban Risk',
+            data,
+            borderColor: '#6366F1',
+            backgroundColor: 'rgba(99,102,241,0.10)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#6366F1',
+            pointBorderColor: '#6366F1',
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1A1D26',
+              borderColor: '#232734',
+              borderWidth: 1,
+              titleColor: '#F5F7FA',
+              bodyColor: '#B0B8C4',
+              padding: 10,
+              cornerRadius: 6,
+              displayColors: false,
+              callbacks: {
+                label: (ctx) => 'Ban Risk: ' + ctx.parsed.y,
+              },
+            },
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 100,
+              ticks: {
+                color: '#7B8496',
+                font: { size: 10, family: 'Inter' },
+                stepSize: 20,
+              },
+              grid: {
+                color: (ctx) => {
+                  const v = ctx.tick.value;
+                  if (v === 20) return 'rgba(16,185,129,0.20)';
+                  if (v === 40) return 'rgba(245,158,11,0.15)';
+                  if (v === 60) return 'rgba(249,115,22,0.15)';
+                  if (v === 80) return 'rgba(239,68,68,0.20)';
+                  return 'rgba(255,255,255,0.04)';
+                },
+              },
+            },
+            x: {
+              ticks: {
+                color: '#7B8496',
+                font: { size: 9 },
+                maxTicksLimit: 6,
+              },
+              grid: { display: false },
+            },
+          },
+        },
+      });
+    }
+
+    // =========================================================
+    // MAIN LOAD
+    // =========================================================
+    async function load(force = false) {
+      try {
+        const url = '/api/radar' + (force ? '?force=true' : '');
+        const [rRes, hRes] = await Promise.all([
+          Neo.api(url),
+          Neo.api('/api/radar/history?days=30').catch(() => ({ series: [], has_enough_data: false })),
+        ]);
+
+        RD.radar = rRes;
+        RD.history = hRes;
+
+        // Insufficient
+        if (rRes.insufficient_data) {
+          document.getElementById('rdHero').style.display = 'none';
+          document.getElementById('rdContent').style.display = 'none';
+          document.getElementById('rdInsufficient').style.display = '';
+          document.getElementById('rdInsufficientMsg').textContent = rRes.message || 'بيانات غير كافية.';
+          return;
+        }
+
+        // Full render
+        document.getElementById('rdHero').style.display = 'grid';
+        document.getElementById('rdContent').style.display = '';
+        document.getElementById('rdInsufficient').style.display = 'none';
+
+        renderGauge(rRes.score, rRes.level);
+        renderMetrics(rRes.metrics);
+        renderFactors(rRes.factors);
+        renderRecs(rRes.recommendations);
+        renderHistory(hRes);
+
+        // Last updated
+        try {
+          const d = new Date(rRes.computed_at);
+          const timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          document.getElementById('rdLastUpdated').textContent = 'آخر تحديث: ' + timeStr;
+        } catch (e) {}
+
+      } catch (e) {
+        console.error('[Radar] load failed:', e);
+        Neo.toast('فشل تحميل الرادار: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // SNAPSHOT
+    // =========================================================
+    async function saveSnapshot() {
+      const btn = document.getElementById('rdSnapshotBtn');
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '⏳...';
+      try {
+        const r = await fetch('/api/radar/snapshot', { method: 'POST', credentials: 'same-origin' });
+        if (r.ok) {
+          btn.textContent = '✅ تم';
+          setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+          Neo.toast('تم حفظ اللقطة', 'success');
+          load(false);
+        } else {
+          const d = await r.json().catch(() => ({}));
+          Neo.toast(d.detail || 'فشل الحفظ', 'error');
+          btn.textContent = orig;
+          btn.disabled = false;
+        }
+      } catch (e) {
+        Neo.toast('فشل الاتصال', 'error');
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'radar',
+          lang: 'ar',
+          breadcrumb: [{ label: 'Radar' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        buildGaugeTicks();
+        buildGaugeZones();
+
+        document.getElementById('rdRefreshBtn').addEventListener('click', async function() {
+          const btn = this;
+          const orig = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = '⏳...';
+          await load(true);
+          btn.disabled = false;
+          btn.textContent = orig;
+        });
+
+        document.getElementById('rdSnapshotBtn').addEventListener('click', saveSnapshot);
+
+        await load(false);
+
+        // Auto-refresh every 60s
+        setInterval(() => {
+          if (!document.hidden) load(false);
+        }, 60000);
+
+      } catch (e) {
+        console.error('[Radar Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

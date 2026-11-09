@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · Sessions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .sess-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .sess-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: sess-spin 0.8s linear infinite;
+    }
+    @keyframes sess-spin { to { transform: rotate(360deg); } }
+
+    .sess-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .sess-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .sess-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* Compare card */
+    .sess-compare {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-4);
+    }
+    .sess-compare-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--neo-sp-3);
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+    }
+    .sess-compare-title {
+      font-size: var(--neo-fs-md);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+    .sess-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: var(--neo-r-sm);
+      font-size: 10px;
+      font-weight: var(--neo-fw-extrabold);
+      font-family: var(--neo-font-mono);
+      text-transform: uppercase;
+    }
+    .sess-badge.ready { background: var(--neo-success-bg); color: var(--neo-success); }
+    .sess-badge.warn { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .sess-badge.bad { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .sess-badge.info { background: var(--neo-accent-subtle); color: var(--neo-accent-hover); }
+
+    .sess-groups {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .sess-group {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+    }
+    .sess-group-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .sess-group-val {
+      font-size: 20px;
+      font-weight: var(--neo-fw-black);
+      font-family: var(--neo-font-mono);
+      color: var(--neo-fg-primary);
+      line-height: 1.1;
+    }
+    .sess-group.full .sess-group-val { color: var(--neo-success); }
+    .sess-group.partial .sess-group-val { color: var(--neo-info); }
+    .sess-group.legacy .sess-group-val { color: var(--neo-warning); }
+    .sess-group-sub {
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      margin-top: 3px;
+      font-family: var(--neo-font-mono);
+    }
+    .sess-diagnostic {
+      background: var(--neo-accent-subtle);
+      border: 1px solid var(--neo-accent-border);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-accent-hover);
+      line-height: 1.6;
+    }
+    .sess-diagnostic.ready { background: var(--neo-success-bg); border-color: var(--neo-success-border); color: var(--neo-success-fg); }
+    .sess-diagnostic.warn { background: var(--neo-warning-bg); border-color: var(--neo-warning-border); color: var(--neo-warning-fg); }
+    .sess-diagnostic.bad { background: var(--neo-danger-bg); border-color: var(--neo-danger-border); color: var(--neo-danger-fg); }
+
+    /* Filters */
+    .sess-filters {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-3);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr) auto;
+      gap: var(--neo-sp-2);
+      align-items: end;
+    }
+    @media (max-width: 900px) { .sess-filters { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 500px) { .sess-filters { grid-template-columns: 1fr; } }
+
+    .sess-filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .sess-filter-label {
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Row */
+    .sess-row { cursor: pointer; transition: background var(--neo-dur-fast); }
+    .sess-row:hover td { background: var(--neo-bg-elevated); }
+
+    .sess-sid {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-accent-hover);
+    }
+    .sess-dq {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      font-family: var(--neo-font-mono);
+    }
+    .sess-dq.full { background: var(--neo-success-bg); color: var(--neo-success); }
+    .sess-dq.partial { background: var(--neo-info-bg); color: var(--neo-info-fg); }
+    .sess-dq.legacy { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .sess-dq.pending, .sess-dq.unknown { background: var(--neo-accent-subtle); color: var(--neo-accent-hover); }
+
+    .sess-verdict {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      font-family: var(--neo-font-mono);
+    }
+    .sess-verdict.valid { background: var(--neo-success-bg); color: var(--neo-success); }
+    .sess-verdict.invalid { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .sess-verdict.suspicious { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .sess-verdict.pending { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    /* Timeline in drawer */
+    .sess-timeline {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .sess-timeline-svg {
+      width: 100%;
+      height: 100px;
+      display: block;
+    }
+    .sess-timeline-legend {
+      display: flex;
+      gap: var(--neo-sp-4);
+      margin-top: var(--neo-sp-2);
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      flex-wrap: wrap;
+    }
+    .sess-timeline-legend span { display: inline-flex; align-items: center; gap: 4px; }
+    .sess-timeline-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Heartbeat table */
+    .sess-hb-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    .sess-hb-table th {
+      padding: 6px 8px;
+      text-align: right;
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      border-bottom: 1px solid var(--neo-border-subtle);
+    }
+    .sess-hb-table th.center { text-align: center; }
+    .sess-hb-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--neo-border-subtle);
+      font-family: var(--neo-font-mono);
+    }
+    .sess-hb-table td.center { text-align: center; }
+    .sess-hb-table tr:last-child td { border-bottom: none; }
+    .sess-hb-table tr.gap td { background: rgba(239,68,68,0.05); }
+    .sess-hb-gap-warn { color: var(--neo-danger); font-weight: var(--neo-fw-extrabold); }
+    .sess-hb-ok { color: var(--neo-success); }
+
+    /* Meta section */
+    .sess-meta-section {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .sess-meta-title {
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      font-weight: var(--neo-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--neo-sp-2);
+    }
+    .sess-meta-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: var(--neo-fs-xs);
+      border-bottom: 1px solid var(--neo-border-subtle);
+    }
+    .sess-meta-row:last-child { border-bottom: none; }
+    .sess-meta-row .k { color: var(--neo-fg-tertiary); }
+    .sess-meta-row .v { color: var(--neo-fg-primary); font-family: var(--neo-font-mono); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <div class="sess-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل Sessions…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="sess-header">
+        <div>
+          <h1 class="sess-header-title">📊 Sessions</h1>
+          <div class="sess-header-sub" id="sessSubtitle">عرض وتحليل الجلسات المسجلة</div>
+        </div>
+        <button class="neo-btn neo-btn-secondary neo-btn-sm" id="sessRefreshBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+          تحديث
+        </button>
+      </div>
+
+      <!-- Compare card -->
+      <div class="sess-compare" id="sessCompareCard" style="display:none;">
+        <div class="sess-compare-head">
+          <div class="sess-compare-title">🧪 مقارنة v2 vs v3</div>
+          <div id="sessCompareBadge"></div>
+        </div>
+        <div class="sess-groups" id="sessCompareGroups"></div>
+        <div class="sess-diagnostic" id="sessCompareDiag">—</div>
+      </div>
+
+      <!-- Filters -->
+      <div class="sess-filters">
+        <div class="sess-filter-field">
+          <label class="sess-filter-label">Data Quality</label>
+          <select id="sessDq" class="neo-select neo-input-sm">
+            <option value="">الكل</option>
+            <option value="full">Full (v3)</option>
+            <option value="partial">Partial</option>
+            <option value="pending">Pending</option>
+            <option value="legacy">Legacy (v2)</option>
+          </select>
+        </div>
+        <div class="sess-filter-field">
+          <label class="sess-filter-label">من تاريخ</label>
+          <input type="date" id="sessFrom" class="neo-input neo-input-sm">
+        </div>
+        <div class="sess-filter-field">
+          <label class="sess-filter-label">إلى تاريخ</label>
+          <input type="date" id="sessTo" class="neo-input neo-input-sm">
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="sessApplyBtn">تطبيق</button>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="sessClearBtn">مسح</button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="sessLoading">
+        <div class="neo-skeleton" style="height: 60px; margin-bottom: 8px;"></div>
+        <div class="neo-skeleton" style="height: 60px; margin-bottom: 8px;"></div>
+        <div class="neo-skeleton" style="height: 60px;"></div>
+      </div>
+
+      <!-- List -->
+      <div id="sessList" class="neo-table-wrap" style="display:none;">
+        <table class="neo-table">
+          <thead>
+            <tr>
+              <th>Session ID</th>
+              <th>الوقت</th>
+              <th class="neo-cell-center">المدة</th>
+              <th class="neo-cell-center">Heartbeats</th>
+              <th class="neo-cell-center">Data Quality</th>
+              <th class="neo-cell-center">Verdict</th>
+              <th>Country</th>
+            </tr>
+          </thead>
+          <tbody id="sessBody"></tbody>
+        </table>
+        <div class="neo-pagination">
+          <div class="neo-pagination-info" id="sessPageInfo">—</div>
+          <div class="neo-pagination-controls">
+            <button class="neo-btn neo-btn-ghost neo-btn-sm" id="sessPrev">← السابق</button>
+            <span class="neo-pagination-pages" id="sessPageNum">1 / 1</span>
+            <button class="neo-btn neo-btn-ghost neo-btn-sm" id="sessNext">التالي →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty -->
+      <div id="sessEmpty" class="neo-empty" style="display:none;">
+        <div class="neo-empty-icon">📭</div>
+        <h3 class="neo-empty-title">مفيش sessions</h3>
+        <p class="neo-empty-msg">لسه مجاش زيارات. ركّب كود v3 واختبر.</p>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Drawer -->
+  <div class="neo-drawer-wrap" id="sessDrawer">
+    <div class="neo-drawer neo-drawer-lg">
+      <div class="neo-drawer-head">
+        <div style="min-width:0;flex:1;">
+          <h3 class="neo-drawer-title" id="sessDrawerTitle">—</h3>
+          <p class="neo-drawer-subtitle" id="sessDrawerSub">—</p>
+        </div>
+        <button class="neo-modal-close" onclick="Neo.closeDrawer('sessDrawer')">✕</button>
+      </div>
+      <div class="neo-drawer-body" id="sessDrawerBody"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const SESS = {
+      page: 1,
+      perPage: 25,
+      total: 0,
+      pages: 1,
+      items: [],
+      filters: { dq: '', from: '', to: '' },
+    };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    function formatTime(iso) {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString('en-GB', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      } catch (e) { return '—'; }
+    }
+
+    // =========================================================
+    // COMPARE
+    // =========================================================
+    async function loadCompare() {
+      try {
+        const d = await Neo.api('/api/sessions/compare/stats');
+        const card = document.getElementById('sessCompareCard');
+        const badge = document.getElementById('sessCompareBadge');
+        const groups = document.getElementById('sessCompareGroups');
+        const diag = document.getElementById('sessCompareDiag');
+
+        card.style.display = '';
+
+        let badgeClass = 'info';
+        let badgeLabel = 'معلومات';
+        if (d.diagnostic === 'v3_only') { badgeClass = 'ready'; badgeLabel = '✓ v3 شغال'; }
+        else if (d.diagnostic === 'v2_only') { badgeClass = 'warn'; badgeLabel = '⚠️ v2 فقط'; }
+        else if (d.diagnostic === 'mixed') { badgeClass = 'info'; badgeLabel = '🔀 خليط'; }
+        else if (d.diagnostic === 'no_data') { badgeClass = 'bad'; badgeLabel = 'لا بيانات'; }
+
+        badge.innerHTML = `<span class="sess-badge ${badgeClass}">${badgeLabel}</span>`;
+
+        let groupsHtml = '';
+        for (const g of (d.groups || [])) {
+          const dq = g.data_quality || 'unknown';
+          const cls = (dq === 'full' || dq === 'partial' || dq === 'legacy') ? dq : '';
+          groupsHtml += `
+            <div class="sess-group ${cls}">
+              <div class="sess-group-label">${esc(dq)}</div>
+              <div class="sess-group-val">${fmtInt(g.count)}</div>
+              <div class="sess-group-sub">
+                متوسط: ${esc(g.avg_time_human || '—')}
+                <br>مدى: ${g.min_time_ms}–${g.max_time_ms}ms
+              </div>
+            </div>
+          `;
+        }
+        groups.innerHTML = groupsHtml || '<div style="color: var(--neo-fg-muted); font-size: 12px; text-align: center; padding: 12px;">مفيش بيانات كافية للمقارنة</div>';
+
+        if (d.v2_fixed_2000ms_ratio !== null && d.v2_fixed_2000ms_ratio !== undefined) {
+          diag.innerHTML = `🔬 <b>${d.v2_fixed_2000ms_ratio}%</b> من زيارات legacy على 2000ms بالظبط — ${esc(d.recommendation)}`;
+        } else {
+          diag.textContent = d.recommendation || '—';
+        }
+        diag.className = 'sess-diagnostic ' + (d.diagnostic === 'v3_only' ? 'ready' : d.diagnostic === 'v2_only' ? 'warn' : d.diagnostic === 'mixed' ? '' : 'bad');
+      } catch (e) {
+        console.error('[SESS] compare load failed:', e);
+      }
+    }
+
+    // =========================================================
+    // LIST
+    // =========================================================
+    function buildQuery() {
+      const p = new URLSearchParams();
+      if (SESS.filters.dq) p.set('data_quality', SESS.filters.dq);
+      if (SESS.filters.from) p.set('from_date', SESS.filters.from);
+      if (SESS.filters.to) p.set('to_date', SESS.filters.to);
+      p.set('page', SESS.page);
+      p.set('per_page', SESS.perPage);
+      return p;
+    }
+
+    async function loadList() {
+      try {
+        document.getElementById('sessLoading').style.display = '';
+        document.getElementById('sessList').style.display = 'none';
+        document.getElementById('sessEmpty').style.display = 'none';
+
+        const q = buildQuery();
+        const data = await Neo.api('/api/sessions?' + q.toString());
+
+        SESS.items = data.items || [];
+        SESS.total = data.total || 0;
+        SESS.pages = data.pages || 1;
+
+        document.getElementById('sessSubtitle').textContent =
+          `${fmtInt(SESS.total)} session · صفحة ${SESS.page} من ${SESS.pages}`;
+
+        document.getElementById('sessLoading').style.display = 'none';
+
+        if (!SESS.items.length) {
+          document.getElementById('sessEmpty').style.display = '';
+          return;
+        }
+
+        document.getElementById('sessList').style.display = '';
+
+        const tbody = document.getElementById('sessBody');
+        tbody.innerHTML = SESS.items.map(s => {
+          const dq = s.data_quality || 'unknown';
+          const verdict = (s.verdict || 'pending').toLowerCase();
+          const sidShort = (s.session_id || '').substring(0, 8);
+
+          return `
+            <tr class="sess-row" data-session-id="${esc(s.session_id)}">
+              <td class="sess-sid">#${esc(sidShort)}</td>
+              <td class="neo-mono" style="font-size: 11px; color: var(--neo-fg-tertiary);">${formatTime(s.started_at)}</td>
+              <td class="neo-cell-center neo-mono" style="font-size: 12px; font-weight: 700;">${esc(s.duration_human || '—')}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-info); font-weight: 700;">${s.heartbeats || 0}</td>
+              <td class="neo-cell-center"><span class="sess-dq ${dq}">${esc(dq)}</span></td>
+              <td class="neo-cell-center"><span class="sess-verdict ${verdict}">${esc(verdict)}</span></td>
+              <td style="font-size: 11px;">${esc(s.country_code || s.country || '—')}</td>
+            </tr>
+          `;
+        }).join('');
+
+        // Bind row clicks
+        tbody.querySelectorAll('.sess-row').forEach(row => {
+          row.addEventListener('click', () => openDrawer(row.dataset.sessionId));
+        });
+
+        // Pagination
+        const from = (SESS.page - 1) * SESS.perPage + 1;
+        const to = Math.min(SESS.page * SESS.perPage, SESS.total);
+        document.getElementById('sessPageInfo').innerHTML =
+          `عرض <b style="color: var(--neo-fg-primary);">${fmtInt(from)}–${fmtInt(to)}</b> من <b style="color: var(--neo-fg-primary);">${fmtInt(SESS.total)}</b>`;
+        document.getElementById('sessPageNum').textContent = `${SESS.page} / ${SESS.pages}`;
+        document.getElementById('sessPrev').disabled = SESS.page <= 1;
+        document.getElementById('sessNext').disabled = SESS.page >= SESS.pages;
+
+      } catch (e) {
+        console.error('[SESS] list load failed:', e);
+        document.getElementById('sessLoading').style.display = 'none';
+        document.getElementById('sessEmpty').style.display = '';
+        document.getElementById('sessEmpty').innerHTML = `
+          <div class="neo-empty-icon">⚠️</div>
+          <h3 class="neo-empty-title">فشل التحميل</h3>
+          <p class="neo-empty-msg">${esc(e.message)}</p>
+        `;
+      }
+    }
+
+    // =========================================================
+    // DRAWER
+    // =========================================================
+    function hbTotal(hb) {
+      return (hb.clicks || 0) + (hb.scrolls || 0) + (hb.keydowns || 0) + Math.floor((hb.mousemoves || 0) / 10);
+    }
+
+    function renderTimeline(heartbeats) {
+      if (!heartbeats || !heartbeats.length) {
+        return `<div class="sess-timeline"><div style="text-align:center;color:var(--neo-fg-muted);font-size:12px;padding:20px;">مفيش heartbeats</div></div>`;
+      }
+
+      const maxT = Math.max(...heartbeats.map(h => h.t_ms || 0), 1);
+      const W = 800, H = 100, PAD = 20;
+      const plotW = W - 2 * PAD;
+      const plotH = H - 2 * PAD;
+
+      let html = `<line x1="${PAD}" y1="${H - PAD}" x2="${W - PAD}" y2="${H - PAD}" stroke="var(--neo-border-default)" stroke-width="1"/>`;
+
+      let prevX = null, prevY = null;
+      for (const hb of heartbeats) {
+        const x = PAD + ((hb.t_ms || 0) / maxT) * plotW;
+        const total = hbTotal(hb);
+        const y = H - PAD - Math.min(plotH, total * 8 + 4);
+        const color = total > 0 ? 'var(--neo-success)' : 'var(--neo-fg-tertiary)';
+
+        if (prevX !== null) {
+          const isGap = hb.gap_ms && hb.gap_ms > 30000;
+          html += `<line x1="${prevX}" y1="${prevY}" x2="${x}" y2="${y}" stroke="${isGap ? 'var(--neo-danger)' : 'var(--neo-border-strong)'}" stroke-width="${isGap ? 2 : 1.5}" ${isGap ? 'stroke-dasharray="4 4"' : ''}/>`;
+        }
+
+        html += `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="var(--neo-bg-canvas)" stroke-width="1.5"/>`;
+        html += `<text x="${x}" y="${H - 4}" text-anchor="middle" fill="var(--neo-fg-muted)" font-size="8" font-family="Inter, monospace">${hb.seq}</text>`;
+
+        prevX = x; prevY = y;
+      }
+
+      html += `<text x="${PAD}" y="14" text-anchor="start" fill="var(--neo-fg-tertiary)" font-size="9" font-family="Inter, monospace">0s</text>`;
+      html += `<text x="${W - PAD}" y="14" text-anchor="end" fill="var(--neo-fg-tertiary)" font-size="9" font-family="Inter, monospace">${Math.round(maxT / 1000)}s</text>`;
+
+      return `
+        <div class="sess-timeline">
+          <svg class="sess-timeline-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${html}</svg>
+          <div class="sess-timeline-legend">
+            <span><span class="sess-timeline-dot" style="background:var(--neo-success);"></span> تفاعل</span>
+            <span><span class="sess-timeline-dot" style="background:var(--neo-fg-tertiary);"></span> ساكت</span>
+            <span><span class="sess-timeline-dot" style="background:var(--neo-danger);"></span> فجوة &gt;30s</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHeartbeats(hbs) {
+      if (!hbs.length) {
+        return `<div class="sess-meta-section"><div style="text-align:center;color:var(--neo-fg-muted);font-size:12px;">مفيش heartbeats — الزيارة قفلت قبل 10 ثواني، أو البوت مش بعت أي نبضة.</div></div>`;
+      }
+
+      let html = `<div style="overflow-x:auto;"><table class="sess-hb-table">
+        <thead><tr>
+          <th class="center">#</th><th>الوقت</th><th class="center">Gap</th>
+          <th class="center">Clicks</th><th class="center">Scrolls</th><th class="center">Moves</th>
+          <th class="center">Keys</th><th class="center">Visible</th><th class="center">Focused</th>
+        </tr></thead><tbody>`;
+
+      for (const hb of hbs) {
+        const isGap = hb.gap_ms && hb.gap_ms > 30000;
+        const gapLabel = hb.gap_ms === null || hb.gap_ms === undefined ? '—' : (hb.gap_ms > 1000 ? `${Math.round(hb.gap_ms / 1000)}s` : `${hb.gap_ms}ms`);
+        const gapClass = isGap ? 'sess-hb-gap-warn' : (hb.gap_ms && hb.gap_ms < 15000 ? 'sess-hb-ok' : '');
+
+        html += `<tr class="${isGap ? 'gap' : ''}">
+          <td class="center">${hb.seq}</td>
+          <td>${esc(hb.t_human || '—')}</td>
+          <td class="center ${gapClass}">${esc(gapLabel)}</td>
+          <td class="center">${hb.clicks || 0}</td>
+          <td class="center">${hb.scrolls || 0}</td>
+          <td class="center">${hb.mousemoves || 0}</td>
+          <td class="center">${hb.keydowns || 0}</td>
+          <td class="center" style="color:${hb.is_visible ? 'var(--neo-success)' : 'var(--neo-fg-muted)'};">${hb.is_visible ? '✓' : '—'}</td>
+          <td class="center" style="color:${hb.is_focused ? 'var(--neo-success)' : 'var(--neo-fg-muted)'};">${hb.is_focused ? '✓' : '—'}</td>
+        </tr>`;
+      }
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    async function openDrawer(sessionId) {
+      try {
+        document.getElementById('sessDrawerTitle').textContent = 'Session #' + sessionId.substring(0, 8);
+        document.getElementById('sessDrawerSub').textContent = 'جاري التحميل...';
+        document.getElementById('sessDrawerBody').innerHTML = '<div class="neo-skeleton" style="height: 200px;"></div>';
+        Neo.openDrawer('sessDrawer');
+
+        const d = await Neo.api('/api/sessions/' + encodeURIComponent(sessionId));
+
+        const started = d.started_at ? new Date(d.started_at).toLocaleString('en-GB') : '—';
+        document.getElementById('sessDrawerSub').innerHTML = `
+          ${esc(started)} · ${d.heartbeats.length} heartbeats
+          ${d.duration_human ? ` · ${esc(d.duration_human)}` : ''}
+        `;
+
+        const dq = d.data_quality || 'unknown';
+        const verdict = (d.verdict || 'pending').toLowerCase();
+
+        const body = document.getElementById('sessDrawerBody');
+        body.innerHTML = `
+          <div style="display:flex;gap:8px;margin-bottom:var(--neo-sp-3);">
+            <span class="sess-dq ${dq}">${esc(dq)}</span>
+            <span class="sess-verdict ${verdict}">${esc(verdict)}</span>
+          </div>
+
+          <div class="sess-meta-section">
+            <div class="sess-meta-title">📋 معلومات الجلسة</div>
+            <div class="sess-meta-row"><span class="k">Session ID</span><span class="v" style="font-size:10px;">${esc(d.session_id)}</span></div>
+            <div class="sess-meta-row"><span class="k">Started</span><span class="v">${esc(started)}</span></div>
+            <div class="sess-meta-row"><span class="k">Ended</span><span class="v">${d.ended_at ? new Date(d.ended_at).toLocaleString('en-GB') : '—'}</span></div>
+            <div class="sess-meta-row"><span class="k">IP</span><span class="v">${esc(d.ip || '—')}</span></div>
+            <div class="sess-meta-row"><span class="k">Country</span><span class="v">${esc(d.country_code || '—')}</span></div>
+            <div class="sess-meta-row"><span class="k">Total Heartbeats</span><span class="v">${d.total_heartbeats}</span></div>
+            <div class="sess-meta-row"><span class="k">Duration</span><span class="v">${esc(d.duration_human || '—')}</span></div>
+            ${d.url ? `<div class="sess-meta-row"><span class="k">URL</span><span class="v" style="font-size:10px;direction:ltr;text-align:left;">${esc(d.url.substring(0, 60))}</span></div>` : ''}
+          </div>
+
+          ${renderTimeline(d.heartbeats)}
+
+          <div class="sess-meta-section">
+            <div class="sess-meta-title">💓 Heartbeats (${d.heartbeats.length})</div>
+            ${renderHeartbeats(d.heartbeats)}
+          </div>
+
+          ${d.visit ? `
+            <div class="sess-meta-section">
+              <div class="sess-meta-title">🎯 Visit Data</div>
+              <div class="sess-meta-row"><span class="k">Verdict</span><span class="v" style="color:${d.visit.verdict === 'valid' ? 'var(--neo-success)' : 'var(--neo-danger)'};">${esc((d.visit.verdict || '').toUpperCase())}</span></div>
+              <div class="sess-meta-row"><span class="k">Score</span><span class="v">${d.visit.score}</span></div>
+              <div class="sess-meta-row"><span class="k">Time on Page</span><span class="v">${esc(d.visit.time_on_page_human || '—')}</span></div>
+              <div class="sess-meta-row"><span class="k">Browser / Device</span><span class="v">${esc(d.visit.browser || '—')} · ${esc(d.visit.device || '—')}</span></div>
+              <div style="text-align:center;margin-top:var(--neo-sp-3);">
+                <a href="/visits/${d.visit.id}" class="neo-btn neo-btn-primary neo-btn-sm" style="text-decoration:none;">🔍 افتح صفحة الزيارة</a>
+              </div>
+            </div>
+          ` : `
+            <div class="sess-meta-section">
+              <div style="text-align:center;color:var(--neo-fg-muted);font-size:12px;padding:12px;">⏳ لسه مفيش visit مسجلة — الـ final beacon ماجاش.</div>
+            </div>
+          `}
+
+          ${d.meta ? `
+            <div class="sess-meta-section">
+              <div class="sess-meta-title">📦 Meta (raw)</div>
+              <pre style="font-family:var(--neo-font-mono);font-size:10px;color:var(--neo-success);background:var(--neo-bg-canvas);padding:12px;border-radius:6px;overflow:auto;max-height:200px;direction:ltr;text-align:left;margin:0;">${esc(JSON.stringify(d.meta, null, 2))}</pre>
+            </div>
+          ` : ''}
+        `;
+      } catch (e) {
+        console.error('[SESS] drawer load failed:', e);
+        document.getElementById('sessDrawerBody').innerHTML = `<div style="text-align:center;color:var(--neo-danger);padding:20px;">فشل التحميل: ${esc(e.message)}</div>`;
+      }
+    }
+
+    // =========================================================
+    // BIND
+    // =========================================================
+    function bindControls() {
+      document.getElementById('sessApplyBtn').addEventListener('click', () => {
+        SESS.filters.dq = document.getElementById('sessDq').value;
+        SESS.filters.from = document.getElementById('sessFrom').value;
+        SESS.filters.to = document.getElementById('sessTo').value;
+        SESS.page = 1;
+        loadList();
+      });
+
+      document.getElementById('sessClearBtn').addEventListener('click', () => {
+        document.getElementById('sessDq').value = '';
+        document.getElementById('sessFrom').value = '';
+        document.getElementById('sessTo').value = '';
+        SESS.filters = { dq: '', from: '', to: '' };
+        SESS.page = 1;
+        loadList();
+      });
+
+      document.getElementById('sessPrev').addEventListener('click', () => {
+        if (SESS.page > 1) { SESS.page--; loadList(); }
+      });
+      document.getElementById('sessNext').addEventListener('click', () => {
+        if (SESS.page < SESS.pages) { SESS.page++; loadList(); }
+      });
+
+      document.getElementById('sessRefreshBtn').addEventListener('click', () => {
+        loadCompare();
+        loadList();
+      });
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'sessions',
+          lang: 'ar',
+          breadcrumb: [{ label: 'Sessions' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindControls();
+        await loadCompare();
+        await loadList();
+
+      } catch (e) {
+        console.error('[SESS Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

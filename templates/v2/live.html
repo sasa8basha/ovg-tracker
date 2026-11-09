@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · Live Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .lv-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .lv-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: lv-spin 0.8s linear infinite;
+    }
+    @keyframes lv-spin { to { transform: rotate(360deg); } }
+
+    /* Header */
+    .lv-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--neo-sp-3); margin-bottom: var(--neo-sp-4);
+      flex-wrap: wrap;
+    }
+    .lv-header-title {
+      font-size: var(--neo-fs-2xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-3);
+    }
+    .lv-rec-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--neo-r-sm);
+      background: var(--neo-danger-bg);
+      border: 1px solid var(--neo-danger-border);
+      font-size: 10px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-danger);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-family: var(--neo-font-mono);
+    }
+    .lv-rec-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--neo-danger);
+      animation: lv-rec-pulse 1.5s ease-in-out infinite;
+      box-shadow: 0 0 8px var(--neo-danger);
+    }
+    @keyframes lv-rec-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .lv-conn-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--neo-r-sm);
+      font-size: 10px;
+      font-weight: var(--neo-fw-black);
+      font-family: var(--neo-font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .lv-conn-badge.sse { background: var(--neo-success-bg); color: var(--neo-success); }
+    .lv-conn-badge.poll { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .lv-conn-badge.off { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    .lv-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-3);
+      flex-wrap: wrap;
+    }
+    .lv-timer {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-accent-hover);
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      background: var(--neo-accent-subtle);
+    }
+    .lv-header-actions {
+      display: flex;
+      gap: var(--neo-sp-2);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* KPI strip */
+    .lv-kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+    }
+    @media (max-width: 900px) { .lv-kpis { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .lv-kpis { grid-template-columns: 1fr 1fr; } }
+
+    .lv-kpi {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3) var(--neo-sp-4);
+      position: relative;
+      overflow: hidden;
+    }
+    .lv-kpi::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--kpi-color, var(--neo-accent));
+      opacity: 0.6;
+    }
+    .lv-kpi-label {
+      font-size: 9px;
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .lv-kpi-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: var(--neo-fv-numeric);
+      font-size: 24px;
+      font-weight: var(--neo-fw-black);
+      line-height: 1;
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+    }
+    .lv-kpi-sub {
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      margin-top: 4px;
+      font-family: var(--neo-font-mono);
+    }
+    .lv-live-dot {
+      display: inline-block;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--neo-success);
+      margin-left: 3px;
+      animation: lv-rec-pulse 1.5s ease-in-out infinite;
+    }
+
+    /* Body */
+    .lv-body {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: var(--neo-sp-3);
+      height: calc(100vh - 320px);
+      min-height: 400px;
+    }
+    @media (max-width: 1024px) {
+      .lv-body { grid-template-columns: 1fr; height: auto; }
+    }
+
+    /* Feed */
+    .lv-feed-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .lv-feed-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-subtle);
+      background: var(--neo-bg-canvas);
+      flex-wrap: wrap;
+      gap: var(--neo-sp-2);
+    }
+    .lv-feed-title {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+    .lv-feed-count {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-tertiary);
+    }
+    .lv-feed-filters {
+      display: flex;
+      gap: 4px;
+    }
+    .lv-feed-filter {
+      padding: 4px 10px;
+      border-radius: var(--neo-r-xs);
+      background: transparent;
+      border: 1px solid var(--neo-border-default);
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .lv-feed-filter.active {
+      background: var(--neo-accent-subtle);
+      border-color: var(--neo-accent-border);
+      color: var(--neo-accent-hover);
+    }
+
+    .lv-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .lv-feed-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--neo-fg-muted);
+      font-size: var(--neo-fs-sm);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+    .lv-feed-empty-icon { font-size: 32px; opacity: 0.4; }
+
+    .lv-item {
+      display: grid;
+      grid-template-columns: 60px 24px 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: var(--neo-r-sm);
+      margin-bottom: 3px;
+      font-size: var(--neo-fs-xs);
+      text-decoration: none;
+      color: var(--neo-fg-secondary);
+      transition: background var(--neo-dur-fast);
+      border: 1px solid transparent;
+    }
+    .lv-item:hover {
+      background: var(--neo-bg-elevated);
+      border-color: var(--neo-border-default);
+    }
+
+    .lv-item.new-valid { animation: lv-slide-in 500ms cubic-bezier(0.16,1,0.3,1); }
+    .lv-item.new-bot { animation: lv-slide-in-bot 900ms cubic-bezier(0.16,1,0.3,1); }
+    .lv-item.new-suspicious { animation: lv-slide-in-susp 700ms cubic-bezier(0.16,1,0.3,1); }
+
+    @keyframes lv-slide-in {
+      from { opacity: 0; transform: translateY(-20px); background: rgba(16,185,129,0.15); }
+      to { opacity: 1; transform: translateY(0); background: transparent; }
+    }
+    @keyframes lv-slide-in-bot {
+      from { opacity: 0; transform: translateY(-20px); background: rgba(239,68,68,0.25); box-shadow: 0 0 24px rgba(239,68,68,0.5); }
+      to { opacity: 1; transform: translateY(0); background: transparent; box-shadow: 0 0 0 transparent; }
+    }
+    @keyframes lv-slide-in-susp {
+      from { opacity: 0; transform: translateY(-20px); background: rgba(245,158,11,0.18); }
+      to { opacity: 1; transform: translateY(0); background: transparent; }
+    }
+
+    .lv-item-time {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      color: var(--neo-fg-muted);
+      font-weight: var(--neo-fw-bold);
+    }
+    .lv-item-icon {
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+    }
+    .lv-item-body {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .lv-item-row1 {
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+      font-family: var(--neo-font-mono);
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .lv-item-row2 {
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .lv-item-zone {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      color: var(--neo-accent-hover);
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--neo-accent-subtle);
+      max-width: 90px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .lv-item-score {
+      font-family: var(--neo-font-mono);
+      font-size: 12px;
+      font-weight: var(--neo-fw-extrabold);
+      min-width: 28px;
+      text-align: center;
+    }
+
+    /* Sidebar */
+    .lv-side {
+      display: flex;
+      flex-direction: column;
+      gap: var(--neo-sp-3);
+    }
+    .lv-side-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .lv-side-head {
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-subtle);
+      background: var(--neo-bg-canvas);
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .lv-side-body {
+      padding: var(--neo-sp-2);
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .lv-alert {
+      padding: 10px 12px;
+      border-radius: var(--neo-r-sm);
+      margin-bottom: 6px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 11px;
+      line-height: 1.5;
+      border: 1px solid;
+    }
+    .lv-alert.critical {
+      background: rgba(239,68,68,0.08);
+      border-color: var(--neo-danger-border);
+      color: var(--neo-danger-fg);
+    }
+    .lv-alert.high {
+      background: var(--neo-warning-bg);
+      border-color: var(--neo-warning-border);
+      color: var(--neo-warning-fg);
+    }
+    .lv-alert-icon { font-size: 16px; flex-shrink: 0; }
+    .lv-alert-body { flex: 1; min-width: 0; }
+    .lv-alert-title {
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin-bottom: 2px;
+      font-size: 12px;
+    }
+    .lv-alert-message { font-size: 10px; opacity: 0.9; }
+    .lv-alert-action {
+      margin-top: 6px;
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: var(--neo-r-xs);
+      background: rgba(255,255,255,0.1);
+      color: var(--neo-fg-primary);
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      text-decoration: none;
+      transition: all var(--neo-dur-fast);
+    }
+    .lv-alert-action:hover { background: rgba(255,255,255,0.2); }
+
+    .lv-side-empty {
+      padding: 30px 12px;
+      text-align: center;
+      color: var(--neo-fg-muted);
+      font-size: var(--neo-fs-sm);
+    }
+    .lv-side-empty-icon {
+      font-size: 32px;
+      opacity: 0.4;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    /* Activity chart */
+    .lv-activity {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 60px;
+      padding: 6px 0;
+    }
+    .lv-activity-bar {
+      flex: 1;
+      min-height: 2px;
+      border-radius: 2px 2px 0 0;
+      background: var(--neo-success);
+      transition: height 600ms cubic-bezier(0.16,1,0.3,1);
+      position: relative;
+    }
+    .lv-activity-bar.bot { background: var(--neo-danger); }
+    .lv-activity-bar.mixed { background: var(--neo-warning); }
+    .lv-activity-label {
+      text-align: center;
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      font-family: var(--neo-font-mono);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="lv-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل Live Monitor…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="lv-header">
+        <div>
+          <h1 class="lv-header-title">
+            Live Monitor
+            <span class="lv-rec-badge"><span class="lv-rec-dot"></span> LIVE</span>
+            <span class="lv-conn-badge off" id="lvConnBadge">⚪ غير متصل</span>
+          </h1>
+          <div class="lv-sub">
+            <span>تراقب الزيارات في الوقت الفعلي</span>
+            <span class="lv-timer" id="lvTimer">شغال من 0:00</span>
+          </div>
+        </div>
+        <div class="lv-header-actions">
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="lvSoundBtn">🔔 <span id="lvSoundLabel">صوت: مفعّل</span></button>
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="lvPauseBtn">⏸ إيقاف مؤقت</button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="lv-kpis">
+        <div class="lv-kpi" style="--kpi-color: var(--neo-accent);">
+          <div class="lv-kpi-label">زيارات اليوم</div>
+          <div class="lv-kpi-value" id="lvKpiTodayTotal">0</div>
+          <div class="lv-kpi-sub" id="lvKpiTodaySub">—</div>
+        </div>
+        <div class="lv-kpi" style="--kpi-color: var(--neo-danger);">
+          <div class="lv-kpi-label">Bot Rate</div>
+          <div class="lv-kpi-value" id="lvKpiBotRate" style="color: var(--neo-danger);">0%</div>
+          <div class="lv-kpi-sub" id="lvKpiBotSub">—</div>
+        </div>
+        <div class="lv-kpi" style="--kpi-color: var(--neo-warning);">
+          <div class="lv-kpi-label">بوتات آخر ساعة</div>
+          <div class="lv-kpi-value" id="lvKpiBotHour" style="color: var(--neo-warning);">0</div>
+          <div class="lv-kpi-sub" id="lvKpiBotHourSub">—</div>
+        </div>
+        <div class="lv-kpi" style="--kpi-color: var(--neo-success);">
+          <div class="lv-kpi-label">زيارات/دقيقة <span class="lv-live-dot"></span></div>
+          <div class="lv-kpi-value" id="lvKpiRate" style="color: var(--neo-success);">0</div>
+          <div class="lv-kpi-sub" id="lvKpiRateSub">آخر دقيقة</div>
+        </div>
+      </div>
+
+      <!-- Body: Feed + Sidebar -->
+      <div class="lv-body">
+        <div class="lv-feed-card">
+          <div class="lv-feed-head">
+            <div class="lv-feed-title">
+              📡 الزيارات الحية
+              <span class="lv-feed-count" id="lvFeedCount">0 زيارة</span>
+            </div>
+            <div class="lv-feed-filters">
+              <button class="lv-feed-filter active" data-filter="all">الكل</button>
+              <button class="lv-feed-filter" data-filter="invalid">🚨 بوت</button>
+              <button class="lv-feed-filter" data-filter="valid">✅ صالح</button>
+            </div>
+          </div>
+          <div class="lv-feed" id="lvFeed">
+            <div class="lv-feed-empty">
+              <span class="lv-feed-empty-icon">📡</span>
+              <div>جاري انتظار أول زيارة...</div>
+              <div style="font-size: 10px; opacity: 0.6;">الزيارات هتظهر هنا في الوقت الفعلي</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lv-side">
+          <div class="lv-side-card" style="flex: 0 0 auto;">
+            <div class="lv-side-head">
+              🚨 تنبيهات
+              <span id="lvAlertsCount" style="font-size: 10px; color: var(--neo-fg-tertiary); font-family: var(--neo-font-mono);">0</span>
+            </div>
+            <div class="lv-side-body" id="lvAlerts" style="max-height: 300px;">
+              <div class="lv-side-empty">
+                <span class="lv-side-empty-icon">✅</span>
+                <div>كل حاجة هادية</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lv-side-card" style="flex: 1;">
+            <div class="lv-side-head">📊 آخر 60 دقيقة</div>
+            <div class="lv-side-body">
+              <div class="lv-activity" id="lvActivity"></div>
+              <div class="lv-activity-label" id="lvActivityLabel">جاري التحميل…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const LV = {
+      latestId: 0,
+      paused: false,
+      soundEnabled: true,
+      sessionStart: Date.now(),
+      filter: 'all',
+      allItems: [],
+      statsTimer: null,
+      alertsTimer: null,
+      activityTimer: null,
+      timerInterval: null,
+      audioCtx: null,
+    };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtNum(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    // =========================================================
+    // TIMER
+    // =========================================================
+    function updateTimer() {
+      const elapsed = Math.floor((Date.now() - LV.sessionStart) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      const h = Math.floor(m / 60);
+      const mm = m % 60;
+      const display = h > 0 ? `${h}:${String(mm).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+      const el = document.getElementById('lvTimer');
+      if (el) el.textContent = `شغال من ${display}`;
+    }
+
+    // =========================================================
+    // CONNECTION BADGE
+    // =========================================================
+    function setConnBadge(status) {
+      const el = document.getElementById('lvConnBadge');
+      if (!el) return;
+      if (status === 'sse') {
+        el.className = 'lv-conn-badge sse';
+        el.textContent = '🟢 SSE';
+      } else if (status === 'poll') {
+        el.className = 'lv-conn-badge poll';
+        el.textContent = '🟡 Polling';
+      } else {
+        el.className = 'lv-conn-badge off';
+        el.textContent = '⚪ غير متصل';
+      }
+    }
+
+    // =========================================================
+    // SOUND
+    // =========================================================
+    function playBeep(isCritical) {
+      if (!LV.soundEnabled) return;
+      try {
+        if (!LV.audioCtx) LV.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = LV.audioCtx.createOscillator();
+        const gain = LV.audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(LV.audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = isCritical ? 880 : 660;
+        gain.gain.setValueAtTime(0.15, LV.audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, LV.audioCtx.currentTime + 0.15);
+        osc.start();
+        osc.stop(LV.audioCtx.currentTime + 0.15);
+      } catch (e) {}
+    }
+
+    // =========================================================
+    // FEED RENDER
+    // =========================================================
+    function verdictIcon(v) {
+      if (v === 'invalid') return '🚨';
+      if (v === 'valid') return '✅';
+      return '⚠️';
+    }
+    function scoreColor(s) {
+      if (s > 80) return 'var(--neo-danger)';
+      if (s > 40) return 'var(--neo-warning)';
+      return 'var(--neo-success)';
+    }
+
+    function renderFeedItem(v, isNew) {
+      const item = document.createElement('a');
+      item.href = `/visits/${v.id}`;
+      item.className = 'lv-item';
+      if (isNew) {
+        if (v.verdict === 'invalid') item.classList.add('new-bot');
+        else if (v.verdict === 'valid') item.classList.add('new-valid');
+        else item.classList.add('new-suspicious');
+      }
+      const countryDisplay = v.country_code || v.country || '—';
+      item.innerHTML = `
+        <span class="lv-item-time">${esc(v.time)}</span>
+        <span class="lv-item-icon">${verdictIcon(v.verdict)}</span>
+        <span class="lv-item-body">
+          <span class="lv-item-row1">${esc(v.ip || '—')} · ${esc(countryDisplay)}</span>
+          <span class="lv-item-row2">${esc(v.browser || '—')} · ${esc(v.device || '—')}</span>
+        </span>
+        <span class="lv-item-zone">${esc(v.zone || '—')}</span>
+        <span class="lv-item-score" style="color: ${scoreColor(v.score || 0)};">${v.score || 0}</span>
+      `;
+      return item;
+    }
+
+    function matchesFilter(v) {
+      if (LV.filter === 'all') return true;
+      return v.verdict === LV.filter;
+    }
+
+    function appendToFeed(items, isNew) {
+      const feed = document.getElementById('lvFeed');
+      if (!feed) return;
+
+      const empty = feed.querySelector('.lv-feed-empty');
+      if (empty && items.length) empty.remove();
+
+      const newBots = [];
+
+      for (const v of items) {
+        if (LV.allItems.some(x => x.id === v.id)) continue;
+        LV.allItems.unshift(v);
+        if (matchesFilter(v)) {
+          const el = renderFeedItem(v, isNew);
+          feed.insertBefore(el, feed.firstChild);
+        }
+        if (isNew && v.verdict === 'invalid') newBots.push(v);
+      }
+
+      // Cap memory 500 items
+      if (LV.allItems.length > 500) {
+        LV.allItems = LV.allItems.slice(0, 500);
+      }
+
+      // Cap DOM at 60
+      while (feed.children.length > 60) {
+        feed.removeChild(feed.lastChild);
+      }
+
+      if (newBots.length > 0) playBeep(newBots.length >= 3);
+
+      const totalShown = feed.querySelectorAll('.lv-item').length;
+      const countEl = document.getElementById('lvFeedCount');
+      if (countEl) countEl.textContent = `${totalShown} زيارة`;
+    }
+
+    function setFilter(filter) {
+      LV.filter = filter;
+      document.querySelectorAll('.lv-feed-filter').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === filter);
+      });
+      const feed = document.getElementById('lvFeed');
+      if (!feed) return;
+      feed.innerHTML = '';
+
+      const filtered = LV.allItems.filter(matchesFilter);
+      if (filtered.length === 0) {
+        const label = filter === 'invalid' ? 'بوت' : filter === 'valid' ? 'صالحة' : '';
+        feed.innerHTML = `<div class="lv-feed-empty"><span class="lv-feed-empty-icon">📡</span><div>مفيش زيارات ${label} لسه</div></div>`;
+        return;
+      }
+      for (const v of filtered.slice(0, 60)) {
+        feed.appendChild(renderFeedItem(v, false));
+      }
+      const countEl = document.getElementById('lvFeedCount');
+      if (countEl) countEl.textContent = `${filtered.length} زيارة`;
+    }
+
+    // =========================================================
+    // SSE / POLLING
+    // =========================================================
+    function initStream() {
+      // Try SSE first
+      try {
+        const es = Neo.openSSE('/api/live/stream?since_id=' + LV.latestId, {
+          onOpen: () => {
+            setConnBadge('sse');
+          },
+          onVisits: (data) => {
+            if (data.items && data.items.length > 0) {
+              appendToFeed(data.items, true);
+              if (data.latest_id && data.latest_id > LV.latestId) {
+                LV.latestId = data.latest_id;
+              }
+            }
+          },
+          onError: () => {
+            if (Neo.state.sse && Neo.state.sse.readyState === EventSource.CLOSED) {
+              setConnBadge('off');
+              // Try reconnect after 3s
+              setTimeout(() => {
+                if (!LV.paused) initStream();
+              }, 3000);
+            }
+          },
+        });
+        if (!es) {
+          // SSE failed to init
+          startPollingFallback();
+        }
+      } catch (e) {
+        startPollingFallback();
+      }
+    }
+
+    let pollTimer = null;
+    async function pollFeed() {
+      if (LV.paused) return;
+      try {
+        const data = await Neo.api(`/api/live/feed?since_id=${LV.latestId}&limit=20`);
+        if (data.items && data.items.length > 0) {
+          appendToFeed(data.items, true);
+          LV.latestId = data.latest_id;
+        }
+      } catch (e) {}
+    }
+
+    function startPollingFallback() {
+      if (pollTimer) clearInterval(pollTimer);
+      setConnBadge('poll');
+      pollTimer = setInterval(pollFeed, 2000);
+    }
+
+    // =========================================================
+    // STATS
+    // =========================================================
+    async function loadStats() {
+      if (LV.paused) return;
+      try {
+        const data = await Neo.api('/api/live/stats');
+
+        const totalEl = document.getElementById('lvKpiTodayTotal');
+        if (totalEl) totalEl.textContent = fmtNum(data.today.total);
+        const totalSub = document.getElementById('lvKpiTodaySub');
+        if (totalSub) totalSub.textContent = `${fmtNum(data.today.valid)} valid · ${fmtNum(data.today.invalid)} bot`;
+
+        const botRateEl = document.getElementById('lvKpiBotRate');
+        if (botRateEl) {
+          botRateEl.textContent = data.today.bot_rate.toFixed(1) + '%';
+          botRateEl.style.color = data.today.bot_rate > 30 ? 'var(--neo-danger)' : data.today.bot_rate > 15 ? 'var(--neo-warning)' : 'var(--neo-success)';
+        }
+        const botSub = document.getElementById('lvKpiBotSub');
+        if (botSub) botSub.textContent = `${fmtNum(data.today.invalid)} من ${fmtNum(data.today.total)}`;
+
+        const botHourEl = document.getElementById('lvKpiBotHour');
+        if (botHourEl) botHourEl.textContent = fmtNum(data.last_hour.invalid);
+        const botHourSub = document.getElementById('lvKpiBotHourSub');
+        if (botHourSub) {
+          const rate = data.last_hour.total > 0 ? Math.round((data.last_hour.invalid / data.last_hour.total) * 100) : 0;
+          botHourSub.textContent = `${fmtNum(data.last_hour.total)} زيارة · ${rate}%`;
+        }
+
+        const rateEl = document.getElementById('lvKpiRate');
+        if (rateEl) rateEl.textContent = fmtNum(data.last_minute.total);
+        const rateSub = document.getElementById('lvKpiRateSub');
+        if (rateSub) {
+          rateSub.textContent = data.last_minute.invalid > 0 ? `${data.last_minute.invalid} بوت في الدقيقة` : 'لا بوتات دلوقتي';
+          rateSub.style.color = data.last_minute.invalid > 0 ? 'var(--neo-danger)' : 'var(--neo-fg-tertiary)';
+        }
+      } catch (e) {}
+    }
+
+    // =========================================================
+    // ALERTS
+    // =========================================================
+    async function loadAlerts() {
+      if (LV.paused) return;
+      try {
+        const data = await Neo.api('/api/live/alerts');
+        renderAlerts(data.alerts || []);
+      } catch (e) {}
+    }
+
+    function renderAlerts(alerts) {
+      const container = document.getElementById('lvAlerts');
+      const countEl = document.getElementById('lvAlertsCount');
+      if (countEl) countEl.textContent = alerts.length;
+
+      if (!alerts.length) {
+        container.innerHTML = `
+          <div class="lv-side-empty">
+            <span class="lv-side-empty-icon">✅</span>
+            <div>كل حاجة هادية</div>
+            <div style="font-size: 10px; margin-top: 4px; opacity: 0.6;">مفيش تنبيهات نشطة</div>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = alerts.map(a => `
+        <div class="lv-alert ${a.severity}">
+          <span class="lv-alert-icon">${a.icon}</span>
+          <div class="lv-alert-body">
+            <div class="lv-alert-title">${esc(a.title)}</div>
+            <div class="lv-alert-message">${esc(a.message)}</div>
+            ${a.action_href ? `<a href="${esc(a.action_href)}" class="lv-alert-action">${esc(a.action_label)} ←</a>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================
+    // ACTIVITY CHART
+    // =========================================================
+    async function loadActivity() {
+      if (LV.paused) return;
+      try {
+        const stats = await Neo.api('/api/live/stats');
+        const total = stats.last_hour.total || 0;
+        const invalid = stats.last_hour.invalid || 0;
+        const botRate = total > 0 ? invalid / total : 0;
+
+        const container = document.getElementById('lvActivity');
+        if (!container) return;
+
+        const bars = [];
+        for (let i = 0; i < 12; i++) {
+          const barHeight = total > 0 ? Math.max(4, Math.min(60, (total / 12) * 4)) : 4;
+          const barClass = botRate > 0.4 ? 'bot' : botRate > 0.15 ? 'mixed' : '';
+          bars.push(`<div class="lv-activity-bar ${barClass}" style="height: ${barHeight}px;"></div>`);
+        }
+        container.innerHTML = bars.join('');
+
+        const labelEl = document.getElementById('lvActivityLabel');
+        if (labelEl) labelEl.textContent = `آخر ساعة: ${fmtNum(total)} زيارة · ${fmtNum(invalid)} بوت`;
+      } catch (e) {}
+    }
+
+    // =========================================================
+    // INITIAL FEED LOAD
+    // =========================================================
+    async function initialLoad() {
+      try {
+        const data = await Neo.api('/api/live/feed?since_id=0&limit=30');
+        if (data.items && data.items.length > 0) {
+          const sorted = [...data.items].sort((a, b) => a.id - b.id);
+          for (const v of sorted) {
+            if (!LV.allItems.some(x => x.id === v.id)) LV.allItems.push(v);
+          }
+          const feed = document.getElementById('lvFeed');
+          if (feed) {
+            feed.innerHTML = '';
+            for (const v of data.items) {
+              if (matchesFilter(v)) feed.appendChild(renderFeedItem(v, false));
+            }
+            const countEl = document.getElementById('lvFeedCount');
+            if (countEl) countEl.textContent = `${feed.children.length} زيارة`;
+          }
+          LV.latestId = data.latest_id;
+        }
+      } catch (e) {
+        console.error('[Live] initial load failed:', e);
+      }
+
+      await Promise.all([loadStats(), loadAlerts(), loadActivity()]);
+    }
+
+    // =========================================================
+    // BIND UI
+    // =========================================================
+    function bindUI() {
+      // Sound toggle
+      const soundBtn = document.getElementById('lvSoundBtn');
+      if (soundBtn) {
+        soundBtn.addEventListener('click', () => {
+          LV.soundEnabled = !LV.soundEnabled;
+          document.getElementById('lvSoundLabel').textContent = LV.soundEnabled ? 'صوت: مفعّل' : 'صوت: صامت';
+        });
+      }
+
+      // Pause
+      const pauseBtn = document.getElementById('lvPauseBtn');
+      if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+          LV.paused = !LV.paused;
+          pauseBtn.textContent = LV.paused ? '▶ استئناف' : '⏸ إيقاف مؤقت';
+          if (LV.paused) {
+            Neo.closeSSE();
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            setConnBadge('off');
+          } else {
+            initStream();
+          }
+        });
+      }
+
+      // Filters
+      document.querySelectorAll('.lv-feed-filter').forEach(btn => {
+        btn.addEventListener('click', () => setFilter(btn.dataset.filter));
+      });
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'live',
+          lang: 'ar',
+          breadcrumb: [{ label: 'Live Monitor' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindUI();
+        updateTimer();
+        await initialLoad();
+
+        // Start SSE
+        initStream();
+
+        // Timers
+        LV.timerInterval = setInterval(updateTimer, 1000);
+        LV.statsTimer = setInterval(loadStats, 5000);
+        LV.alertsTimer = setInterval(loadAlerts, 10000);
+        LV.activityTimer = setInterval(loadActivity, 15000);
+
+        // Cleanup on close
+        window.addEventListener('beforeunload', () => {
+          Neo.closeSSE();
+          if (pollTimer) clearInterval(pollTimer);
+        });
+
+      } catch (e) {
+        console.error('[Live Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

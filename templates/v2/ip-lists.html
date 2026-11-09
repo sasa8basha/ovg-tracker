@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · قوائم IP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .ipl-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .ipl-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: ipl-spin 0.8s linear infinite;
+    }
+    @keyframes ipl-spin { to { transform: rotate(360deg); } }
+
+    /* Header */
+    .ipl-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .ipl-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .ipl-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+    .ipl-header-actions {
+      display: flex; gap: var(--neo-sp-2);
+      align-items: center; flex-wrap: wrap;
+    }
+
+    /* KPI strip */
+    .ipl-kpis {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-4);
+    }
+    @media (max-width: 1100px) { .ipl-kpis { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px) { .ipl-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+    .ipl-kpi {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+    }
+    .ipl-kpi-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .ipl-kpi-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 22px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      line-height: 1.1;
+    }
+    .ipl-kpi-value.green { color: var(--neo-success); }
+    .ipl-kpi-value.red { color: var(--neo-danger); }
+    .ipl-kpi-value.amber { color: var(--neo-warning); }
+
+    /* Tabs */
+    .ipl-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-default);
+    }
+    .ipl-tab {
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+    .ipl-tab:hover { color: var(--neo-fg-secondary); }
+    .ipl-tab.active {
+      color: var(--neo-fg-primary);
+      border-bottom-color: var(--neo-accent);
+    }
+    .ipl-tab-count {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--neo-bg-elevated);
+      color: var(--neo-fg-muted);
+    }
+    .ipl-tab.active .ipl-tab-count {
+      background: var(--neo-accent-subtle);
+      color: var(--neo-accent-hover);
+    }
+
+    /* Filters */
+    .ipl-filters {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-3);
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: var(--neo-sp-2);
+      align-items: end;
+    }
+    @media (max-width: 700px) { .ipl-filters { grid-template-columns: 1fr; } }
+
+    .ipl-filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .ipl-filter-label {
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Panel */
+    .ipl-panel { display: none; }
+    .ipl-panel.active { display: block; }
+
+    /* Table actions */
+    .ipl-table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--neo-sp-2);
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+    }
+    .ipl-count {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+    }
+
+    .ipl-mono { font-family: var(--neo-font-mono); font-size: 11px; }
+    .ipl-ip { font-family: var(--neo-font-mono); font-weight: 700; color: var(--neo-fg-primary); }
+
+    .ipl-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+    }
+    .ipl-badge.residential { background: var(--neo-success-bg); color: var(--neo-success); }
+    .ipl-badge.datacenter  { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .ipl-badge.vpn         { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .ipl-badge.proxy       { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .ipl-badge.tor         { background: rgba(168,85,247,0.15); color: #A855F7; }
+    .ipl-badge.suspicious  { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .ipl-badge.unknown     { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    .ipl-risk {
+      font-family: var(--neo-font-mono);
+      font-weight: var(--neo-fw-extrabold);
+    }
+
+    /* Feeds */
+    .ipl-feed-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-2);
+    }
+    .ipl-feed-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-2);
+    }
+    .ipl-feed-name {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+    }
+    .ipl-feed-status {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+    }
+    .ipl-feed-status.ok { background: var(--neo-success-bg); color: var(--neo-success); }
+    .ipl-feed-status.stale { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .ipl-feed-status.unknown { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+    .ipl-feed-info {
+      display: flex;
+      gap: var(--neo-sp-4);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+      flex-wrap: wrap;
+    }
+
+    /* Empty state */
+    .ipl-empty {
+      text-align: center;
+      padding: var(--neo-sp-8) var(--neo-sp-4);
+      color: var(--neo-fg-muted);
+      font-size: var(--neo-fs-sm);
+    }
+    .ipl-empty-icon {
+      font-size: 40px;
+      opacity: 0.4;
+      display: block;
+      margin-bottom: var(--neo-sp-2);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ipl-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل IP Lists…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="ipl-header">
+        <div>
+          <h1 class="ipl-header-title">🌐 قوائم IP</h1>
+          <div class="ipl-header-sub" id="iplSubtitle">Whitelist · Blacklist · Reputation Feeds</div>
+        </div>
+        <div class="ipl-header-actions">
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="iplRefreshBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+            تحديث
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="ipl-kpis" id="iplKpis">
+        <div class="ipl-kpi"><div class="ipl-kpi-label">إجمالي IPs</div><div class="ipl-kpi-value" id="kpiTotal">0</div></div>
+        <div class="ipl-kpi"><div class="ipl-kpi-label">Residential</div><div class="ipl-kpi-value green" id="kpiResidential">0</div></div>
+        <div class="ipl-kpi"><div class="ipl-kpi-label">Datacenter</div><div class="ipl-kpi-value red" id="kpiDatacenter">0</div></div>
+        <div class="ipl-kpi"><div class="ipl-kpi-label">VPN</div><div class="ipl-kpi-value red" id="kpiVpn">0</div></div>
+        <div class="ipl-kpi"><div class="ipl-kpi-label">Proxy</div><div class="ipl-kpi-value amber" id="kpiProxy">0</div></div>
+        <div class="ipl-kpi"><div class="ipl-kpi-label">Tor</div><div class="ipl-kpi-value amber" id="kpiTor">0</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="ipl-tabs">
+        <button class="ipl-tab active" data-tab="whitelist">
+          ✅ Whitelist <span class="ipl-tab-count" id="tabCountWl">0</span>
+        </button>
+        <button class="ipl-tab" data-tab="blacklist">
+          🚫 Blacklist <span class="ipl-tab-count" id="tabCountBl">0</span>
+        </button>
+        <button class="ipl-tab" data-tab="feeds">
+          📡 Reputation Feeds <span class="ipl-tab-count" id="tabCountFeeds">0</span>
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="ipl-filters" id="iplFiltersWrap">
+        <div class="ipl-filter-field">
+          <label class="ipl-filter-label">الحملة</label>
+          <select id="iplCampaign" class="neo-select neo-input-sm">
+            <option value="">كل الحملات</option>
+          </select>
+        </div>
+        <div class="ipl-filter-field">
+          <label class="ipl-filter-label">بحث (IP / ISP / ASN / Country)</label>
+          <input type="text" id="iplSearch" class="neo-input neo-input-sm" placeholder="فلترة سريعة...">
+        </div>
+        <button class="neo-btn neo-btn-ghost neo-btn-sm" id="iplClearBtn">مسح</button>
+      </div>
+
+      <!-- Whitelist panel -->
+      <div class="ipl-panel active" data-panel="whitelist">
+        <div class="ipl-table-header">
+          <div class="ipl-count" id="wlCount">— IP</div>
+          <button class="neo-btn neo-btn-success neo-btn-sm" id="wlExportBtn">
+            ⬇ تصدير CSV (للـ PopAds whitelist)
+          </button>
+        </div>
+        <div class="neo-table-wrap">
+          <table class="neo-table">
+            <thead>
+              <tr>
+                <th>IP</th>
+                <th>الدولة</th>
+                <th>ISP</th>
+                <th>ASN</th>
+                <th class="neo-cell-center">Risk Score</th>
+              </tr>
+            </thead>
+            <tbody id="wlBody">
+              <tr><td colspan="5" class="neo-table-empty">جاري التحميل…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Blacklist panel -->
+      <div class="ipl-panel" data-panel="blacklist">
+        <div class="ipl-table-header">
+          <div class="ipl-count" id="blCount">— IP</div>
+          <button class="neo-btn neo-btn-danger neo-btn-sm" id="blExportBtn">
+            ⬇ تصدير CSV (للحظر في PopAds)
+          </button>
+        </div>
+        <div class="neo-table-wrap">
+          <table class="neo-table">
+            <thead>
+              <tr>
+                <th>IP</th>
+                <th class="neo-cell-center">التصنيف</th>
+                <th>الدولة</th>
+                <th>ISP</th>
+                <th class="neo-cell-center">Risk</th>
+                <th>الأسباب</th>
+              </tr>
+            </thead>
+            <tbody id="blBody">
+              <tr><td colspan="6" class="neo-table-empty">جاري التحميل…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Feeds panel -->
+      <div class="ipl-panel" data-panel="feeds">
+        <div class="ipl-table-header">
+          <div class="ipl-count" id="feedsCount">— feed</div>
+          <div class="ipl-header-sub">تحديث تلقائي كل 24 ساعة</div>
+        </div>
+        <div id="feedsBody">
+          <div class="neo-skeleton" style="height: 80px; margin-bottom: 8px;"></div>
+          <div class="neo-skeleton" style="height: 80px;"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const IPL = {
+      tab: 'whitelist',
+      campaignId: '',
+      search: '',
+      whitelist: [],
+      blacklist: [],
+      feeds: [],
+    };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    // =========================================================
+    // LOAD CAMPAIGNS (for filter)
+    // =========================================================
+    async function loadCampaigns() {
+      try {
+        const campaigns = await Neo.api('/api/campaigns');
+        const sel = document.getElementById('iplCampaign');
+        sel.innerHTML = '<option value="">كل الحملات</option>' + campaigns.map(c =>
+          `<option value="${c.id}">${esc(c.name)}</option>`
+        ).join('');
+      } catch (e) {
+        console.error('[IPL] campaigns load failed:', e);
+      }
+    }
+
+    // =========================================================
+    // LOAD STATS
+    // =========================================================
+    async function loadStats() {
+      try {
+        const q = IPL.campaignId ? `?campaign_id=${IPL.campaignId}` : '';
+        const d = await Neo.api('/api/ip-intel/stats' + q);
+
+        document.getElementById('kpiTotal').textContent = fmtInt(d.total);
+        document.getElementById('kpiResidential').textContent = fmtInt(d.residential);
+        document.getElementById('kpiDatacenter').textContent = fmtInt(d.datacenter);
+        document.getElementById('kpiVpn').textContent = fmtInt(d.vpn);
+        document.getElementById('kpiProxy').textContent = fmtInt(d.proxy);
+        document.getElementById('kpiTor').textContent = fmtInt(d.tor);
+      } catch (e) {
+        console.error('[IPL] stats load failed:', e);
+      }
+    }
+
+    // =========================================================
+    // FILTER HELPERS
+    // =========================================================
+    function filterRows(rows) {
+      if (!IPL.search) return rows;
+      const s = IPL.search.toLowerCase();
+      return rows.filter(r =>
+        (r.ip || '').toLowerCase().includes(s) ||
+        (r.country || '').toLowerCase().includes(s) ||
+        (r.isp || '').toLowerCase().includes(s) ||
+        (r.asn || '').toLowerCase().includes(s) ||
+        (r.classification || '').toLowerCase().includes(s)
+      );
+    }
+
+    // =========================================================
+    // LOAD WHITELIST
+    // =========================================================
+    async function loadWhitelist() {
+      try {
+        const q = IPL.campaignId ? `?campaign_id=${IPL.campaignId}` : '';
+        const d = await Neo.api('/api/ip-intel/whitelist' + q);
+        IPL.whitelist = d.items || [];
+        document.getElementById('tabCountWl').textContent = fmtInt(d.count);
+
+        const filtered = filterRows(IPL.whitelist);
+        document.getElementById('wlCount').textContent = `${fmtInt(filtered.length)} IP`;
+
+        const body = document.getElementById('wlBody');
+        if (!filtered.length) {
+          body.innerHTML = `
+            <tr><td colspan="5">
+              <div class="ipl-empty">
+                <span class="ipl-empty-icon">✅</span>
+                مفيش IPs نضيفة لسه. استنى الـ worker يخلص تحليل.
+              </div>
+            </td></tr>
+          `;
+          return;
+        }
+
+        body.innerHTML = filtered.map(r => {
+          const risk = Number(r.risk_score || 0);
+          const riskColor = risk > 10 ? 'var(--neo-warning)' : 'var(--neo-success)';
+          return `
+            <tr>
+              <td class="ipl-ip">${esc(r.ip)}</td>
+              <td>${esc(r.country || '—')}</td>
+              <td style="font-size: 11px;">${esc((r.isp || '').substring(0, 40))}</td>
+              <td class="ipl-mono">${esc(r.asn || '—')}</td>
+              <td class="neo-cell-center ipl-risk" style="color: ${riskColor};">${risk}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="5" class="neo-table-empty" style="color: var(--neo-danger);">${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    // =========================================================
+    // LOAD BLACKLIST
+    // =========================================================
+    async function loadBlacklist() {
+      try {
+        const q = IPL.campaignId ? `?campaign_id=${IPL.campaignId}` : '';
+        const d = await Neo.api('/api/ip-intel/blacklist' + q);
+        IPL.blacklist = d.items || [];
+        document.getElementById('tabCountBl').textContent = fmtInt(d.count);
+
+        const filtered = filterRows(IPL.blacklist);
+        document.getElementById('blCount').textContent = `${fmtInt(filtered.length)} IP`;
+
+        const body = document.getElementById('blBody');
+        if (!filtered.length) {
+          body.innerHTML = `
+            <tr><td colspan="6">
+              <div class="ipl-empty">
+                <span class="ipl-empty-icon">🎉</span>
+                مفيش IPs مشبوهة. ممتاز!
+              </div>
+            </td></tr>
+          `;
+          return;
+        }
+
+        body.innerHTML = filtered.map(r => {
+          const reasons = (r.reasons || []).map(x => x.reason).slice(0, 2).join(' · ');
+          const cls = (r.classification || 'unknown').toLowerCase();
+          return `
+            <tr>
+              <td class="ipl-ip">${esc(r.ip)}</td>
+              <td class="neo-cell-center"><span class="ipl-badge ${cls}">${esc(r.classification || 'unknown')}</span></td>
+              <td>${esc(r.country || '—')}</td>
+              <td style="font-size: 11px;">${esc((r.isp || '').substring(0, 35))}</td>
+              <td class="neo-cell-center ipl-risk" style="color: var(--neo-danger);">${r.risk_score}</td>
+              <td style="font-size: 10px; color: var(--neo-fg-tertiary); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${esc(reasons)}">${esc(reasons || '—')}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        document.getElementById('blBody').innerHTML = `<tr><td colspan="6" class="neo-table-empty" style="color: var(--neo-danger);">${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    // =========================================================
+    // LOAD FEEDS
+    // =========================================================
+    async function loadFeeds() {
+      try {
+        const d = await Neo.api('/api/system/feeds');
+        IPL.feeds = d.feeds || [];
+        document.getElementById('tabCountFeeds').textContent = fmtInt(IPL.feeds.length);
+        document.getElementById('feedsCount').textContent = `${IPL.feeds.length} feed`;
+
+        const body = document.getElementById('feedsBody');
+        if (!IPL.feeds.length) {
+          body.innerHTML = `
+            <div class="ipl-empty">
+              <span class="ipl-empty-icon">📡</span>
+              مفيش feeds لسه. الـ loader بيشتغل في الخلفية.
+            </div>
+          `;
+          return;
+        }
+
+        body.innerHTML = IPL.feeds.map(f => {
+          const statusCls = f.status === 'ok' ? 'ok' : f.status === 'stale' ? 'stale' : 'unknown';
+          const statusLabel = f.status === 'ok' ? '✓ سليم' : f.status === 'stale' ? '⚠️ قديم' : '؟ غير معروف';
+          return `
+            <div class="ipl-feed-card">
+              <div class="ipl-feed-head">
+                <div class="ipl-feed-name">${esc(f.name)}</div>
+                <span class="ipl-feed-status ${statusCls}">${statusLabel}</span>
+              </div>
+              <div class="ipl-feed-info">
+                <span>📊 <b style="color: var(--neo-fg-primary);">${fmtInt(f.record_count)}</b> record</span>
+                <span>🕐 ${f.age_hours != null ? `${f.age_hours}h ago` : '—'}</span>
+                <span>📅 ${f.last_updated ? new Date(f.last_updated).toLocaleString('en-GB', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        document.getElementById('feedsBody').innerHTML = `<div class="ipl-empty" style="color: var(--neo-danger);">${esc(e.message)}</div>`;
+      }
+    }
+
+    // =========================================================
+    // EXPORT
+    // =========================================================
+    async function exportList(kind) {
+      const q = IPL.campaignId ? `?campaign_id=${IPL.campaignId}` : '';
+      const url = `/api/ip-intel/export/${kind}${q}`;
+      try {
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        let fn = `ovg_${kind}.csv`;
+        const disp = res.headers.get('Content-Disposition');
+        if (disp) {
+          const m = disp.match(/filename="?([^";]+)"?/);
+          if (m) fn = m[1];
+        }
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl; a.download = fn;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+        Neo.toast(`تم تصدير ${kind} ✅`, 'success');
+      } catch (e) {
+        Neo.toast('فشل التصدير: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // TABS
+    // =========================================================
+    function switchTab(tab) {
+      IPL.tab = tab;
+      document.querySelectorAll('.ipl-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.querySelectorAll('.ipl-panel').forEach(p => {
+        p.classList.toggle('active', p.dataset.panel === tab);
+      });
+
+      // Hide filters in feeds tab
+      document.getElementById('iplFiltersWrap').style.display = tab === 'feeds' ? 'none' : '';
+    }
+
+    // =========================================================
+    // LOAD ALL
+    // =========================================================
+    async function loadAll() {
+      await Promise.all([
+        loadStats(),
+        loadWhitelist(),
+        loadBlacklist(),
+        loadFeeds(),
+      ]);
+    }
+
+    // =========================================================
+    // BIND
+    // =========================================================
+    function bindControls() {
+      // Tabs
+      document.querySelectorAll('.ipl-tab').forEach(t => {
+        t.addEventListener('click', () => switchTab(t.dataset.tab));
+      });
+
+      // Campaign filter
+      document.getElementById('iplCampaign').addEventListener('change', (e) => {
+        IPL.campaignId = e.target.value;
+        loadAll();
+      });
+
+      // Search
+      document.getElementById('iplSearch').addEventListener('input', (e) => {
+        IPL.search = e.target.value;
+        loadWhitelist();
+        loadBlacklist();
+      });
+
+      // Clear
+      document.getElementById('iplClearBtn').addEventListener('click', () => {
+        IPL.campaignId = '';
+        IPL.search = '';
+        document.getElementById('iplCampaign').value = '';
+        document.getElementById('iplSearch').value = '';
+        loadAll();
+      });
+
+      // Refresh
+      document.getElementById('iplRefreshBtn').addEventListener('click', loadAll);
+
+      // Export
+      document.getElementById('wlExportBtn').addEventListener('click', () => exportList('whitelist'));
+      document.getElementById('blExportBtn').addEventListener('click', () => exportList('blacklist'));
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'ip-lists',
+          lang: 'ar',
+          breadcrumb: [{ label: 'قوائم IP' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindControls();
+        await loadCampaigns();
+        await loadAll();
+
+      } catch (e) {
+        console.error('[IPL Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

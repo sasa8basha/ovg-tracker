@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · تفاصيل الحملة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .cd-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .cd-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: cd-spin 0.8s linear infinite;
+    }
+    @keyframes cd-spin { to { transform: rotate(360deg); } }
+
+    .cd-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .cd-header-title {
+      font-size: var(--neo-fs-2xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 6px 0;
+      line-height: 1.2;
+    }
+    .cd-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      display: flex;
+      gap: var(--neo-sp-2);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .cd-status-badge {
+      display: inline-flex;
+      padding: 3px 10px;
+      border-radius: var(--neo-r-sm);
+      font-size: 10px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+    }
+    .cd-status-badge.active { background: var(--neo-success-bg); color: var(--neo-success); }
+    .cd-status-badge.paused { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .cd-status-badge.archived { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    /* Hero P&L */
+    .cd-hero {
+      background: linear-gradient(135deg, var(--neo-bg-surface) 0%, var(--neo-bg-elevated) 100%);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-5);
+      margin-bottom: var(--neo-sp-4);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: var(--neo-sp-4);
+      position: relative;
+      overflow: hidden;
+    }
+    .cd-hero::before {
+      content: "";
+      position: absolute;
+      top: -50%; right: -30%;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(34,211,238,0.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cd-hero.neg::before {
+      background: radial-gradient(circle, rgba(244,63,94,0.2) 0%, transparent 70%);
+    }
+    .cd-hero-label {
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .cd-hero-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 40px;
+      font-weight: var(--neo-fw-black);
+      line-height: 1;
+      margin-top: var(--neo-sp-2);
+      letter-spacing: -0.03em;
+      color: var(--neo-info);
+    }
+    .cd-hero.neg .cd-hero-value { color: var(--neo-danger); }
+    .cd-hero-value.muted { color: var(--neo-fg-muted); font-size: 32px; }
+    .cd-hero-roi {
+      display: inline-flex;
+      padding: 3px 10px;
+      border-radius: var(--neo-r-sm);
+      font-size: 12px;
+      font-weight: var(--neo-fw-extrabold);
+      font-family: var(--neo-font-mono);
+      margin-top: var(--neo-sp-2);
+    }
+    .cd-hero-roi.pos { background: rgba(34,211,238,0.12); color: var(--neo-info); }
+    .cd-hero-roi.neg { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .cd-hero-roi.muted { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+    .cd-hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: var(--neo-sp-5);
+      align-items: end;
+      position: relative;
+    }
+    .cd-hero-stat-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      font-weight: var(--neo-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .cd-hero-stat-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+    }
+
+    /* Tracking URL Hero */
+    .cd-url-hero {
+      background: linear-gradient(135deg, rgba(99,102,241,0.10) 0%, rgba(34,211,238,0.06) 100%);
+      border: 2px solid var(--neo-accent);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-5);
+      margin-bottom: var(--neo-sp-4);
+    }
+    .cd-url-head {
+      display: flex;
+      gap: var(--neo-sp-3);
+      align-items: flex-start;
+      margin-bottom: var(--neo-sp-3);
+    }
+    .cd-url-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--neo-r-md);
+      background: linear-gradient(135deg, var(--neo-accent), var(--neo-accent-hover));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .cd-url-title {
+      font-size: var(--neo-fs-lg);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin: 0;
+      line-height: 1.2;
+    }
+    .cd-url-subtitle {
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-accent-hover);
+      margin-top: 2px;
+    }
+    .cd-url-box {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-success);
+      word-break: break-all;
+      line-height: 1.7;
+      margin-bottom: var(--neo-sp-3);
+      max-height: 180px;
+      overflow-y: auto;
+      direction: ltr;
+      text-align: left;
+    }
+    .cd-url-actions {
+      display: flex;
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+    }
+
+    /* Hint */
+    .cd-hint {
+      background: rgba(34,211,238,0.08);
+      border: 1px solid rgba(34,211,238,0.25);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+      font-size: var(--neo-fs-xs);
+      color: #67E8F9;
+      line-height: 1.7;
+      margin-top: var(--neo-sp-3);
+    }
+    .cd-hint.warn {
+      background: rgba(245,158,11,0.08);
+      border-color: rgba(245,158,11,0.25);
+      color: var(--neo-warning-fg);
+    }
+    .cd-hint code {
+      background: rgba(34,211,238,0.15);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+    }
+
+    /* Section */
+    .cd-section {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-5);
+      margin-bottom: var(--neo-sp-4);
+    }
+    .cd-section-title {
+      font-size: var(--neo-fs-md);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin: 0 0 var(--neo-sp-4) 0;
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+
+    /* Code box */
+    .cd-code-box {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+      position: relative;
+      margin-bottom: var(--neo-sp-3);
+    }
+    .cd-code-box pre {
+      margin: 0;
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-success);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 240px;
+      overflow-y: auto;
+      direction: ltr;
+      text-align: left;
+    }
+
+    /* Adsterra KPIs */
+    .cd-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-4);
+    }
+    .cd-kpi {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+    }
+    .cd-kpi-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      margin-bottom: 3px;
+    }
+    .cd-kpi-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+    }
+
+    /* Advanced fields */
+    .cd-adv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--neo-sp-3);
+    }
+    @media (max-width: 700px) { .cd-adv-grid { grid-template-columns: 1fr; } }
+
+    .cd-threshold-picker {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .cd-threshold-btn {
+      flex: 1;
+      padding: var(--neo-sp-2);
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-sm);
+      text-align: center;
+      cursor: pointer;
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      transition: all var(--neo-dur-fast);
+    }
+    .cd-threshold-btn:hover { color: var(--neo-fg-secondary); }
+    .cd-threshold-btn.active {
+      background: var(--neo-accent-subtle);
+      border-color: var(--neo-accent);
+      color: var(--neo-accent-hover);
+    }
+
+    /* Info grid */
+    .cd-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--neo-sp-2);
+    }
+    .cd-info-item {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+    }
+    .cd-info-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      margin-bottom: 3px;
+    }
+    .cd-info-value {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-primary);
+      font-family: var(--neo-font-mono);
+      font-weight: var(--neo-fw-bold);
+      word-break: break-all;
+    }
+
+    /* Chart */
+    .cd-chart-wrap { height: 200px; position: relative; margin-top: var(--neo-sp-3); }
+
+    /* Danger zone */
+    .cd-danger {
+      background: rgba(244,63,94,0.06);
+      border: 1px solid rgba(244,63,94,0.25);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-4);
+      margin-top: var(--neo-sp-4);
+    }
+    .cd-danger-title {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-danger);
+      margin: 0 0 6px 0;
+    }
+    .cd-danger-desc {
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-danger-fg);
+      margin: 0 0 var(--neo-sp-3) 0;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cd-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل الحملة…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="cd-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:var(--neo-sp-2);margin-bottom:6px;flex-wrap:wrap;">
+            <h1 class="cd-header-title" id="cdTitle">—</h1>
+            <span id="cdStatus" class="cd-status-badge">—</span>
+          </div>
+          <div class="cd-header-sub" id="cdSub">—</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a href="/v2/campaigns" class="neo-btn neo-btn-ghost neo-btn-sm" style="text-decoration: none;">← كل الحملات</a>
+        </div>
+      </div>
+
+      <!-- P&L Hero -->
+      <div class="cd-hero" id="cdHero">
+        <div style="position:relative;">
+          <div class="cd-hero-label">صافي الربح</div>
+          <div class="cd-hero-value" id="cdHeroProfit">—</div>
+          <div class="cd-hero-roi pos" id="cdHeroRoi">—</div>
+        </div>
+        <div class="cd-hero-stats">
+          <div>
+            <div class="cd-hero-stat-label">التكلفة</div>
+            <div class="cd-hero-stat-value" id="cdHeroCost">$0.00</div>
+          </div>
+          <div>
+            <div class="cd-hero-stat-label">الإيراد</div>
+            <div class="cd-hero-stat-value" id="cdHeroRev">$0.00</div>
+          </div>
+          <div>
+            <div class="cd-hero-stat-label">الزيارات</div>
+            <div class="cd-hero-stat-value" id="cdHeroTotal">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tracking URL -->
+      <div class="cd-url-hero" id="cdUrlHero">
+        <div class="cd-url-head">
+          <div class="cd-url-icon">🔗</div>
+          <div style="flex:1;min-width:0;">
+            <h2 class="cd-url-title" id="cdUrlTitle">—</h2>
+            <div class="cd-url-subtitle" id="cdUrlSub">—</div>
+          </div>
+        </div>
+        <div class="cd-url-box" id="cdUrlBox" dir="ltr">—</div>
+        <div class="cd-url-actions">
+          <button class="neo-btn neo-btn-primary" id="cdCopyUrlBtn">📋 نسخ الرابط</button>
+          <button class="neo-btn neo-btn-secondary" id="cdDownloadUrlBtn">⬇ تحميل</button>
+        </div>
+        <div class="cd-hint" id="cdUrlHint"></div>
+      </div>
+
+      <!-- Destination (Direct/Hybrid) -->
+      <div class="cd-section" id="cdDestSection" style="display:none;">
+        <h3 class="cd-section-title">🎯 الوجهة (Adsterra Direct Link)</h3>
+        <div id="cdDestBody"></div>
+      </div>
+
+      <!-- Tracker Code (Landing/Hybrid) -->
+      <div class="cd-section" id="cdCodeSection" style="display:none;">
+        <h3 class="cd-section-title">📄 كود التتبع</h3>
+        <div id="cdCodeBody"><div class="neo-skeleton" style="height: 40px;"></div></div>
+      </div>
+
+      <!-- Adsterra -->
+      <div class="cd-section" id="cdAdsterraSection">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--neo-sp-4);flex-wrap:wrap;gap:8px;">
+          <h3 class="cd-section-title" style="margin:0;">💰 أرباح Adsterra</h3>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="cdSyncAdsterraBtn" style="display:none;">🔄 مزامنة</button>
+        </div>
+        <div id="cdAdsterraBody"><div class="neo-skeleton" style="height: 100px;"></div></div>
+      </div>
+
+      <!-- Basic info -->
+      <div class="cd-section">
+        <h3 class="cd-section-title">⚙️ الإعدادات الأساسية</h3>
+        <div class="cd-info-grid">
+          <div class="cd-info-item"><div class="cd-info-label">نوع الحملة</div><div class="cd-info-value" id="cdInfoType">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">المصدر</div><div class="cd-info-value" id="cdInfoSource">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">الوجهة</div><div class="cd-info-value" id="cdInfoDest">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">Buy CPM</div><div class="cd-info-value" id="cdInfoBuy">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">Sell CPM</div><div class="cd-info-value" id="cdInfoSell">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">Zone ID</div><div class="cd-info-value" id="cdInfoZone">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">Campaign Key</div><div class="cd-info-value" id="cdInfoKey" style="font-size:10px;">—</div></div>
+        </div>
+      </div>
+
+      <!-- Advanced settings -->
+      <div class="cd-section">
+        <h3 class="cd-section-title">🛠️ الإعدادات المتقدمة</h3>
+        <div class="cd-adv-grid">
+          <div class="neo-field">
+            <label class="neo-field-label">Daily Budget ($)</label>
+            <input type="number" id="cdAdvBudget" class="neo-input" min="0" step="0.01" placeholder="0 = بدون حد">
+            <span class="neo-field-hint">0 = بدون ميزانية يومية</span>
+          </div>
+          <div class="neo-field">
+            <label class="neo-field-label">Bot Block Threshold</label>
+            <div class="cd-threshold-picker">
+              <button type="button" class="cd-threshold-btn" data-threshold="60" data-mode="strict">Strict (60)</button>
+              <button type="button" class="cd-threshold-btn" data-threshold="85" data-mode="balanced">Balanced (85)</button>
+              <button type="button" class="cd-threshold-btn" data-threshold="100" data-mode="permissive">Permissive (100)</button>
+            </div>
+          </div>
+          <div class="neo-field">
+            <label class="neo-field-label">Redirect Delay (ms)</label>
+            <input type="number" id="cdAdvRedirect" class="neo-input" min="100" max="2000" step="50">
+            <span class="neo-field-hint">100-2000 ms</span>
+          </div>
+          <div class="neo-field">
+            <label class="neo-field-label">Traffic Source Campaign ID</label>
+            <input type="text" id="cdAdvSourceId" class="neo-input" placeholder="e.g. 123456" maxlength="100">
+          </div>
+          <div class="neo-field" style="grid-column: 1 / -1;">
+            <label class="neo-field-label">Notes</label>
+            <textarea id="cdAdvNotes" class="neo-textarea" placeholder="ملاحظات داخلية..." maxlength="1000"></textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:var(--neo-sp-4);">
+          <button class="neo-btn neo-btn-primary" id="cdAdvSaveBtn">💾 حفظ الإعدادات</button>
+          <span id="cdAdvMsg" style="font-size:var(--neo-fs-xs);"></span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="cd-section">
+        <h3 class="cd-section-title">🎬 الإجراءات</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="#" id="cdBtnViewVisits" class="neo-btn neo-btn-secondary" style="text-decoration:none;">👁 عرض الزيارات</a>
+          <button class="neo-btn neo-btn-secondary" id="cdBtnRotateKey">🔄 تجديد المفتاح</button>
+          <button class="neo-btn neo-btn-secondary" id="cdBtnTogglePause">⏸ إيقاف</button>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="cd-danger">
+        <h3 class="cd-danger-title">⚠️ حذف الحملة</h3>
+        <p class="cd-danger-desc">هتحذف الحملة وكل زياراتها نهائيًا. مفيش رجوع بعد التأكيد.</p>
+        <button class="neo-btn neo-btn-danger" id="cdBtnDelete">🗑 حذف الحملة</button>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const CD = {
+      campaignId: null,
+      data: null,
+      selectedThreshold: 100,
+      adsterraChart: null,
+    };
+
+    function fmtMoney(n) {
+      const v = Number(n || 0);
+      if (Math.abs(v) < 0.005) return '$0.00';
+      const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+      return sign + '$' + Math.abs(v).toFixed(2);
+    }
+    function fmtMoneyAbs(n) { return '$' + Math.abs(Number(n || 0)).toFixed(2); }
+    function fmtMoney4(n) { return '$' + Number(n || 0).toFixed(4); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    // =========================================================
+    // COPY / DOWNLOAD HELPERS
+    // =========================================================
+    function copyText(text, btn, okLabel) {
+      if (!text) { Neo.toast('مفيش محتوى', 'error'); return; }
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = okLabel || '✓ تم';
+        const origBg = btn.style.background;
+        btn.style.background = 'var(--neo-success)';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = origBg; }, 1800);
+      }).catch(() => Neo.toast('فشل النسخ', 'error'));
+    }
+
+    function downloadText(text, filename) {
+      try {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) { Neo.toast('فشل التحميل: ' + e.message, 'error'); }
+    }
+
+    // =========================================================
+    // RENDER: HERO
+    // =========================================================
+    function renderHero(c) {
+      const st = c.stats || {};
+      const pl = st.pl || {};
+      const isMuted = pl.error === 'no_sell_revenue';
+      const profit = Number(pl.profit || 0);
+
+      const heroProfit = document.getElementById('cdHeroProfit');
+      const heroRoi = document.getElementById('cdHeroRoi');
+      const hero = document.getElementById('cdHero');
+
+      if (isMuted) {
+        hero.classList.remove('neg');
+        heroProfit.classList.add('muted');
+        heroProfit.textContent = '—';
+        heroRoi.textContent = '⚙️ اضبط Sell CPM';
+        heroRoi.className = 'cd-hero-roi muted';
+      } else {
+        heroProfit.classList.remove('muted');
+        heroProfit.textContent = fmtMoney(profit);
+        heroRoi.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`;
+        heroRoi.className = 'cd-hero-roi ' + (profit >= 0 ? 'pos' : 'neg');
+        hero.classList.toggle('neg', profit < 0);
+      }
+
+      document.getElementById('cdHeroCost').textContent = fmtMoneyAbs(pl.cost);
+      document.getElementById('cdHeroRev').textContent = fmtMoneyAbs(pl.revenue);
+      document.getElementById('cdHeroTotal').textContent = fmtInt(st.total || 0);
+    }
+
+    // =========================================================
+    // RENDER: TRACKING URL
+    // =========================================================
+    function renderTrackingUrl(c) {
+      const titleEl = document.getElementById('cdUrlTitle');
+      const subEl = document.getElementById('cdUrlSub');
+      const boxEl = document.getElementById('cdUrlBox');
+      const hintEl = document.getElementById('cdUrlHint');
+      const copyBtn = document.getElementById('cdCopyUrlBtn');
+      const dlBtn = document.getElementById('cdDownloadUrlBtn');
+
+      const url = c.tracking_url || '';
+
+      if (!url) {
+        titleEl.textContent = '⚠️ الرابط غير متوفر';
+        subEl.textContent = 'محتاج تعدل الحملة';
+        boxEl.textContent = '—';
+        copyBtn.disabled = true; dlBtn.disabled = true;
+        hintEl.className = 'cd-hint warn';
+        hintEl.innerHTML = '⚠️ <b>ملاحظة:</b> الرابط مش هيتولد. تأكد من <code>landing_url</code> أو <code>destination_url</code>.';
+        return;
+      }
+
+      if (c.type === 'direct') {
+        titleEl.textContent = '🔗 الرابط اللي تحطه في PopAds (Direct Link)';
+        subEl.textContent = 'PopAds هيستبدل الماكروز ← سيرفرنا يستقبلها ← redirect لـ Adsterra';
+        hintEl.className = 'cd-hint';
+        hintEl.innerHTML = '💡 <b>خطوات:</b> انسخ الرابط → الصقه في PopAds → الزائر يشوف spinner ~1-2 ثانية → redirect تلقائي.';
+      } else if (c.type === 'landing') {
+        titleEl.textContent = '🔗 الرابط (Landing Page)';
+        subEl.textContent = 'الماكروز في URL صفحة الهبوط، وكود التتبع يسجلها';
+        hintEl.className = 'cd-hint';
+        hintEl.innerHTML = '💡 <b>خطوات:</b> الرابط في PopAds + كود التتبع في صفحتك. الكود يقرأ الماكروز ويراقب السلوك.';
+      } else {
+        titleEl.textContent = '🔗 الرابط (Hybrid)';
+        subEl.textContent = 'صفحة هبوط + redirect';
+        hintEl.className = 'cd-hint';
+        hintEl.innerHTML = '💡 Hybrid: الرابط + كود التتبع. استخدمهم مع بعض.';
+      }
+
+      boxEl.textContent = url;
+      copyBtn.disabled = false; dlBtn.disabled = false;
+
+      copyBtn.onclick = () => copyText(url, copyBtn, '✓ تم النسخ');
+      dlBtn.onclick = () => {
+        downloadText(url, `popads-url-${c.campaign_key.substring(0, 8)}.txt`);
+        Neo.toast('تم التحميل ✅', 'success');
+      };
+    }
+
+    // =========================================================
+    // RENDER: DESTINATION
+    // =========================================================
+    function renderDestination(c) {
+      const section = document.getElementById('cdDestSection');
+      if (c.type === 'landing') { section.style.display = 'none'; return; }
+      section.style.display = '';
+
+      if (!c.destination_url) {
+        document.getElementById('cdDestBody').innerHTML = '<div class="cd-hint warn">⚠️ مفيش رابط وجهة متسجل</div>';
+        return;
+      }
+
+      document.getElementById('cdDestBody').innerHTML = `
+        <div class="cd-info-item" style="margin-bottom: var(--neo-sp-3);">
+          <div class="cd-info-label">رابط Adsterra</div>
+          <div class="cd-info-value" style="direction:ltr;text-align:left;">${Neo.escape(c.destination_url)}</div>
+        </div>
+        <div class="cd-hint">
+          💡 السيرفر بيضيف <code>?${Neo.escape(c.adsterra_tracking_param || 'sub_id')}={session_id}</code> تلقائيًا.
+        </div>
+      `;
+    }
+
+    // =========================================================
+    // RENDER: TRACKER CODE
+    // =========================================================
+    async function renderTrackerCode(c) {
+      const section = document.getElementById('cdCodeSection');
+      if (c.type === 'direct') { section.style.display = 'none'; return; }
+      section.style.display = '';
+
+      const body = document.getElementById('cdCodeBody');
+
+      try {
+        const codeData = await Neo.api(`/api/campaigns/${c.id}/tracker-code-v3`);
+        const sizeKb = Math.round((codeData.size_bytes || 0) / 1024);
+        const lines = codeData.lines || 0;
+
+        body.innerHTML = `
+          <div class="cd-hint" style="margin-bottom: var(--neo-sp-3);">
+            📌 <b>التركيب:</b> الصق الكود قبل <code>&lt;/body&gt;</code> أو جوه <code>&lt;head&gt;</code>.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:var(--neo-sp-3);">
+            <button class="neo-btn neo-btn-primary neo-btn-sm" id="cdDlCodeBtn">⬇ تحميل الكود</button>
+            <button class="neo-btn neo-btn-secondary neo-btn-sm" id="cdCopyFullCodeBtn">📋 نسخ الكود كامل</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--neo-sp-3);">
+            <div>
+              <div style="font-size:10px;color:var(--neo-fg-tertiary);margin-bottom:6px;">📄 الجزء 1</div>
+              <div class="cd-code-box">
+                <button class="neo-btn neo-btn-ghost neo-btn-xs" id="cdCopyPart1" style="position:absolute;top:8px;left:8px;">📋</button>
+                <pre>${Neo.escape(codeData.part1 || '')}</pre>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--neo-fg-tertiary);margin-bottom:6px;">📄 الجزء 2</div>
+              <div class="cd-code-box">
+                <button class="neo-btn neo-btn-ghost neo-btn-xs" id="cdCopyPart2" style="position:absolute;top:8px;left:8px;">📋</button>
+                <pre>${Neo.escape(codeData.part2 || '')}</pre>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--neo-fg-muted);margin-top:var(--neo-sp-3);">
+            ${Neo.escape(codeData.version || 'v7.1')} · ${sizeKb} KB · ${lines} سطر
+          </div>
+        `;
+
+        document.getElementById('cdCopyPart1').onclick = function() { copyText(codeData.part1 || '', this); };
+        document.getElementById('cdCopyPart2').onclick = function() { copyText(codeData.part2 || '', this); };
+        document.getElementById('cdCopyFullCodeBtn').onclick = function() { copyText(codeData.full || '', this); };
+
+        document.getElementById('cdDlCodeBtn').onclick = async function() {
+          const btn = this;
+          const orig = btn.textContent;
+          btn.disabled = true; btn.textContent = '⏳...';
+          try {
+            const response = await fetch(`/api/campaigns/${c.id}/tracker-code-v3/download`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            let filename = `ovg-tracker-${c.campaign_key.substring(0, 8)}.txt`;
+            const disp = response.headers.get('Content-Disposition');
+            if (disp) { const m = disp.match(/filename="?([^";]+)"?/); if (m) filename = m[1]; }
+            const blob = await response.blob();
+            const objUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objUrl; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(objUrl), 1500);
+            btn.textContent = '✓';
+            setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+          } catch (err) {
+            Neo.toast('فشل: ' + err.message, 'error');
+            btn.disabled = false; btn.textContent = orig;
+          }
+        };
+      } catch (err) {
+        body.innerHTML = `<div class="cd-hint warn">⚠️ فشل: ${Neo.escape(err.message)}</div>`;
+      }
+    }
+
+    // =========================================================
+    // RENDER: ADSTERRA
+    // =========================================================
+    async function renderAdsterra(c) {
+      const body = document.getElementById('cdAdsterraBody');
+      const syncBtn = document.getElementById('cdSyncAdsterraBtn');
+
+      if (!c.adsterra_api_key_set) {
+        syncBtn.style.display = 'none';
+        body.innerHTML = `
+          <div class="cd-hint warn" style="text-align:center;">
+            <div style="font-size:14px;font-weight:800;color:var(--neo-fg-primary);margin-bottom:6px;">🔑 مفتاح Adsterra API غير مسجل</div>
+            <div style="font-size:11.5px;color:var(--neo-fg-tertiary);line-height:1.6;margin-bottom:14px;">عشان نسحب الأرباح تلقائيًا، محتاج مفتاح API.</div>
+            <div style="display:flex;gap:8px;max-width:500px;margin:0 auto;">
+              <input type="text" id="cdAdsterraKeyInput" class="neo-input" placeholder="الصق الـ API Key...">
+              <button class="neo-btn neo-btn-primary neo-btn-sm" id="cdSaveAdsterraKeyBtn" style="white-space:nowrap;">حفظ</button>
+            </div>
+            <div id="cdAdsterraKeyMsg" style="font-size:11px;margin-top:10px;min-height:16px;"></div>
+          </div>
+        `;
+
+        document.getElementById('cdSaveAdsterraKeyBtn').onclick = async function() {
+          const key = (document.getElementById('cdAdsterraKeyInput').value || '').trim();
+          const msgEl = document.getElementById('cdAdsterraKeyMsg');
+          if (!key) { msgEl.style.color = 'var(--neo-danger)'; msgEl.textContent = 'لازم تلصق المفتاح'; return; }
+          this.disabled = true; this.textContent = 'جاري التحقق...';
+
+          try {
+            const verify = await fetch('/api/adsterra/verify', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ api_key: key }),
+            }).then(r => r.json());
+
+            if (!verify.ok) {
+              msgEl.style.color = 'var(--neo-danger)';
+              msgEl.textContent = '❌ ' + (verify.error || 'المفتاح غير صالح');
+              this.disabled = false; this.textContent = 'حفظ';
+              return;
+            }
+
+            msgEl.style.color = 'var(--neo-success)';
+            msgEl.textContent = `✓ المفتاح شغال — ${verify.domains_count} domain(s)`;
+
+            await Neo.api('/api/campaigns/' + c.id, {
+              method: 'PATCH',
+              body: JSON.stringify({ adsterra_api_key: key }),
+            });
+
+            Neo.toast('تم الحفظ ✅', 'success');
+            setTimeout(() => loadCampaign(), 600);
+          } catch (err) {
+            msgEl.style.color = 'var(--neo-danger)';
+            msgEl.textContent = 'فشل: ' + err.message;
+            this.disabled = false; this.textContent = 'حفظ';
+          }
+        };
+        return;
+      }
+
+      // Has key
+      syncBtn.style.display = '';
+      body.innerHTML = '<div class="neo-skeleton" style="height: 100px;"></div>';
+
+      try {
+        const overview = await Neo.api(`/api/adsterra/${c.id}/overview?days=7`);
+        const t = overview.totals || {};
+
+        body.innerHTML = `
+          <div class="cd-kpi-grid">
+            <div class="cd-kpi">
+              <div class="cd-kpi-label">Impressions (7d)</div>
+              <div class="cd-kpi-value">${fmtInt(t.impressions)}</div>
+            </div>
+            <div class="cd-kpi">
+              <div class="cd-kpi-label">Clicks</div>
+              <div class="cd-kpi-value">${fmtInt(t.clicks)}</div>
+            </div>
+            <div class="cd-kpi">
+              <div class="cd-kpi-label">Revenue</div>
+              <div class="cd-kpi-value" style="color: var(--neo-success);">${fmtMoney4(t.revenue)}</div>
+            </div>
+            <div class="cd-kpi">
+              <div class="cd-kpi-label">CPM</div>
+              <div class="cd-kpi-value" style="color: var(--neo-info);">${fmtMoney4(t.cpm)}</div>
+            </div>
+            <div class="cd-kpi">
+              <div class="cd-kpi-label">CTR</div>
+              <div class="cd-kpi-value">${Number(t.ctr || 0).toFixed(2)}%</div>
+            </div>
+          </div>
+          <div class="cd-chart-wrap"><canvas id="cdAdsterraChart"></canvas></div>
+        `;
+
+        renderAdsterraChart(overview.series || []);
+
+        syncBtn.onclick = async function() {
+          const btn = this;
+          const orig = btn.textContent;
+          btn.disabled = true; btn.textContent = '⏳...';
+          try {
+            const result = await fetch(`/api/adsterra/${c.id}/sync-visits?days=3`, {
+              method: 'POST',
+              credentials: 'same-origin',
+            }).then(r => r.json());
+
+            if (result.ok) {
+              Neo.toast(`✓ ${result.updated} زيارة (تخطي ${result.skipped})`, 'success', 4000);
+              loadCampaign();
+            } else {
+              Neo.toast('فشل المزامنة', 'error');
+            }
+          } catch (err) {
+            Neo.toast('فشل: ' + err.message, 'error');
+          } finally {
+            btn.disabled = false; btn.textContent = orig;
+          }
+        };
+      } catch (err) {
+        body.innerHTML = `<div class="cd-hint warn">⚠️ فشل: ${Neo.escape(err.message)}</div>`;
+      }
+    }
+
+    function renderAdsterraChart(series) {
+      const canvas = document.getElementById('cdAdsterraChart');
+      if (!canvas || !series || !series.length) return;
+
+      if (CD.adsterraChart) {
+        try { CD.adsterraChart.destroy(); } catch (e) {}
+        CD.adsterraChart = null;
+      }
+
+      const labels = series.map(s => s.date || s.day || '');
+      const impressions = series.map(s => Number(s.impression || 0));
+      const revenue = series.map(s => Number(s.revenue || 0));
+
+      CD.adsterraChart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Impressions',
+              data: impressions,
+              backgroundColor: 'rgba(99,102,241,0.4)',
+              borderColor: '#6366F1',
+              borderWidth: 1,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Revenue ($)',
+              data: revenue,
+              type: 'line',
+              backgroundColor: 'rgba(16,185,129,0.1)',
+              borderColor: '#10B981',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 3,
+              yAxisID: 'y1',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: {
+                color: '#B0B8C4',
+                font: { family: 'Inter', size: 10 },
+              },
+            },
+          },
+          scales: {
+            x: { ticks: { color: '#7B8496', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { position: 'left', ticks: { color: '#7B8496', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y1: { position: 'right', ticks: { color: '#10B981', font: { size: 9 } }, grid: { display: false } },
+          },
+        },
+      });
+    }
+
+    // =========================================================
+    // RENDER: BASIC INFO
+    // =========================================================
+    function renderBasicInfo(c) {
+      document.getElementById('cdInfoType').textContent = c.type;
+      document.getElementById('cdInfoSource').textContent = c.traffic_source_slug;
+      document.getElementById('cdInfoDest').textContent = c.destination_slug;
+      document.getElementById('cdInfoBuy').textContent = '$' + Number(c.buy_cpm).toFixed(2);
+      document.getElementById('cdInfoSell').textContent = '$' + Number(c.sell_cpm).toFixed(2);
+      document.getElementById('cdInfoZone').textContent = c.destination_zone_id || '—';
+      document.getElementById('cdInfoKey').textContent = c.campaign_key;
+      document.getElementById('cdBtnViewVisits').href = '/v2/visits?campaign_id=' + c.id;
+    }
+
+    // =========================================================
+    // RENDER: ADVANCED
+    // =========================================================
+    function renderAdvanced(c) {
+      document.getElementById('cdAdvBudget').value = c.daily_budget || '';
+      document.getElementById('cdAdvRedirect').value = c.redirect_delay_ms || 500;
+      document.getElementById('cdAdvSourceId').value = c.traffic_source_campaign_id || '';
+      document.getElementById('cdAdvNotes').value = c.notes || '';
+
+      const threshold = Number(c.bot_block_threshold || 100);
+      CD.selectedThreshold = threshold;
+      document.querySelectorAll('.cd-threshold-btn').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.threshold) === threshold);
+      });
+    }
+
+    function setupAdvanced() {
+      document.querySelectorAll('.cd-threshold-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          CD.selectedThreshold = Number(btn.dataset.threshold);
+          document.querySelectorAll('.cd-threshold-btn').forEach(b => b.classList.toggle('active', b === btn));
+        });
+      });
+
+      document.getElementById('cdAdvSaveBtn').addEventListener('click', async function() {
+        const msgEl = document.getElementById('cdAdvMsg');
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = 'جاري الحفظ...';
+        msgEl.textContent = '';
+
+        const budget = parseFloat(document.getElementById('cdAdvBudget').value);
+        const redirectDelay = parseInt(document.getElementById('cdAdvRedirect').value, 10);
+        const sourceId = document.getElementById('cdAdvSourceId').value.trim();
+        const notes = document.getElementById('cdAdvNotes').value.trim();
+
+        const body = {};
+        if (!isNaN(budget) && budget >= 0) body.daily_budget = budget;
+        if (!isNaN(redirectDelay) && redirectDelay >= 100 && redirectDelay <= 2000) body.redirect_delay_ms = redirectDelay;
+        if (sourceId !== undefined) body.traffic_source_campaign_id = sourceId;
+        if (notes !== undefined) body.notes = notes;
+        body.bot_block_threshold = CD.selectedThreshold;
+
+        try {
+          await Neo.api('/api/campaigns/' + CD.campaignId, { method: 'PATCH', body: JSON.stringify(body) });
+          msgEl.style.color = 'var(--neo-success)';
+          msgEl.textContent = '✓ تم الحفظ';
+          Neo.toast('تم حفظ الإعدادات ✅', 'success');
+          setTimeout(() => loadCampaign(), 600);
+        } catch (err) {
+          msgEl.style.color = 'var(--neo-danger)';
+          msgEl.textContent = 'فشل: ' + err.message;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = '💾 حفظ الإعدادات';
+        }
+      });
+    }
+
+    // =========================================================
+    // ACTIONS
+    // =========================================================
+    async function togglePause() {
+      const newStatus = CD.data.status === 'active' ? 'paused' : 'active';
+      try {
+        await Neo.api('/api/campaigns/' + CD.campaignId, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: newStatus }),
+        });
+        Neo.toast('تم التحديث', 'success');
+        loadCampaign();
+      } catch (e) {
+        Neo.toast('فشل', 'error');
+      }
+    }
+
+    async function rotateKey() {
+      if (!confirm('تجديد المفتاح هيبطّل الرابط القديم. متأكد؟')) return;
+      try {
+        await Neo.api('/api/campaigns/' + CD.campaignId + '/rotate-key', { method: 'POST' });
+        Neo.toast('تم التجديد — حدّث الرابط في PopAds', 'success', 5000);
+        loadCampaign();
+      } catch (e) {
+        Neo.toast('فشل', 'error');
+      }
+    }
+
+    async function deleteCampaign() {
+      if (!confirm('هتحذف الحملة وكل زياراتها. متأكد؟')) return;
+      if (!confirm('تأكيد أخير: هل أنت متأكد 100%؟')) return;
+      try {
+        await Neo.api('/api/campaigns/' + CD.campaignId, { method: 'DELETE' });
+        Neo.toast('تم الحذف', 'success');
+        setTimeout(() => window.location.href = '/v2/campaigns', 500);
+      } catch (e) {
+        Neo.toast('فشل', 'error');
+      }
+    }
+
+    // =========================================================
+    // LOAD CAMPAIGN
+    // =========================================================
+    async function loadCampaign() {
+      try {
+        CD.data = await Neo.api('/api/campaigns/' + CD.campaignId);
+        const c = CD.data;
+
+        // Header
+        document.getElementById('cdTitle').textContent = c.name;
+        const statusBadge = document.getElementById('cdStatus');
+        statusBadge.className = 'cd-status-badge ' + c.status;
+        statusBadge.textContent = c.status === 'active' ? 'نشطة' : c.status === 'paused' ? 'موقوفة' : 'مؤرشفة';
+
+        document.getElementById('cdSub').innerHTML =
+          `<span>${Neo.escape(c.type)}</span> · <span>${Neo.escape(c.traffic_source_slug)} → ${Neo.escape(c.destination_slug)}</span>`;
+
+        // Render sections
+        renderHero(c);
+        renderTrackingUrl(c);
+        renderDestination(c);
+        await renderTrackerCode(c);
+        await renderAdsterra(c);
+        renderBasicInfo(c);
+        renderAdvanced(c);
+
+        // Toggle button
+        const toggleBtn = document.getElementById('cdBtnTogglePause');
+        toggleBtn.textContent = c.status === 'active' ? '⏸ إيقاف' : '▶ تشغيل';
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+      } catch (e) {
+        console.error('[Campaign Detail] load failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل تحميل الحملة</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape(e.message || 'خطأ')}</div>
+            <a href="/v2/campaigns" class="neo-btn neo-btn-primary" style="margin-top: 16px;text-decoration:none;">← رجوع للحملات</a>
+          `;
+        }
+      }
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        CD.campaignId = parseInt(parts[parts.length - 1], 10) || 0;
+        if (!CD.campaignId) throw new Error('Campaign ID غير صالح');
+
+        await Neo.mount({
+          active: 'campaigns',
+          lang: 'ar',
+          breadcrumb: [
+            { label: 'الحملات', href: '/v2/campaigns' },
+            { label: 'تفاصيل' },
+          ],
+        });
+
+        document.getElementById('cdBtnTogglePause').addEventListener('click', togglePause);
+        document.getElementById('cdBtnRotateKey').addEventListener('click', rotateKey);
+        document.getElementById('cdBtnDelete').addEventListener('click', deleteCampaign);
+
+        setupAdvanced();
+        await loadCampaign();
+
+      } catch (e) {
+        console.error('[Campaign Detail Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

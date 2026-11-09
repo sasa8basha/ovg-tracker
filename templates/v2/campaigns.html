@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · الحملات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .cmp-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .cmp-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: cmp-spin 0.8s linear infinite;
+    }
+    @keyframes cmp-spin { to { transform: rotate(360deg); } }
+
+    .cmp-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .cmp-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .cmp-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* Grid */
+    .cmp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: var(--neo-sp-3);
+    }
+
+    .cmp-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-4);
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: var(--neo-sp-3);
+      position: relative;
+      overflow: hidden;
+      transition: all var(--neo-dur-fast);
+      cursor: pointer;
+    }
+    .cmp-card:hover {
+      border-color: var(--neo-border-strong);
+      transform: translateY(-2px);
+      box-shadow: var(--neo-shadow-md);
+    }
+    .cmp-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      opacity: 0.7;
+    }
+    .cmp-card.type-landing::before { background: #3B82F6; }
+    .cmp-card.type-direct::before { background: #A855F7; }
+    .cmp-card.type-hybrid::before { background: #10B981; }
+
+    .cmp-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--neo-sp-2);
+    }
+    .cmp-card-name {
+      font-size: var(--neo-fs-md);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .cmp-type-badge {
+      display: inline-flex;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+    }
+    .cmp-type-badge.landing { background: rgba(59,130,246,0.15); color: #93C5FD; }
+    .cmp-type-badge.direct  { background: rgba(168,85,247,0.15); color: #C4B5FD; }
+    .cmp-type-badge.hybrid  { background: rgba(16,185,129,0.15); color: #6EE7B7; }
+
+    .cmp-pl {
+      display: flex;
+      align-items: baseline;
+      gap: var(--neo-sp-2);
+    }
+    .cmp-profit {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 22px;
+      font-weight: var(--neo-fw-black);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .cmp-profit.pos { color: var(--neo-success); }
+    .cmp-profit.neg { color: var(--neo-danger); }
+    .cmp-profit.muted { color: var(--neo-fg-muted); }
+
+    .cmp-roi {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .cmp-roi.pos { background: var(--neo-success-bg); color: var(--neo-success); }
+    .cmp-roi.neg { background: var(--neo-danger-bg); color: var(--neo-danger); }
+
+    .cmp-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding-top: var(--neo-sp-3);
+      border-top: 1px solid var(--neo-border-subtle);
+    }
+    .cmp-stat-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      margin-bottom: 2px;
+    }
+    .cmp-stat-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+    }
+
+    .cmp-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      padding: 2px 6px;
+      border-radius: var(--neo-r-xs);
+      text-transform: uppercase;
+    }
+    .cmp-status.active { background: var(--neo-success-bg); color: var(--neo-success); }
+    .cmp-status.paused { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .cmp-status.archived { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    /* Create modal — Type picker */
+    .cmp-type-picker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-4);
+    }
+    .cmp-type-btn {
+      padding: var(--neo-sp-3) var(--neo-sp-2);
+      background: var(--neo-bg-canvas);
+      border: 2px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      cursor: pointer;
+      text-align: center;
+      transition: all var(--neo-dur-fast);
+      font-family: inherit;
+      color: inherit;
+    }
+    .cmp-type-btn:hover { border-color: var(--neo-border-strong); }
+    .cmp-type-btn.active {
+      border-color: var(--neo-accent);
+      background: var(--neo-accent-subtle);
+    }
+    .cmp-type-icon { font-size: 22px; margin-bottom: 4px; }
+    .cmp-type-label {
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cmp-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل الحملات…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="cmp-header">
+        <div>
+          <h1 class="cmp-header-title">🎯 الحملات</h1>
+          <div class="cmp-header-sub" id="cmpSubtitle">إدارة كاملة لحملات CPM Arbitrage</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="cmpRefreshBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+            تحديث
+          </button>
+          <button class="neo-btn neo-btn-primary" id="cmpNewBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            حملة جديدة
+          </button>
+        </div>
+      </div>
+
+      <div id="cmpGrid" class="cmp-grid"></div>
+
+      <div id="cmpEmpty" class="neo-empty" style="display:none;">
+        <div class="neo-empty-icon">🎯</div>
+        <h3 class="neo-empty-title">مفيش حملات بعد</h3>
+        <p class="neo-empty-msg">أضف أول حملة عشان تبدأ تتبع الترافيك والأرباح.</p>
+        <button class="neo-btn neo-btn-primary" onclick="CMP.openCreate()">+ أضف أول حملة</button>
+      </div>
+
+      <div id="cmpError" class="neo-empty" style="display:none;">
+        <div class="neo-empty-icon">⚠️</div>
+        <h3 class="neo-empty-title">فشل تحميل الحملات</h3>
+        <p class="neo-empty-msg" id="cmpErrorMsg">—</p>
+        <button class="neo-btn neo-btn-primary" onclick="CMP.load()">🔄 إعادة المحاولة</button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Create Modal -->
+  <div class="neo-modal-wrap" id="cmpCreateModal">
+    <div class="neo-modal neo-modal-lg">
+      <div class="neo-modal-head">
+        <h3 class="neo-modal-title">🎯 حملة جديدة</h3>
+        <button class="neo-modal-close" onclick="CMP.closeCreate()">✕</button>
+      </div>
+      <div class="neo-modal-body">
+
+        <div class="neo-field" style="margin-bottom: var(--neo-sp-4);">
+          <label class="neo-field-label">نوع الحملة *</label>
+          <div class="cmp-type-picker">
+            <button type="button" class="cmp-type-btn active" data-type="landing">
+              <div class="cmp-type-icon">🏠</div>
+              <div class="cmp-type-label">Landing</div>
+            </button>
+            <button type="button" class="cmp-type-btn" data-type="direct">
+              <div class="cmp-type-icon">🔗</div>
+              <div class="cmp-type-label">Direct</div>
+            </button>
+            <button type="button" class="cmp-type-btn" data-type="hybrid">
+              <div class="cmp-type-icon">🔀</div>
+              <div class="cmp-type-label">Hybrid</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="neo-field" style="margin-bottom: var(--neo-sp-3);">
+          <label class="neo-field-label neo-field-label-required">اسم الحملة</label>
+          <input type="text" id="cmpNameInput" class="neo-input" placeholder="مثال: PopAds EG → Adsterra 10245" maxlength="200">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:var(--neo-sp-3);">
+          <div class="neo-field">
+            <label class="neo-field-label">مصدر الترافيك</label>
+            <select id="cmpSourceSelect" class="neo-select"></select>
+          </div>
+          <div class="neo-field">
+            <label class="neo-field-label">Buy CPM ($)</label>
+            <input type="number" id="cmpBuyCpm" class="neo-input" step="0.01" min="0" value="1.00">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:var(--neo-sp-3);">
+          <div class="neo-field">
+            <label class="neo-field-label">الوجهة (شركة الإعلانات)</label>
+            <select id="cmpDestSelect" class="neo-select"></select>
+          </div>
+          <div class="neo-field">
+            <label class="neo-field-label">Sell CPM ($)</label>
+            <input type="number" id="cmpSellCpm" class="neo-input" step="0.01" min="0" value="2.00">
+          </div>
+        </div>
+
+        <div class="neo-field" id="cmpLandingWrap" style="margin-bottom: var(--neo-sp-3); display:none;">
+          <label class="neo-field-label neo-field-label-required">رابط صفحة الهبوط</label>
+          <input type="url" id="cmpLandingUrl" class="neo-input" placeholder="https://your-landing.com">
+          <span class="neo-field-hint">الصفحة اللي هتحط فيها كود التتبع</span>
+        </div>
+
+        <div class="neo-field" id="cmpDestWrap" style="margin-bottom: var(--neo-sp-3); display:none;">
+          <label class="neo-field-label neo-field-label-required">رابط الوجهة (Direct Link)</label>
+          <input type="url" id="cmpDestUrl" class="neo-input" placeholder="https://www.effectivegatecpm.com/...">
+          <span class="neo-field-hint">الرابط اللي جاي من Adsterra</span>
+        </div>
+
+        <div class="neo-field" style="margin-bottom: var(--neo-sp-3);">
+          <label class="neo-field-label">Adsterra API Key (اختياري)</label>
+          <input type="text" id="cmpAdsterraKey" class="neo-input" placeholder="الصق الـ API key...">
+          <span class="neo-field-hint">هنسحب بيه الأرباح تلقائيًا</span>
+        </div>
+
+        <div class="neo-field">
+          <label class="neo-field-label">Zone ID (اختياري)</label>
+          <input type="text" id="cmpZoneId" class="neo-input" placeholder="10245">
+        </div>
+
+      </div>
+      <div class="neo-modal-foot">
+        <button class="neo-btn neo-btn-ghost" onclick="CMP.closeCreate()">إلغاء</button>
+        <button class="neo-btn neo-btn-primary" id="cmpCreateBtn" onclick="CMP.create()">إنشاء الحملة</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const CMP = {
+      campaigns: [],
+      sources: [],
+      destinations: [],
+      newType: 'landing',
+    };
+
+    function fmtMoney(n) {
+      const v = Number(n || 0);
+      if (Math.abs(v) < 0.005) return '$0.00';
+      const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+      return sign + '$' + Math.abs(v).toFixed(2);
+    }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    // =========================================================
+    // RENDER CAMPAIGNS GRID
+    // =========================================================
+    function renderCampaigns() {
+      const grid = document.getElementById('cmpGrid');
+      const empty = document.getElementById('cmpEmpty');
+      const error = document.getElementById('cmpError');
+
+      if (!CMP.campaigns.length) {
+        grid.innerHTML = '';
+        grid.style.display = 'none';
+        empty.style.display = '';
+        return;
+      }
+
+      grid.style.display = 'grid';
+      empty.style.display = 'none';
+      error.style.display = 'none';
+
+      grid.innerHTML = CMP.campaigns.map(c => {
+        const st = c.stats || {};
+        const pl = st.pl || {};
+        const profit = Number(pl.profit || 0);
+        const isMuted = pl.error === 'no_sell_revenue';
+        const profitCls = isMuted ? 'muted' : (profit >= 0 ? 'pos' : 'neg');
+        const profitDisplay = isMuted ? '—' : fmtMoney(profit);
+        const roiDisplay = isMuted ? 'Sell CPM مفقود' : `${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`;
+
+        const statusLabel = c.status === 'active' ? '🟢 نشطة' : c.status === 'paused' ? '⏸ موقوفة' : '📦 مؤرشفة';
+
+        return `
+          <a href="/v2/campaigns/${c.id}" class="cmp-card type-${c.type}">
+            <div class="cmp-card-head">
+              <div class="cmp-card-name">${Neo.escape(c.name)}</div>
+              <span class="cmp-type-badge ${c.type}">${c.type}</span>
+            </div>
+            <div class="cmp-pl">
+              <span class="cmp-profit ${profitCls}">${profitDisplay}</span>
+              <span class="cmp-roi ${profitCls}">${roiDisplay}</span>
+            </div>
+            <div class="cmp-stats">
+              <div>
+                <div class="cmp-stat-label">إجمالي</div>
+                <div class="cmp-stat-value">${fmtInt(st.total || 0)}</div>
+              </div>
+              <div>
+                <div class="cmp-stat-label">Valid</div>
+                <div class="cmp-stat-value" style="color:var(--neo-success);">${fmtInt(st.valid || 0)}</div>
+              </div>
+              <div>
+                <div class="cmp-stat-label">Bot %</div>
+                <div class="cmp-stat-value" style="color:var(--neo-danger);">${Number(st.bot_rate || 0).toFixed(1)}%</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="cmp-status ${c.status}">${statusLabel}</span>
+              <span style="font-size:10px;color:var(--neo-fg-muted);font-family:var(--neo-font-mono);">${Neo.escape(c.traffic_source_slug)} → ${Neo.escape(c.destination_slug)}</span>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    // =========================================================
+    // LOAD CAMPAIGNS
+    // =========================================================
+    async function loadCampaigns() {
+      try {
+        CMP.campaigns = await Neo.api('/api/campaigns');
+        document.getElementById('cmpSubtitle').textContent = `${CMP.campaigns.length} حملة`;
+        renderCampaigns();
+      } catch (e) {
+        console.error('[Campaigns] load failed:', e);
+        document.getElementById('cmpErrorMsg').textContent = e.message || 'خطأ في الاتصال';
+        document.getElementById('cmpGrid').style.display = 'none';
+        document.getElementById('cmpEmpty').style.display = 'none';
+        document.getElementById('cmpError').style.display = '';
+      }
+    }
+
+    // =========================================================
+    // OPEN CREATE MODAL
+    // =========================================================
+    async function openCreate() {
+      try {
+        if (!CMP.sources.length) CMP.sources = await Neo.api('/api/traffic-sources');
+        if (!CMP.destinations.length) CMP.destinations = await Neo.api('/api/destinations');
+
+        document.getElementById('cmpSourceSelect').innerHTML = CMP.sources.map(s =>
+          `<option value="${Neo.escape(s.slug)}">${Neo.escape(s.name)}</option>`
+        ).join('');
+        document.getElementById('cmpDestSelect').innerHTML = CMP.destinations.map(d =>
+          `<option value="${Neo.escape(d.slug)}">${Neo.escape(d.name)}</option>`
+        ).join('');
+
+        // Reset
+        document.getElementById('cmpNameInput').value = '';
+        document.getElementById('cmpLandingUrl').value = '';
+        document.getElementById('cmpDestUrl').value = '';
+        document.getElementById('cmpAdsterraKey').value = '';
+        document.getElementById('cmpZoneId').value = '';
+
+        // Use user's CPM defaults
+        const user = Neo.state.user || {};
+        document.getElementById('cmpBuyCpm').value = (user.cpm_buy != null ? Number(user.cpm_buy) : 1.0).toFixed(2);
+        document.getElementById('cmpSellCpm').value = (user.cpm_sell != null ? Number(user.cpm_sell) : 2.0).toFixed(2);
+
+        CMP.updateType('landing');
+        Neo.openModal('cmpCreateModal');
+      } catch (e) {
+        Neo.toast('فشل تحميل القوائم: ' + e.message, 'error');
+      }
+    }
+
+    function closeCreate() {
+      Neo.closeModal('cmpCreateModal');
+    }
+
+    // =========================================================
+    // TYPE SWITCH
+    // =========================================================
+    function updateType(type) {
+      CMP.newType = type;
+      document.querySelectorAll('.cmp-type-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.type === type);
+      });
+
+      const isDirect = type === 'direct';
+      const isLanding = type === 'landing';
+      const isHybrid = type === 'hybrid';
+
+      document.getElementById('cmpDestWrap').style.display = (isDirect || isHybrid) ? '' : 'none';
+      document.getElementById('cmpLandingWrap').style.display = (isLanding || isHybrid) ? '' : 'none';
+    }
+
+    // =========================================================
+    // CREATE CAMPAIGN
+    // =========================================================
+    async function createCampaign() {
+      const name = document.getElementById('cmpNameInput').value.trim();
+      const landing = document.getElementById('cmpLandingUrl').value.trim();
+      const destUrl = document.getElementById('cmpDestUrl').value.trim();
+
+      if (!name) { Neo.toast('اسم الحملة مطلوب', 'error'); return; }
+      if ((CMP.newType === 'landing' || CMP.newType === 'hybrid') && !landing) {
+        Neo.toast('حملات Landing محتاجة رابط صفحة الهبوط', 'error'); return;
+      }
+      if ((CMP.newType === 'direct' || CMP.newType === 'hybrid') && !destUrl) {
+        Neo.toast('حملات Direct محتاجة رابط الوجهة', 'error'); return;
+      }
+
+      const body = {
+        name: name,
+        type: CMP.newType,
+        traffic_source_slug: document.getElementById('cmpSourceSelect').value,
+        buy_cpm: parseFloat(document.getElementById('cmpBuyCpm').value) || 0,
+        destination_slug: document.getElementById('cmpDestSelect').value,
+        sell_cpm: parseFloat(document.getElementById('cmpSellCpm').value) || 0,
+        landing_url: landing,
+        destination_url: destUrl,
+        adsterra_api_key: document.getElementById('cmpAdsterraKey').value.trim(),
+        destination_zone_id: document.getElementById('cmpZoneId').value.trim(),
+      };
+
+      const btn = document.getElementById('cmpCreateBtn');
+      btn.disabled = true;
+      btn.classList.add('neo-btn-loading');
+      const orig = btn.textContent;
+      btn.textContent = 'جاري الإنشاء...';
+
+      try {
+        const res = await Neo.api('/api/campaigns', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        Neo.toast('تم إنشاء الحملة ✅', 'success');
+        closeCreate();
+        setTimeout(() => { window.location.href = '/v2/campaigns/' + res.id; }, 500);
+      } catch (e) {
+        Neo.toast('فشل: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('neo-btn-loading');
+        btn.textContent = orig;
+      }
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'campaigns',
+          lang: 'ar',
+          breadcrumb: [{ label: 'الحملات' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        document.getElementById('cmpNewBtn').addEventListener('click', openCreate);
+        document.getElementById('cmpRefreshBtn').addEventListener('click', loadCampaigns);
+
+        document.querySelectorAll('.cmp-type-btn').forEach(btn => {
+          btn.addEventListener('click', () => updateType(btn.dataset.type));
+        });
+
+        document.getElementById('cmpCreateModal').addEventListener('click', (e) => {
+          if (e.target.id === 'cmpCreateModal') closeCreate();
+        });
+
+        await loadCampaigns();
+
+      } catch (e) {
+        console.error('[Campaigns Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+
+    // =========================================================
+    // PUBLIC API
+    // =========================================================
+    CMP.openCreate = openCreate;
+    CMP.closeCreate = closeCreate;
+    CMP.create = createCampaign;
+    CMP.load = loadCampaigns;
+    CMP.updateType = updateType;
+    window.CMP = CMP;
+  </script>
+</body>
+</html>
