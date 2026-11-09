@@ -9,19 +9,39 @@
     mounted: false, cmdOpen: false, cmdItems: [], cmdSelected: 0, cmdQuery: '',
     baseTitle: document.title, attentionTimer: null, pulseTimer: null,
     quickActionsEl: null, quickActionsTarget: null,
+    pulse: null,  // Phase 1 — last pulse payload
   };
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtNum = (n) => Number(n || 0).toLocaleString('en-US');
-  const fmtMoney = (n) => { const v = Number(n || 0); const sign = v > 0 ? '+' : (v < 0 ? '-' : ''); return sign + '$' + Math.abs(v).toFixed(2); };
+  const fmtMoney = (n) => {
+    const v = Number(n || 0);
+    if (Math.abs(v) < 0.005) return '$0.00';
+    const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+    return sign + '$' + Math.abs(v).toFixed(2);
+  };
   const fmtPct = (n, d = 1) => Number(n || 0).toFixed(d) + '%';
 
-  function localDateStr(d) { const dt = d || new Date(); const y = dt.getFullYear(); const m = String(dt.getMonth() + 1).padStart(2, '0'); const day = String(dt.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
+  function localDateStr(d) {
+    const dt = d || new Date();
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   async function api(url, opts = {}) {
-    const res = await fetch(url, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) }, ...opts });
+    const res = await fetch(url, {
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      ...opts,
+    });
     if (res.status === 401) { window.location.href = '/'; throw new Error('Unauthorized'); }
-    if (!res.ok) { let msg = 'HTTP ' + res.status; try { const j = await res.json(); msg = j.detail || msg; } catch (_) {} throw new Error(msg); }
+    if (!res.ok) {
+      let msg = 'HTTP ' + res.status;
+      try { const j = await res.json(); msg = j.detail || msg; } catch (_) {}
+      throw new Error(msg);
+    }
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('application/json')) return res.json();
     return res.text();
@@ -200,29 +220,79 @@
     el.innerHTML = items.map((it, i) => { const isLast = i === items.length - 1; const crumb = it.href ? `<a href="${esc(it.href)}" class="crumb" style="color:inherit;text-decoration:none;">${esc(it.label)}</a>` : `<span class="crumb ${isLast ? 'active' : ''}">${esc(it.label)}</span>`; return (i > 0 ? '<span class="sep">/</span>' : '') + crumb; }).join('');
   }
 
+  // =========================================================
+  // Phase 1 — Money Pulse via /api/stats/pulse (1 call, not 4)
+  // =========================================================
   async function refreshMoneyPulse() {
     try {
-      const today = localDateStr(); const yest = localDateStr(new Date(Date.now() - 86400000));
-      const [todayTotal, todayValid, yestTotal, yestValid] = await Promise.all([
-        api(`/api/visits?from_date=${today}&to_date=${today}&per_page=1`).then(r => r.total || 0).catch(() => 0),
-        api(`/api/visits?from_date=${today}&to_date=${today}&verdict=valid&per_page=1`).then(r => r.total || 0).catch(() => 0),
-        api(`/api/visits?from_date=${yest}&to_date=${yest}&per_page=1`).then(r => r.total || 0).catch(() => 0),
-        api(`/api/visits?from_date=${yest}&to_date=${yest}&verdict=valid&per_page=1`).then(r => r.total || 0).catch(() => 0),
-      ]);
-      const buyCpm = Number(S.user?.cpm_buy ?? 1.0); const sellCpm = Number(S.user?.cpm_sell ?? 1.5);
-      const todayProfit = (todayValid * sellCpm / 1000) - (todayTotal * buyCpm / 1000);
-      const yestProfit = (yestValid * sellCpm / 1000) - (yestTotal * buyCpm / 1000);
-      let trendPct = 0; let trendDir = 'flat';
-      if (Math.abs(yestProfit) > 0.01) { trendPct = ((todayProfit - yestProfit) / Math.abs(yestProfit)) * 100; if (trendPct > 5) trendDir = 'up'; else if (trendPct < -5) trendDir = 'down'; } else if (todayProfit > 0.01) trendDir = 'up'; else if (todayProfit < -0.01) trendDir = 'down';
-      const pulse = document.getElementById('shMoneyPulse');
-      if (pulse) {
-        const cls = todayProfit > 0.01 ? 'pos' : todayProfit < -0.01 ? 'neg' : 'zero'; pulse.className = `sh-money-pulse ${cls}`;
-        const valEl = pulse.querySelector('.sh-mp-value'); if (valEl) valEl.textContent = fmtMoney(todayProfit);
-        const trendEl = pulse.querySelector('.sh-mp-trend'); if (trendEl) { if (trendDir === 'flat') { trendEl.textContent = '—'; trendEl.className = 'sh-mp-trend flat'; } else { const arrow = trendDir === 'up' ? '↑' : '↓'; trendEl.textContent = `${arrow}${Math.abs(trendPct).toFixed(0)}%`; trendEl.className = `sh-mp-trend ${trendDir}`; } }
+      const pulse = await api('/api/stats/pulse');
+      S.pulse = pulse;
+
+      const today = pulse.today || {};
+      const yest = pulse.yesterday || {};
+      const todayProfit = Number(today.profit || 0);
+      const yestProfit = Number(yest.profit || 0);
+      const source = today.source || 'unknown';
+      const integrity = (today.integrity && today.integrity.integrity) || 'unknown';
+
+      // Trend: % change vs yesterday
+      let trendPct = 0;
+      let trendDir = 'flat';
+      if (Math.abs(yestProfit) > 0.01) {
+        trendPct = ((todayProfit - yestProfit) / Math.abs(yestProfit)) * 100;
+        if (trendPct > 5) trendDir = 'up';
+        else if (trendPct < -5) trendDir = 'down';
+      } else if (todayProfit > 0.01) trendDir = 'up';
+      else if (todayProfit < -0.01) trendDir = 'down';
+
+      const el = document.getElementById('shMoneyPulse');
+      if (el) {
+        const cls = todayProfit > 0.01 ? 'pos' : todayProfit < -0.01 ? 'neg' : 'zero';
+        el.className = `sh-money-pulse ${cls}`;
+
+        // Indicator when profit is estimated, not exact
+        const estimated = (source === 'cpm' || source === 'unknown' || integrity !== 'exact');
+        const indicator = estimated ? ' *' : '';
+
+        const valEl = el.querySelector('.sh-mp-value');
+        if (valEl) valEl.textContent = fmtMoney(todayProfit) + indicator;
+
+        const trendEl = el.querySelector('.sh-mp-trend');
+        if (trendEl) {
+          if (trendDir === 'flat') {
+            trendEl.textContent = '—';
+            trendEl.className = 'sh-mp-trend flat';
+          } else {
+            const arrow = trendDir === 'up' ? '↑' : '↓';
+            trendEl.textContent = `${arrow}${Math.abs(trendPct).toFixed(0)}%`;
+            trendEl.className = `sh-mp-trend ${trendDir}`;
+          }
+        }
+
+        // Tooltip: explain the source of the number
+        let title = `الربح اليوم: ${fmtMoney(todayProfit)}`;
+        if (source === 'cpm') title += ' — تقدير بالـ CPM';
+        else if (source === 'exact_partial') title += ' — محسوب من BID جزئي';
+        else if (source === 'exact') title += ' — محسوب من BID الحقيقي';
+        else title += ' — مفيش بيانات كافية';
+        if (integrity === 'partial_warn') title += ' (تحذير: تغطية BID منخفضة)';
+        el.title = title;
       }
-      const visitsEl = document.getElementById('shStatusVisits'); if (visitsEl) visitsEl.textContent = fmtNum(todayTotal) + ' زيارة';
-      const profitEl = document.getElementById('shStatusProfit'); if (profitEl) { profitEl.textContent = fmtMoney(todayProfit); profitEl.style.color = todayProfit > 0 ? 'var(--sh-green)' : todayProfit < 0 ? 'var(--sh-rose)' : 'var(--sh-ink-lo)'; }
-    } catch (err) {}
+
+      const visitsEl = document.getElementById('shStatusVisits');
+      if (visitsEl) visitsEl.textContent = fmtNum(today.visits || 0) + ' زيارة';
+      const profitEl = document.getElementById('shStatusProfit');
+      if (profitEl) {
+        profitEl.textContent = fmtMoney(todayProfit);
+        profitEl.style.color = todayProfit > 0
+          ? 'var(--sh-green)'
+          : todayProfit < 0
+            ? 'var(--sh-rose)'
+            : 'var(--sh-ink-lo)';
+      }
+    } catch (err) {
+      // Silent — pulse is cosmetic
+    }
   }
 
   async function refreshAttentionCount() {
@@ -307,5 +377,12 @@
     S.mounted = true; return appRoot;
   }
 
-  window.Shell = { mount, toast, openCmd, closeCmd, api, setBreadcrumb, refreshMoneyPulse, refreshAttentionCount, applyTheme, esc, fmtNum, fmtMoney, fmtPct, localDateStr, ICON, state: S };
+  window.Shell = {
+    mount, toast, openCmd, closeCmd, api, setBreadcrumb,
+    refreshMoneyPulse, refreshAttentionCount, applyTheme,
+    esc, fmtNum, fmtMoney, fmtPct,
+    localDateStr,   // ← Phase 1: previously internal, now public
+    ICON,
+    state: S,
+  };
 })();
