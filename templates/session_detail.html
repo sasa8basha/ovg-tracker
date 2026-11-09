@@ -11,7 +11,7 @@
     html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
     body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
     #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
-    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 13px; z-index: 9998; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-size: 13px; z-index: 9998; }
     .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
     @keyframes db-spin { to { transform: rotate(360deg); } }
 
@@ -31,6 +31,13 @@
     .sd-badge.verdict-suspicious { background: rgba(245,158,11,0.15); color: #F59E0B; }
     .sd-badge.verdict-pending { background: rgba(255,255,255,0.05); color: #7B8496; }
 
+    .sd-tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid #232734; flex-wrap: wrap; }
+    .sd-tab { padding: 10px 18px; background: transparent; border: none; border-bottom: 2px solid transparent; color: #7B8496; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; transition: all 120ms; }
+    .sd-tab.active { color: #F8FAFC; border-bottom-color: #7C5CFF; }
+    .sd-tab:hover { color: #CBD5E1; }
+    .sd-panel { display: none; }
+    .sd-panel.active { display: block; }
+
     .sd-card { background: #0F1117; border: 1px solid #232734; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
     .sd-card-title { font-size: 12px; font-weight: 800; color: #F8FAFC; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; }
 
@@ -45,14 +52,12 @@
     .sd-info-value { font-size: 12px; color: #F8FAFC; font-weight: 700; font-family: 'JetBrains Mono', monospace; word-break: break-all; }
     .sd-info-value.muted { color: #7B8496; font-style: italic; font-family: 'Inter', sans-serif; }
 
-    /* Timeline */
     .sd-timeline { background: #08090D; border: 1px solid #232734; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
     .sd-timeline-svg { width: 100%; height: 100px; display: block; }
     .sd-timeline-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 10px; color: #7B8496; flex-wrap: wrap; }
     .sd-timeline-legend span { display: inline-flex; align-items: center; gap: 4px; }
     .sd-timeline-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-    /* Heartbeat table */
     .sd-hb-table { width: 100%; border-collapse: collapse; font-size: 11px; }
     .sd-hb-table th { padding: 6px 8px; text-align: right; font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; border-bottom: 1px solid #1A1D29; }
     .sd-hb-table th.center { text-align: center; }
@@ -65,7 +70,6 @@
     .sd-hb-vis { color: #10B981; }
     .sd-hb-invis { color: #4A5263; }
 
-    /* Evidence */
     .sd-evidence-list { display: flex; flex-direction: column; gap: 6px; }
     .sd-evidence-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #161822; border-radius: 6px; font-size: 11px; }
     .sd-evidence-code { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #F8FAFC; min-width: 150px; }
@@ -74,7 +78,6 @@
     .sd-evidence-score.neg { background: rgba(16,185,129,0.15); color: #10B981; }
     .sd-evidence-detail { color: #7B8496; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* Behavior grid */
     .sd-beh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
     .sd-beh-item { padding: 8px 10px; background: #161822; border-radius: 6px; }
     .sd-beh-label { font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 3px; }
@@ -85,6 +88,23 @@
 
     .sd-link { color: #9B80FF; text-decoration: none; font-weight: 700; }
     .sd-link:hover { text-decoration: underline; }
+
+    /* Meta tabs */
+    .meta-precheck { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+    .meta-precheck-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+    .meta-precheck-row .lbl { color: #7B8496; }
+    .meta-precheck-row .val { font-family: 'JetBrains Mono', monospace; color: #F8FAFC; font-weight: 800; }
+    .meta-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+    .meta-badge.block { background: rgba(244,63,94,0.15); color: #F43F5E; }
+    .meta-badge.redirect { background: rgba(16,185,129,0.15); color: #10B981; }
+    .meta-badge.challenge { background: rgba(245,158,11,0.15); color: #F59E0B; }
+
+    .macro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 8px; }
+    .macro-item { background: #161822; border-radius: 6px; padding: 8px 10px; }
+    .macro-key { font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+    .macro-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800; color: #9B80FF; word-break: break-all; }
+
+    .json-block { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: #08090D; padding: 14px; border-radius: 8px; overflow: auto; max-height: 600px; color: #34D399; line-height: 1.6; direction: ltr; text-align: left; border: 1px solid #232734; }
   </style>
 </head>
 <body>
@@ -108,49 +128,89 @@
       <div id="sdLoading" style="text-align:center;padding:40px;color:#7B8496;">جاري التحميل…</div>
 
       <div id="sdContent" style="display:none;">
-        <div class="sd-kpis" id="sdKpis"></div>
-
-        <div class="sd-card">
-          <div class="sd-card-title">📋 معلومات الجلسة</div>
-          <div class="sd-info-grid" id="sdInfo"></div>
+        <div class="sd-tabs">
+          <button class="sd-tab active" data-tab="overview" type="button">📊 Overview</button>
+          <button class="sd-tab" data-tab="visit" type="button">🎯 Visit & Behavior</button>
+          <button class="sd-tab" data-tab="meta" type="button">📦 Meta كامل</button>
         </div>
 
-        <div class="sd-card" id="sdTimelineCard">
-          <div class="sd-card-title">📊 Heartbeat Timeline</div>
-          <div class="sd-timeline">
-            <svg class="sd-timeline-svg" id="sdTimelineSvg" viewBox="0 0 800 100" preserveAspectRatio="none"></svg>
-            <div class="sd-timeline-legend">
-              <span><span class="sd-timeline-dot" style="background:#10B981;"></span> تفاعل</span>
-              <span><span class="sd-timeline-dot" style="background:#7B8496;"></span> ساكت</span>
-              <span><span class="sd-timeline-dot" style="background:#F43F5E;"></span> فجوة >30s</span>
+        <!-- ===== Tab: Overview ===== -->
+        <div class="sd-panel active" data-panel="overview">
+          <div class="sd-kpis" id="sdKpis"></div>
+
+          <div class="sd-card">
+            <div class="sd-card-title">📋 معلومات الجلسة</div>
+            <div class="sd-info-grid" id="sdInfo"></div>
+          </div>
+
+          <div class="sd-card" id="sdTimelineCard">
+            <div class="sd-card-title">📊 Heartbeat Timeline</div>
+            <div class="sd-timeline">
+              <svg class="sd-timeline-svg" id="sdTimelineSvg" viewBox="0 0 800 100" preserveAspectRatio="none"></svg>
+              <div class="sd-timeline-legend">
+                <span><span class="sd-timeline-dot" style="background:#10B981;"></span> تفاعل</span>
+                <span><span class="sd-timeline-dot" style="background:#7B8496;"></span> ساكت</span>
+                <span><span class="sd-timeline-dot" style="background:#F43F5E;"></span> فجوة &gt;30s</span>
+              </div>
             </div>
+          </div>
+
+          <div class="sd-card">
+            <div class="sd-card-title">💓 Heartbeats (<span id="sdHbCount">0</span>)</div>
+            <div id="sdHbBody"></div>
           </div>
         </div>
 
-        <div class="sd-card">
-          <div class="sd-card-title">💓 Heartbeats (<span id="sdHbCount">0</span>)</div>
-          <div id="sdHbBody"></div>
+        <!-- ===== Tab: Visit ===== -->
+        <div class="sd-panel" data-panel="visit">
+          <div class="sd-card" id="sdVisitCard">
+            <div class="sd-card-title">🎯 بيانات الزيارة</div>
+            <div id="sdVisitBody"></div>
+          </div>
+
+          <div class="sd-card" id="sdBehaviorCard" style="display:none;">
+            <div class="sd-card-title">🧠 السلوك (Behavioral)</div>
+            <div class="sd-beh-grid" id="sdBehavior"></div>
+          </div>
+
+          <div class="sd-card" id="sdEvidenceCard" style="display:none;">
+            <div class="sd-card-title">📋 الأدلة (Evidence)</div>
+            <div class="sd-evidence-list" id="sdEvidence"></div>
+          </div>
         </div>
 
-        <div class="sd-card" id="sdVisitCard">
-          <div class="sd-card-title">🎯 بيانات الزيارة</div>
-          <div id="sdVisitBody"></div>
-        </div>
+        <!-- ===== Tab: Meta ===== -->
+        <div class="sd-panel" data-panel="meta">
+          <div class="sd-card">
+            <div class="sd-card-title">🔬 Precheck (عند الـ handshake)</div>
+            <div id="sdPrecheckBox"></div>
+          </div>
 
-        <div class="sd-card" id="sdBehaviorCard" style="display:none;">
-          <div class="sd-card-title">🧠 السلوك (Behavioral)</div>
-          <div class="sd-beh-grid" id="sdBehavior"></div>
-        </div>
+          <div class="sd-card">
+            <div class="sd-card-title">🏷️ PopAds Macros (الخام)</div>
+            <div id="sdMacrosBox"></div>
+          </div>
 
-        <div class="sd-card" id="sdEvidenceCard" style="display:none;">
-          <div class="sd-card-title">📋 الأدلة (Evidence)</div>
-          <div class="sd-evidence-list" id="sdEvidence"></div>
+          <div class="sd-card">
+            <div class="sd-card-title">🌐 IP Info (من وقت الـ handshake)</div>
+            <div class="sd-info-grid" id="sdIpInfoBox"></div>
+          </div>
+
+          <div class="sd-card">
+            <div class="sd-card-title">⚙️ Campaign Mode</div>
+            <div id="sdCampaignModeBox" style="padding:10px 14px;background:rgba(0,0,0,0.3);border-radius:8px;font-size:12px;"></div>
+          </div>
+
+          <div class="sd-card">
+            <div class="sd-card-title">💾 Meta (Raw JSON)</div>
+            <pre id="sdMetaJson" class="json-block"></pre>
+          </div>
         </div>
       </div>
 
       <div id="sdError" class="sd-empty-state" style="display:none;">
         <span class="sd-empty-icon">⚠️</span>
-        <div class="sd-empty-title" style="font-size:16px;font-weight:800;color:#F8FAFC;margin-bottom:6px;">فشل التحميل</div>
+        <div style="font-size:16px;font-weight:800;color:#F8FAFC;margin-bottom:6px;">فشل التحميل</div>
         <div style="font-size:12px;" id="sdErrorMsg">—</div>
       </div>
     </main>
@@ -166,60 +226,49 @@
       return (hb.clicks || 0) + (hb.scrolls || 0) + (hb.keydowns || 0) + Math.floor((hb.mousemoves || 0) / 10);
     }
 
+    function setupTabs() {
+      document.querySelectorAll('.sd-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.sd-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.sd-panel').forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          const target = document.querySelector(`[data-panel="${tab.dataset.tab}"]`);
+          if (target) target.classList.add('active');
+        });
+      });
+    }
+
     function renderTimeline(heartbeats) {
       const svg = document.getElementById('sdTimelineSvg');
       if (!heartbeats || heartbeats.length === 0) {
         svg.innerHTML = '<text x="400" y="50" text-anchor="middle" fill="#4A5263" font-size="12" font-family="Inter">No heartbeats</text>';
         return;
       }
-
       const maxT = Math.max(...heartbeats.map(h => h.t_ms || 0), 1);
-      const W = 800, H = 100;
-      const PAD = 20;
-      const plotW = W - 2 * PAD;
-      const plotH = H - 2 * PAD;
-
-      let html = '';
-
-      // Baseline
-      html += `<line x1="${PAD}" y1="${H - PAD}" x2="${W - PAD}" y2="${H - PAD}" stroke="#232734" stroke-width="1"/>`;
-
-      // Draw points and connecting lines
+      const W = 800, H = 100, PAD = 20;
+      const plotW = W - 2 * PAD, plotH = H - 2 * PAD;
+      let html = `<line x1="${PAD}" y1="${H - PAD}" x2="${W - PAD}" y2="${H - PAD}" stroke="#232734" stroke-width="1"/>`;
       let prevX = null, prevY = null;
       for (const hb of heartbeats) {
         const x = PAD + ((hb.t_ms || 0) / maxT) * plotW;
         const total = hbTotal(hb);
         const y = H - PAD - Math.min(plotH, total * 8 + 4);
         const color = total > 0 ? '#10B981' : '#7B8496';
-
         if (prevX !== null) {
           const isGap = hb.gap_ms && hb.gap_ms > 30000;
-          if (isGap) {
-            html += `<line x1="${prevX}" y1="${prevY}" x2="${x}" y2="${y}" stroke="#F43F5E" stroke-width="2" stroke-dasharray="4 4"/>`;
-          } else {
-            html += `<line x1="${prevX}" y1="${prevY}" x2="${x}" y2="${y}" stroke="#232734" stroke-width="1.5"/>`;
-          }
+          html += `<line x1="${prevX}" y1="${prevY}" x2="${x}" y2="${y}" stroke="${isGap ? '#F43F5E' : '#232734'}" stroke-width="${isGap ? 2 : 1.5}" ${isGap ? 'stroke-dasharray="4 4"' : ''}/>`;
         }
-
         html += `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="#08090D" stroke-width="1.5"/>`;
-
-        // Label for seq
         html += `<text x="${x}" y="${H - 4}" text-anchor="middle" fill="#4A5263" font-size="8" font-family="JetBrains Mono">${hb.seq}</text>`;
-
-        prevX = x;
-        prevY = y;
+        prevX = x; prevY = y;
       }
-
-      // Time labels
       html += `<text x="${PAD}" y="14" text-anchor="start" fill="#7B8496" font-size="9" font-family="JetBrains Mono">0s</text>`;
       html += `<text x="${W - PAD}" y="14" text-anchor="end" fill="#7B8496" font-size="9" font-family="JetBrains Mono">${Math.round(maxT / 1000)}s</text>`;
-
       svg.innerHTML = html;
     }
 
     function renderHeartbeats(hbs) {
       document.getElementById('sdHbCount').textContent = hbs.length;
-
       if (!hbs.length) {
         document.getElementById('sdHbBody').innerHTML = `
           <div class="sd-empty-state">
@@ -228,43 +277,27 @@
           </div>`;
         return;
       }
-
-      let html = `
-        <div style="overflow-x:auto;">
-        <table class="sd-hb-table">
-          <thead>
-            <tr>
-              <th class="center">#</th>
-              <th>الوقت</th>
-              <th class="center">Gap</th>
-              <th class="center">Clicks</th>
-              <th class="center">Scrolls</th>
-              <th class="center">Moves</th>
-              <th class="center">Keys</th>
-              <th class="center">Visible</th>
-              <th class="center">Focused</th>
-            </tr>
-          </thead>
-          <tbody>`;
-
+      let html = `<div style="overflow-x:auto;"><table class="sd-hb-table">
+        <thead><tr>
+          <th class="center">#</th><th>الوقت</th><th class="center">Gap</th>
+          <th class="center">Clicks</th><th class="center">Scrolls</th><th class="center">Moves</th>
+          <th class="center">Keys</th><th class="center">Visible</th><th class="center">Focused</th>
+        </tr></thead><tbody>`;
       for (const hb of hbs) {
         const isGap = hb.gap_ms && hb.gap_ms > 30000;
-        const gapLabel = hb.gap_ms === null || hb.gap_ms === undefined ? '—'
-          : hb.gap_ms > 1000 ? `${Math.round(hb.gap_ms / 1000)}s` : `${hb.gap_ms}ms`;
+        const gapLabel = hb.gap_ms === null || hb.gap_ms === undefined ? '—' : (hb.gap_ms > 1000 ? `${Math.round(hb.gap_ms / 1000)}s` : `${hb.gap_ms}ms`);
         const gapClass = isGap ? 'sd-hb-gap-warn' : (hb.gap_ms && hb.gap_ms < 15000 ? 'sd-hb-ok' : '');
-
-        html += `
-          <tr class="${isGap ? 'gap' : ''}">
-            <td class="center">${hb.seq}</td>
-            <td>${esc(hb.t_human || '—')}</td>
-            <td class="center ${gapClass}">${esc(gapLabel)}</td>
-            <td class="center">${hb.clicks || 0}</td>
-            <td class="center">${hb.scrolls || 0}</td>
-            <td class="center">${hb.mousemoves || 0}</td>
-            <td class="center">${hb.keydowns || 0}</td>
-            <td class="center ${hb.is_visible ? 'sd-hb-vis' : 'sd-hb-invis'}">${hb.is_visible ? '✓' : '—'}</td>
-            <td class="center ${hb.is_focused ? 'sd-hb-vis' : 'sd-hb-invis'}">${hb.is_focused ? '✓' : '—'}</td>
-          </tr>`;
+        html += `<tr class="${isGap ? 'gap' : ''}">
+          <td class="center">${hb.seq}</td>
+          <td>${esc(hb.t_human || '—')}</td>
+          <td class="center ${gapClass}">${esc(gapLabel)}</td>
+          <td class="center">${hb.clicks || 0}</td>
+          <td class="center">${hb.scrolls || 0}</td>
+          <td class="center">${hb.mousemoves || 0}</td>
+          <td class="center">${hb.keydowns || 0}</td>
+          <td class="center ${hb.is_visible ? 'sd-hb-vis' : 'sd-hb-invis'}">${hb.is_visible ? '✓' : '—'}</td>
+          <td class="center ${hb.is_focused ? 'sd-hb-vis' : 'sd-hb-invis'}">${hb.is_focused ? '✓' : '—'}</td>
+        </tr>`;
       }
       html += '</tbody></table></div>';
       document.getElementById('sdHbBody').innerHTML = html;
@@ -276,103 +309,51 @@
           <div class="sd-empty-state">
             <span class="sd-empty-icon">⏳</span>
             مفيش زيارة مسجلة بعد — الـ final beacon ماجاش.
-            <br><span style="font-size:10px;">الزيارة ممكن تكون لسه شغالة، أو الزائر قفل قبل ما الـ final يوصل.</span>
           </div>`;
         return;
       }
-
       document.getElementById('sdVisitBody').innerHTML = `
         <div class="sd-info-grid" style="margin-bottom:12px;">
-          <div class="sd-info-item">
-            <div class="sd-info-label">Verdict</div>
-            <div class="sd-info-value" style="color:${visit.verdict === 'valid' ? '#10B981' : visit.verdict === 'invalid' ? '#F43F5E' : '#F59E0B'};">
-              ${esc((visit.verdict || '').toUpperCase())}
-            </div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Score</div>
-            <div class="sd-info-value">${visit.score}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Time on Page</div>
-            <div class="sd-info-value">${esc(visit.time_on_page_human || '—')}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Country</div>
-            <div class="sd-info-value">${esc(visit.country || '—')} ${visit.country_code ? '(' + esc(visit.country_code) + ')' : ''}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Device</div>
-            <div class="sd-info-value">${esc(visit.device || '—')}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Browser</div>
-            <div class="sd-info-value">${esc(visit.browser || '—')}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">OS</div>
-            <div class="sd-info-value">${esc(visit.os || '—')}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">ISP</div>
-            <div class="sd-info-value">${esc(visit.isp || '—')}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">VPN</div>
-            <div class="sd-info-value" style="color:${visit.is_vpn ? '#F43F5E' : '#10B981'};">${visit.is_vpn ? 'YES' : 'NO'}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Honeypot</div>
-            <div class="sd-info-value" style="color:${visit.is_honeypot_triggered ? '#F43F5E' : '#7B8496'};">${visit.is_honeypot_triggered ? 'TRIGGERED' : 'no'}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Canvas</div>
-            <div class="sd-info-value" style="font-size:10px;">${esc(visit.canvas_hash || '—')}</div>
-          </div>
-          <div class="sd-info-item">
-            <div class="sd-info-label">Hardware</div>
-            <div class="sd-info-value">${esc(visit.hardware || '—')}</div>
-          </div>
+          <div class="sd-info-item"><div class="sd-info-label">Verdict</div>
+            <div class="sd-info-value" style="color:${visit.verdict === 'valid' ? '#10B981' : visit.verdict === 'invalid' ? '#F43F5E' : '#F59E0B'};">${esc((visit.verdict || '').toUpperCase())}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Score</div><div class="sd-info-value">${visit.score}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Time on Page</div><div class="sd-info-value">${esc(visit.time_on_page_human || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Country</div><div class="sd-info-value">${esc(visit.country || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Device</div><div class="sd-info-value">${esc(visit.device || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Browser</div><div class="sd-info-value">${esc(visit.browser || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">OS</div><div class="sd-info-value">${esc(visit.os || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">ISP</div><div class="sd-info-value">${esc(visit.isp || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">VPN</div><div class="sd-info-value" style="color:${visit.is_vpn ? '#F43F5E' : '#10B981'};">${visit.is_vpn ? 'YES' : 'NO'}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Honeypot</div><div class="sd-info-value" style="color:${visit.is_honeypot_triggered ? '#F43F5E' : '#7B8496'};">${visit.is_honeypot_triggered ? 'TRIGGERED' : 'no'}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Canvas</div><div class="sd-info-value" style="font-size:10px;">${esc(visit.canvas_hash || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Hardware</div><div class="sd-info-value">${esc(visit.hardware || '—')}</div></div>
         </div>
         <div style="text-align:center;margin-top:12px;">
           <a href="/visits/${visit.id}" class="sd-link">→ افتح صفحة الزيارة الكاملة</a>
         </div>
       `;
 
-      // Behavior
       if (visit.behavioral && Object.keys(visit.behavioral).length > 0) {
         document.getElementById('sdBehaviorCard').style.display = '';
         const b = visit.behavioral;
         const fields = [
-          ['scroll_depth_pct', 'Scroll %'],
-          ['scroll_pattern', 'Scroll Pattern'],
-          ['mouse_distance_total', 'Mouse Distance (px)'],
-          ['mouse_velocity_median', 'Mouse Velocity (px/s)'],
-          ['first_move_delay_ms', 'First Move (ms)'],
-          ['first_scroll_delay_ms', 'First Scroll (ms)'],
-          ['keydown_count', 'Keydowns'],
-          ['backspace_count', 'Backspaces'],
-          ['clicks', 'Clicks'],
-          ['clicks_on_links', 'Clicks on Links'],
-          ['idle_periods_count', 'Idle Periods'],
-          ['longest_idle_ms', 'Longest Idle (ms)'],
-          ['tab_switches', 'Tab Switches'],
-          ['total_unfocused_ms', 'Unfocused Time (ms)'],
+          ['scroll_depth_pct', 'Scroll %'], ['scroll_pattern', 'Scroll Pattern'],
+          ['mouse_distance_total', 'Mouse Distance (px)'], ['mouse_velocity_median', 'Mouse Velocity (px/s)'],
+          ['first_move_delay_ms', 'First Move (ms)'], ['first_scroll_delay_ms', 'First Scroll (ms)'],
+          ['keydown_count', 'Keydowns'], ['backspace_count', 'Backspaces'],
+          ['clicks', 'Clicks'], ['clicks_on_links', 'Clicks on Links'],
+          ['idle_periods_count', 'Idle Periods'], ['longest_idle_ms', 'Longest Idle (ms)'],
+          ['tab_switches', 'Tab Switches'], ['total_unfocused_ms', 'Unfocused Time (ms)'],
         ];
         let html = '';
         for (const [key, label] of fields) {
           const val = b[key];
           if (val === undefined || val === null) continue;
-          html += `
-            <div class="sd-beh-item">
-              <div class="sd-beh-label">${esc(label)}</div>
-              <div class="sd-beh-val">${esc(String(val))}</div>
-            </div>`;
+          html += `<div class="sd-beh-item"><div class="sd-beh-label">${esc(label)}</div><div class="sd-beh-val">${esc(String(val))}</div></div>`;
         }
         document.getElementById('sdBehavior').innerHTML = html;
       }
 
-      // Evidence
       if (visit.evidence && Array.isArray(visit.evidence) && visit.evidence.length > 0) {
         document.getElementById('sdEvidenceCard').style.display = '';
         let html = '';
@@ -381,15 +362,85 @@
           const score = parseInt(ev.score) || 0;
           const scoreClass = score >= 0 ? 'pos' : 'neg';
           const sign = score >= 0 ? '+' : '';
-          html += `
-            <div class="sd-evidence-item">
-              <span class="sd-evidence-code">${esc(ev.code || 'UNKNOWN')}</span>
-              <span class="sd-evidence-score ${scoreClass}">${sign}${score}</span>
-              <span class="sd-evidence-detail" title="${esc(ev.detail || '')}">${esc(ev.detail || '')}</span>
-            </div>`;
+          html += `<div class="sd-evidence-item">
+            <span class="sd-evidence-code">${esc(ev.code || 'UNKNOWN')}</span>
+            <span class="sd-evidence-score ${scoreClass}">${sign}${score}</span>
+            <span class="sd-evidence-detail" title="${esc(ev.detail || '')}">${esc(ev.detail || '')}</span>
+          </div>`;
         }
         document.getElementById('sdEvidence').innerHTML = html;
       }
+    }
+
+    // =========================================================
+    // Meta panel (Phase 2)
+    // =========================================================
+    function renderMeta(meta) {
+      const m = meta || {};
+
+      // ---- Precheck ----
+      const pre = m.precheck || {};
+      const preEl = document.getElementById('sdPrecheckBox');
+      if (!pre || Object.keys(pre).length === 0) {
+        preEl.innerHTML = '<div class="sd-empty-state" style="padding:20px;">مفيش precheck مسجل</div>';
+      } else {
+        const action = pre.action || 'unknown';
+        const actionClass = action === 'block' ? 'block' : action === 'challenge' ? 'challenge' : 'redirect';
+        const reasons = pre.reasons || [];
+        preEl.innerHTML = `
+          <div class="meta-precheck">
+            <div class="meta-precheck-row"><span class="lbl">Action</span><span class="val"><span class="meta-badge ${actionClass}">${esc(action.toUpperCase())}</span></span></div>
+            <div class="meta-precheck-row"><span class="lbl">Score</span><span class="val">${pre.score != null ? pre.score : '—'}</span></div>
+            ${reasons.length ? `<div style="margin-top:10px;"><div class="lbl" style="font-size:10px;color:#4A5263;margin-bottom:6px;">Reasons:</div>
+              ${reasons.map(r => `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#FDA4AF;padding:4px 8px;background:rgba(244,63,94,0.08);border-radius:4px;margin-bottom:3px;">${esc(r)}</div>`).join('')}
+            </div>` : ''}
+          </div>`;
+      }
+
+      // ---- Macros ----
+      const macros = m.macros || {};
+      const macrosEl = document.getElementById('sdMacrosBox');
+      const keys = Object.keys(macros);
+      if (keys.length === 0) {
+        macrosEl.innerHTML = '<div class="sd-empty-state" style="padding:20px;">مفيش macros مسجلة</div>';
+      } else {
+        macrosEl.innerHTML = `<div class="macro-grid">${keys.map(k => `
+          <div class="macro-item">
+            <div class="macro-key">${esc(k)}</div>
+            <div class="macro-val">${esc(String(macros[k]))}</div>
+          </div>`).join('')}</div>`;
+      }
+
+      // ---- IP info ----
+      const ipInfo = m.ip_info || {};
+      const ipEl = document.getElementById('sdIpInfoBox');
+      if (!ipInfo || Object.keys(ipInfo).length === 0) {
+        ipEl.innerHTML = '<div class="sd-empty-state" style="padding:20px;grid-column:1/-1;">مفيش IP info</div>';
+      } else {
+        const sec = ipInfo.security || {};
+        ipEl.innerHTML = `
+          <div class="sd-info-item"><div class="sd-info-label">Country</div><div class="sd-info-value">${esc(ipInfo.country || '—')} (${esc(ipInfo.country_code || '—')})</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">ISP</div><div class="sd-info-value">${esc(ipInfo.isp || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">ASN</div><div class="sd-info-value">${esc(ipInfo.asn || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Type</div><div class="sd-info-value">${esc(ipInfo.type || '—')}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">VPN</div><div class="sd-info-value" style="color:${sec.vpn ? '#F43F5E' : '#10B981'};">${sec.vpn ? 'YES' : 'NO'}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Hosting</div><div class="sd-info-value" style="color:${sec.hosting ? '#F43F5E' : '#10B981'};">${sec.hosting ? 'YES' : 'NO'}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Proxy</div><div class="sd-info-value" style="color:${sec.proxy ? '#F43F5E' : '#10B981'};">${sec.proxy ? 'YES' : 'NO'}</div></div>
+          <div class="sd-info-item"><div class="sd-info-label">Lat / Lon</div><div class="sd-info-value">${ipInfo.lat || 0}, ${ipInfo.lon || 0}</div></div>
+        `;
+      }
+
+      // ---- Campaign mode ----
+      const cmEl = document.getElementById('sdCampaignModeBox');
+      const cm = m.campaign_mode;
+      if (cm) {
+        cmEl.innerHTML = `<span style="color:#9B80FF;font-family:'JetBrains Mono',monospace;font-weight:800;">${esc(cm.toUpperCase())}</span> <span style="color:#7B8496;margin-left:8px;">(يحدد عتبات القرار)</span>`;
+      } else {
+        cmEl.innerHTML = '<span style="color:#7B8496;">—</span>';
+      }
+
+      // ---- Raw JSON ----
+      document.getElementById('sdMetaJson').textContent = JSON.stringify(meta || {}, null, 2);
     }
 
     async function loadDetail() {
@@ -417,7 +468,6 @@
           ${d.duration_human ? `<span>·</span><span>مدة: ${esc(d.duration_human)}</span>` : ''}
         `;
 
-        // KPIs
         const kpis = [
           { label: 'Duration', value: d.duration_human || '—' },
           { label: 'Heartbeats', value: d.total_heartbeats },
@@ -426,12 +476,9 @@
           { label: 'Country', value: d.country_code || '—' },
         ];
         document.getElementById('sdKpis').innerHTML = kpis.map(k => `
-          <div class="sd-kpi">
-            <div class="sd-kpi-label">${esc(k.label)}</div>
-            <div class="sd-kpi-value">${esc(String(k.value))}</div>
-          </div>`).join('');
+          <div class="sd-kpi"><div class="sd-kpi-label">${esc(k.label)}</div><div class="sd-kpi-value">${esc(String(k.value))}</div></div>
+        `).join('');
 
-        // Info
         const infoItems = [
           ['Session ID', d.session_id],
           ['Started', started],
@@ -440,19 +487,18 @@
           ['Consent', d.consent_state || '—'],
           ['Clock Drift', d.clock_drift_ms ? d.clock_drift_ms + 'ms' : '—'],
           ['Campaign ID', d.campaign_id || '—'],
-          ['Site ID', d.site_id || '—'],
           ['URL', d.url || '—'],
           ['Visitor FP Hash', d.visitor_fp_hash || '—'],
         ];
         document.getElementById('sdInfo').innerHTML = infoItems.map(([k, v]) => `
-          <div class="sd-info-item">
-            <div class="sd-info-label">${esc(k)}</div>
-            <div class="sd-info-value ${v === '—' ? 'muted' : ''}">${esc(String(v || '—'))}</div>
-          </div>`).join('');
+          <div class="sd-info-item"><div class="sd-info-label">${esc(k)}</div>
+          <div class="sd-info-value ${v === '—' ? 'muted' : ''}">${esc(String(v || '—'))}</div></div>
+        `).join('');
 
         renderTimeline(d.heartbeats);
         renderHeartbeats(d.heartbeats);
         renderVisit(d.visit);
+        renderMeta(d.meta);
 
         document.getElementById('sdLoading').style.display = 'none';
         document.getElementById('sdContent').style.display = '';
@@ -479,6 +525,7 @@
         document.getElementById('bootSkeleton').style.display = 'none';
         document.getElementById('shAppRoot').style.display = '';
 
+        setupTabs();
         await loadDetail();
       } catch (e) {
         console.error('[Session Detail Boot]', e);

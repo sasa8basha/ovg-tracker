@@ -20,31 +20,53 @@
     .risk-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 6px; }
     .risk-bar > div { height: 100%; border-radius: 3px; transition: width 600ms ease-out; }
 
-    /* Phase 1: dedicated error card */
-    .visit-error-card {
-      max-width: 520px;
-      margin: 80px auto;
-      padding: 32px 24px;
-      background: rgba(244,63,94,0.05);
-      border: 1px solid rgba(244,63,94,0.3);
-      border-radius: 20px;
-      text-align: center;
-    }
+    .visit-error-card { max-width: 520px; margin: 80px auto; padding: 32px 24px; background: rgba(244,63,94,0.05); border: 1px solid rgba(244,63,94,0.3); border-radius: 20px; text-align: center; }
     .visit-error-icon { font-size: 56px; margin-bottom: 16px; display: block; opacity: 0.85; }
     .visit-error-title { font-size: 20px; font-weight: 800; color: #F1F5F9; margin: 0 0 8px; }
     .visit-error-msg { font-size: 13px; color: #94A3B8; line-height: 1.6; margin: 0 0 20px; }
-    .visit-error-link {
-      display: inline-block;
-      padding: 10px 20px;
-      background: #6366F1;
-      color: white;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 13px;
-      transition: background 120ms;
-    }
+    .visit-error-link { display: inline-block; padding: 10px 20px; background: #6366F1; color: white; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; transition: background 120ms; }
     .visit-error-link:hover { background: #818CF8; }
+
+    /* Tabs */
+    .vt-tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; }
+    .vt-tab { padding: 10px 18px; background: transparent; border: none; border-bottom: 2px solid transparent; color: #94A3B8; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; transition: all 120ms; }
+    .vt-tab.active { color: #F1F5F9; border-bottom-color: #6366F1; }
+    .vt-tab:hover { color: #CBD5E1; }
+    .vt-panel { display: none; }
+    .vt-panel.active { display: block; }
+
+    /* Decision / Signal rows */
+    .dec-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    @media (max-width: 700px) { .dec-row { grid-template-columns: 1fr; } }
+    .dec-box { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 14px; }
+    .dec-label { font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .dec-value { font-size: 16px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: #F1F5F9; }
+
+    .sig-list { display: flex; flex-direction: column; gap: 6px; }
+    .sig-item { display: grid; grid-template-columns: 200px 80px 1fr 40px; gap: 10px; align-items: center; padding: 8px 12px; background: rgba(0,0,0,0.25); border-radius: 8px; font-size: 11px; }
+    @media (max-width: 700px) { .sig-item { grid-template-columns: 1fr; gap: 4px; } }
+    .sig-code { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #E2E8F0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sig-dir { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-align: center; }
+    .sig-dir.bot { background: rgba(244,63,94,0.15); color: #F43F5E; }
+    .sig-dir.human { background: rgba(16,185,129,0.15); color: #10B981; }
+    .sig-bar-wrap { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+    .sig-bar-fill { height: 100%; border-radius: 3px; }
+    .sig-strength { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; text-align: right; color: #CBD5E1; }
+    .sig-detail { grid-column: 1 / -1; font-size: 10px; color: #64748B; margin-top: 2px; }
+
+    .dq-field { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 4px; font-size: 11px; }
+    .dq-field-name { font-family: 'JetBrains Mono', monospace; color: #CBD5E1; }
+    .dq-field-tag { font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 3px; }
+    .dq-field-tag.missing { background: rgba(244,63,94,0.15); color: #F43F5E; }
+    .dq-field-tag.weak { background: rgba(245,158,11,0.15); color: #F59E0B; }
+
+    .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+    .kv-item { background: rgba(0,0,0,0.25); border-radius: 6px; padding: 8px 10px; }
+    .kv-label { font-size: 9px; color: #64748B; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+    .kv-value { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800; color: #F1F5F9; word-break: break-all; }
+
+    pre.json-block { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; overflow: auto; max-height: 400px; color: #34D399; line-height: 1.6; direction: ltr; text-align: left; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="min-h-screen p-6">
@@ -66,17 +88,20 @@
 
     <div id="visitContent" style="display:none;">
 
-      <div class="flex justify-between items-center mb-8">
+      <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
         <div class="flex items-center gap-4">
           <button onclick="history.back()" class="text-slate-400 hover:text-white transition bg-white/5 p-2 rounded-lg">→</button>
           <div>
             <div class="flex items-center gap-3 flex-wrap">
               <h1 class="text-2xl font-extrabold text-white font-mono">زيارة <span id="vId" class="text-indigo-400"></span></h1>
               <span id="vBadge" class="px-3 py-1 rounded-full text-xs font-bold border"></span>
-              <span id="vConfidenceBadge" class="px-2 py-1 rounded-full text-[11px] font-bold bg-slate-700 text-slate-300 hidden"></span>
+              <span id="vDqBadge" class="px-2 py-1 rounded-full text-[10px] font-bold hidden"></span>
             </div>
             <p id="vTime" class="text-slate-400 text-sm mt-1"></p>
           </div>
+        </div>
+        <div class="flex gap-2">
+          <a id="vSessionLink" href="#" class="px-3 py-2 rounded-lg text-xs font-bold border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition" style="display:none;text-decoration:none;">🔗 Session</a>
         </div>
       </div>
 
@@ -96,170 +121,268 @@
 
       <div id="mismatchBanner" class="hidden mb-6"></div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Tabs -->
+      <div class="vt-tabs">
+        <button class="vt-tab active" data-tab="overview" type="button">📋 نظرة عامة</button>
+        <button class="vt-tab" data-tab="decision" type="button">🔬 القرار الكامل</button>
+        <button class="vt-tab" data-tab="behavior" type="button">🧠 السلوك العميق</button>
+      </div>
 
-        <div class="lg:col-span-1 space-y-6">
-          <div class="glass-card p-6 flex flex-col items-center justify-center">
-            <div class="score-ring mb-4">
-              <svg viewBox="0 0 150 150">
-                <circle class="score-bg" cx="75" cy="75" r="65"></circle>
-                <circle id="scoreCircle" class="score-progress" cx="75" cy="75" r="65"></circle>
-              </svg>
-              <div class="text-center z-10">
-                <div id="vScore" class="text-4xl font-extrabold text-white font-mono">0</div>
-                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk Score</div>
+      <!-- ===== Panel: Overview ===== -->
+      <div class="vt-panel active" data-panel="overview">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-1 space-y-6">
+            <div class="glass-card p-6 flex flex-col items-center justify-center">
+              <div class="score-ring mb-4">
+                <svg viewBox="0 0 150 150">
+                  <circle class="score-bg" cx="75" cy="75" r="65"></circle>
+                  <circle id="scoreCircle" class="score-progress" cx="75" cy="75" r="65"></circle>
+                </svg>
+                <div class="text-center z-10">
+                  <div id="vScore" class="text-4xl font-extrabold text-white font-mono">0</div>
+                  <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk Score</div>
+                </div>
+              </div>
+              <div id="vVerdictText" class="text-lg font-bold"></div>
+              <div id="vCategories" class="flex flex-wrap gap-1 mt-3 justify-center"></div>
+            </div>
+
+            <div class="glass-card p-6">
+              <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💰</span> الأرباح المالية</h3>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">BID</div><div id="vBid" class="text-sm font-bold text-rose-400 font-mono">$0.00</div></div>
+                <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الإيراد</div><div id="vRevenue" class="text-sm font-bold text-emerald-400 font-mono">$0.00</div></div>
+                <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الربح</div><div id="vProfit" class="text-sm font-bold font-mono">$0.00</div></div>
               </div>
             </div>
-            <div id="vVerdictText" class="text-lg font-bold"></div>
-            <div id="vCategories" class="flex flex-wrap gap-1 mt-3 justify-center"></div>
-          </div>
 
-          <div class="glass-card p-6">
-            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💰</span> الأرباح المالية</h3>
-            <div class="grid grid-cols-3 gap-3">
-              <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">BID</div><div id="vBid" class="text-sm font-bold text-rose-400 font-mono">$0.00</div></div>
-              <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الإيراد</div><div id="vRevenue" class="text-sm font-bold text-emerald-400 font-mono">$0.00</div></div>
-              <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الربح</div><div id="vProfit" class="text-sm font-bold font-mono">$0.00</div></div>
-            </div>
-          </div>
-
-          <div class="glass-card p-6">
-            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧠</span> السلوك والتفاعل</h3>
-            <div class="grid grid-cols-3 gap-3">
-              <div class="stat-box"><div class="text-xs text-slate-400 mb-1">المكوث</div><div id="vTimeOnPage" class="text-lg font-bold text-blue-400 font-mono">0s</div></div>
-              <div class="stat-box"><div class="text-xs text-slate-400 mb-1">نقرات</div><div id="vClicks" class="text-lg font-bold text-emerald-400 font-mono">0</div></div>
-              <div class="stat-box"><div class="text-xs text-slate-400 mb-1">سكرول</div><div id="vScrolls" class="text-lg font-bold text-amber-400 font-mono">0</div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="lg:col-span-2 space-y-6">
-
-          <div class="glass-card p-6" id="ipIntelCard">
-            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <span>🌐</span> IP Intelligence
-              </h3>
-              <span id="vClassification" class="px-3 py-1 rounded-full text-[10px] font-bold"></span>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-              <div><div class="text-xs text-slate-500 mb-1">IP</div><div id="vIpIntelIp" class="font-mono text-white font-bold break-all text-xs"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">Country</div><div id="vIpIntelCountry" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">ISP</div><div id="vIpIntelIsp" class="text-slate-200 text-xs break-all"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vIpIntelAsn" class="font-mono text-slate-200 text-xs"></div></div>
-            </div>
-
-            <div class="mb-3">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-xs text-slate-400 font-bold">Risk Score</span>
-                <span id="vIpRiskScore" class="font-mono text-sm font-bold">0</span>
+            <div class="glass-card p-6">
+              <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧠</span> السلوك والتفاعل</h3>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="stat-box"><div class="text-xs text-slate-400 mb-1">المكوث</div><div id="vTimeOnPage" class="text-lg font-bold text-blue-400 font-mono">0s</div></div>
+                <div class="stat-box"><div class="text-xs text-slate-400 mb-1">نقرات</div><div id="vClicks" class="text-lg font-bold text-emerald-400 font-mono">0</div></div>
+                <div class="stat-box"><div class="text-xs text-slate-400 mb-1">سكرول</div><div id="vScrolls" class="text-lg font-bold text-amber-400 font-mono">0</div></div>
               </div>
-              <div class="risk-bar"><div id="vIpRiskBar" style="width:0%;background:#10B981;"></div></div>
-            </div>
-
-            <div id="vIpReasons" class="mt-3"></div>
-          </div>
-
-          <div class="glass-card p-6">
-            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <span>📊</span> PopAds — كل الماكروز
-              </h3>
-              <button id="toggleRawBtn" class="text-[10px] px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white transition border border-white/10">
-                🔍 إظهار Raw JSON
-              </button>
-            </div>
-
-            <div id="popadsKnown" class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm"></div>
-
-            <div id="popadsRaw" class="hidden mt-4">
-              <div class="text-[10px] text-slate-500 mb-2 font-bold">Raw JSON (كل اللي جاي من PopAds):</div>
-              <pre id="popadsRawPre" class="text-[11px] bg-black/40 p-3 rounded-lg overflow-auto max-h-80 text-emerald-400 font-mono leading-relaxed" style="direction:ltr;text-align:left;"></pre>
             </div>
           </div>
 
-          <div class="glass-card p-6">
-            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🌐</span> الشبكة والاتصال</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div><div class="text-xs text-slate-500 mb-1">IP Address</div><div id="vIp" class="font-mono text-white font-bold bg-white/5 px-2 py-1 rounded break-all"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">Country (من إحنا)</div><div id="vCountry" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">Country (PopAds)</div><div id="vCountryPopads" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">ISP (من إحنا)</div><div id="vIsp" class="text-slate-200 text-xs break-all"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">ISP (PopAds)</div><div id="vIspPopads" class="text-slate-200 text-xs break-all"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vAsn" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">نوع الاتصال</div><div id="vConnType" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">VPN/Proxy</div><div id="vVpn"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">Timezone</div><div id="vTimezone" class="text-slate-200"></div></div>
+          <div class="lg:col-span-2 space-y-6">
+            <div class="glass-card p-6">
+              <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2"><span>🌐</span> IP Intelligence</h3>
+                <span id="vClassification" class="px-3 py-1 rounded-full text-[10px] font-bold"></span>
+              </div>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                <div><div class="text-xs text-slate-500 mb-1">IP</div><div id="vIpIntelIp" class="font-mono text-white font-bold break-all text-xs"></div></div>
+                <div><div class="text-xs text-slate-500 mb-1">Country</div><div id="vIpIntelCountry" class="text-slate-200"></div></div>
+                <div><div class="text-xs text-slate-500 mb-1">ISP</div><div id="vIpIntelIsp" class="text-slate-200 text-xs break-all"></div></div>
+                <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vIpIntelAsn" class="font-mono text-slate-200 text-xs"></div></div>
+              </div>
+              <div class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-slate-400 font-bold">Risk Score</span>
+                  <span id="vIpRiskScore" class="font-mono text-sm font-bold">0</span>
+                </div>
+                <div class="risk-bar"><div id="vIpRiskBar" style="width:0%;background:#10B981;"></div></div>
+              </div>
+              <div id="vIpReasons" class="mt-3"></div>
+            </div>
+
+            <div class="glass-card p-6">
+              <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2"><span>📊</span> PopAds Macros</h3>
+                <button id="toggleRawBtn" class="text-[10px] px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white transition border border-white/10">🔍 Raw JSON</button>
+              </div>
+              <div id="popadsKnown" class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm"></div>
+              <div id="popadsRaw" class="hidden mt-4">
+                <pre id="popadsRawPre" class="json-block"></pre>
+              </div>
+            </div>
+
+            <div class="glass-card p-6">
+              <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💻</span> الجهاز والبصمة</h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div><div class="text-xs text-slate-500 mb-1">OS</div><div id="vOs" class="text-slate-200"></div></div>
+                <div><div class="text-xs text-slate-500 mb-1">Browser</div><div id="vBrowser" class="text-slate-200"></div></div>
+                <div><div class="text-xs text-slate-500 mb-1">Device</div><div id="vDevice" class="text-slate-200"></div></div>
+                <div><div class="text-xs text-slate-500 mb-1">Hardware</div><div id="vHardware" class="text-slate-200"></div></div>
+                <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Canvas</div><div id="vCanvas" class="text-slate-200 font-mono text-xs bg-white/5 p-2 rounded break-all"></div></div>
+                <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Zone ID</div><div id="vZone" class="text-slate-200 font-mono"></div></div>
+              </div>
             </div>
           </div>
-
-          <div class="glass-card p-6">
-            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💻</span> الجهاز والبصمة</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div><div class="text-xs text-slate-500 mb-1">النظام (OS)</div><div id="vOs" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">المتصفح</div><div id="vBrowser" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">الجهاز</div><div id="vDevice" class="text-slate-200"></div></div>
-              <div><div class="text-xs text-slate-500 mb-1">الهاردوير</div><div id="vHardware" class="text-slate-200"></div></div>
-              <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Canvas Hash</div><div id="vCanvas" class="text-slate-200 font-mono text-xs bg-white/5 p-2 rounded break-all"></div></div>
-              <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Zone ID</div><div id="vZone" class="text-slate-200 font-mono"></div></div>
-            </div>
-          </div>
-
         </div>
       </div>
+
+      <!-- ===== Panel: Decision ===== -->
+      <div class="vt-panel" data-panel="decision">
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🎯</span> القرار النهائي</h3>
+          <div class="dec-row">
+            <div class="dec-box">
+              <div class="dec-label">Verdict</div>
+              <div class="dec-value" id="decVerdict">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Mode</div>
+              <div class="dec-value" id="decMode">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Bot Probability</div>
+              <div class="dec-value" id="decBotProb">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Confidence</div>
+              <div class="dec-value" id="decConf">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Reason</div>
+              <div class="dec-value" id="decReason" style="font-size:12px;">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Filter Reason</div>
+              <div class="dec-value" id="decFilter" style="font-size:12px;">—</div>
+            </div>
+          </div>
+          <div id="decReasonDetail" style="margin-top:10px;padding:12px;background:rgba(99,102,241,0.08);border-radius:8px;font-size:12px;color:#A5B4FC;line-height:1.6;display:none;"></div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧬</span> Fusion Engine</h3>
+          <div class="dec-row">
+            <div class="dec-box">
+              <div class="dec-label">Bot Evidence</div>
+              <div class="dec-value" id="fusBotEv" style="color:#F43F5E;">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Human Evidence</div>
+              <div class="dec-value" id="fusHumanEv" style="color:#10B981;">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Prior Risk</div>
+              <div class="dec-value" id="fusPrior">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Impossible?</div>
+              <div class="dec-value" id="fusImpossible">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>📊</span> جودة البيانات</h3>
+          <div class="dec-row">
+            <div class="dec-box">
+              <div class="dec-label">Level</div>
+              <div class="dec-value" id="dqLevel">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Completeness</div>
+              <div class="dec-value" id="dqCompleteness">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Reliability</div>
+              <div class="dec-value" id="dqReliability">—</div>
+            </div>
+            <div class="dec-box">
+              <div class="dec-label">Max Confidence Cap</div>
+              <div class="dec-value" id="dqCap">—</div>
+            </div>
+          </div>
+          <div id="dqFields" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2"><span>🔔</span> Signals (<span id="sigCount">0</span>)</h3>
+            <div style="display:flex;gap:6px;">
+              <button id="sigFilterAll" class="text-[10px] px-3 py-1 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-bold" type="button">الكل</button>
+              <button id="sigFilterBot" class="text-[10px] px-3 py-1 rounded bg-white/5 text-slate-400 border border-white/10 font-bold" type="button">Bot</button>
+              <button id="sigFilterHuman" class="text-[10px] px-3 py-1 rounded bg-white/5 text-slate-400 border border-white/10 font-bold" type="button">Human</button>
+            </div>
+          </div>
+          <div id="sigList" class="sig-list"></div>
+          <div id="sigEmpty" style="display:none;text-align:center;padding:40px;color:#64748B;font-size:12px;">مفيش signals مسجلة (زيارة legacy أو v2)</div>
+        </div>
+
+        <div class="glass-card p-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💾</span> Full Payload (خام)</h3>
+          <pre id="fullPayloadJson" class="json-block"></pre>
+        </div>
+      </div>
+
+      <!-- ===== Panel: Behavior ===== -->
+      <div class="vt-panel" data-panel="behavior">
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🖱️</span> تحليل الماوس</h3>
+          <div id="behMouse" class="kv-grid"></div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>⌨️</span> الكتابة والسكرول</h3>
+          <div id="behKeys" class="kv-grid"></div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>⚡</span> الأحداث والتفاعل</h3>
+          <div id="behEvents" class="kv-grid"></div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>⏱️</span> أول 30 ثانية</h3>
+          <div id="first30s" class="kv-grid"></div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>📍</span> Milestones (Timing)</h3>
+          <div id="milestonesGrid" class="kv-grid"></div>
+        </div>
+
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>📺</span> Ad Events</h3>
+          <div id="adEventsList" style="font-size:12px;"></div>
+        </div>
+
+        <div class="glass-card p-6">
+          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🎯</span> Fingerprint Cache</h3>
+          <div id="fpStrikesBox" class="kv-grid"></div>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <style>
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
 
   <script>
     const visitId = window.location.pathname.split('/').pop();
     let currentGroundTruth = null;
+    let fullData = null;
+    let sigFilter = 'all';
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
 
     const MACRO_LABELS = {
-      bid: 'BID (تكلفة الزيارة)',
-      impressionid: 'Impression ID',
-      websiteid: 'Website ID',
-      categoryid: 'Category ID',
-      categoryname: 'Category Name',
-      ispid: 'ISP ID',
-      ispname: 'ISP Name',
-      country: 'Country',
-      quality: 'Quality (1-10)',
-      screenresolution: 'Screen Resolution',
-      osname: 'OS Name',
-      browsername: 'Browser Name',
-      formfactorname: 'Form Factor',
-      devicename: 'Device Name',
-      campaignid: 'Campaign ID',
-      campaignname: 'Campaign Name',
-      osid: 'OS ID',
-      browserid: 'Browser ID',
-      formfactorid: 'Form Factor ID',
-      deviceid: 'Device ID',
-      adblock: 'AdBlock',
-      ip: 'IP (from PopAds)',
-      ipv6: 'IPv6',
-      useragent: 'User Agent (from PopAds)',
-      lang: 'Language',
+      bid: 'BID (تكلفة الزيارة)', impressionid: 'Impression ID', websiteid: 'Website ID',
+      categoryid: 'Category ID', categoryname: 'Category Name', ispid: 'ISP ID',
+      ispname: 'ISP Name', country: 'Country', quality: 'Quality (1-10)',
+      screenresolution: 'Screen Resolution', osname: 'OS Name', browsername: 'Browser Name',
+      formfactorname: 'Form Factor', devicename: 'Device Name', campaignid: 'Campaign ID',
+      campaignname: 'Campaign Name', osid: 'OS ID', browserid: 'Browser ID',
+      formfactorid: 'Form Factor ID', deviceid: 'Device ID', adblock: 'AdBlock',
+      ip: 'IP (from PopAds)', ipv6: 'IPv6', useragent: 'User Agent', lang: 'Language',
     };
 
     const CLASS_STYLES = {
-      residential: { bg: 'rgba(16,185,129,0.15)', color: '#10B981', label: '✅ Residential (نضيف)' },
-      datacenter:  { bg: 'rgba(244,63,94,0.15)',  color: '#F43F5E', label: '🏢 Datacenter (مشبوه)' },
-      vpn:         { bg: 'rgba(244,63,94,0.15)',  color: '#F43F5E', label: '🚫 VPN' },
-      proxy:       { bg: 'rgba(249,115,22,0.15)', color: '#F97316', label: '🔀 Proxy' },
-      tor:         { bg: 'rgba(168,85,247,0.15)', color: '#A855F7', label: '🧅 Tor' },
-      suspicious:  { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: '⚠️ Suspicious' },
-      unknown:     { bg: 'rgba(100,116,139,0.15)',color: '#94A3B8', label: '❓ Unknown' },
+      residential: { bg: 'rgba(16,185,129,0.15)', color: '#10B981', label: '✅ Residential' },
+      datacenter: { bg: 'rgba(244,63,94,0.15)', color: '#F43F5E', label: '🏢 Datacenter' },
+      vpn: { bg: 'rgba(244,63,94,0.15)', color: '#F43F5E', label: '🚫 VPN' },
+      proxy: { bg: 'rgba(249,115,22,0.15)', color: '#F97316', label: '🔀 Proxy' },
+      tor: { bg: 'rgba(168,85,247,0.15)', color: '#A855F7', label: '🧅 Tor' },
+      suspicious: { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: '⚠️ Suspicious' },
+      unknown: { bg: 'rgba(100,116,139,0.15)', color: '#94A3B8', label: '❓ Unknown' },
     };
 
-    // Phase 1: show dedicated error UI instead of destroying the page
     function showError(msg) {
       document.getElementById('visitLoading').style.display = 'none';
       document.getElementById('visitContent').style.display = 'none';
@@ -267,24 +390,36 @@
       document.getElementById('visitErrorMsg').textContent = msg || 'حدث خطأ غير متوقع.';
     }
 
+    // =========================================================
+    // Tabs
+    // =========================================================
+    function setupTabs() {
+      document.querySelectorAll('.vt-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.vt-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.vt-panel').forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          const target = document.querySelector(`[data-panel="${tab.dataset.tab}"]`);
+          if (target) target.classList.add('active');
+        });
+      });
+    }
+
+    // =========================================================
+    // Overview renderers (from Phase 1)
+    // =========================================================
     function renderPopadsMacros(known, raw) {
       const container = document.getElementById('popadsKnown');
       const keys = Object.keys(known || {});
-
       if (keys.length === 0) {
-        container.innerHTML = '<div class="col-span-3 text-slate-500 text-sm text-center py-6 bg-white/5 rounded-lg">مفيش ماكروز PopAds في الزيارة دي.</div>';
+        container.innerHTML = '<div class="col-span-3 text-slate-500 text-sm text-center py-6 bg-white/5 rounded-lg">مفيش ماكروز PopAds</div>';
       } else {
         container.innerHTML = keys.map(function(k) {
           const val = known[k];
           const label = MACRO_LABELS[k] || k;
-          let display = val;
-          let color = 'text-slate-200';
-          let extra = '';
-
-          if (k === 'bid') {
-            display = '$' + Number(val).toFixed(6);
-            color = 'text-rose-400';
-          } else if (k === 'quality') {
+          let display = val; let color = 'text-slate-200'; let extra = '';
+          if (k === 'bid') { display = '$' + Number(val).toFixed(6); color = 'text-rose-400'; }
+          else if (k === 'quality') {
             const q = Number(val);
             color = q >= 8 ? 'text-emerald-400' : q >= 5 ? 'text-amber-400' : 'text-rose-400';
             display = q + ' / 10';
@@ -292,28 +427,22 @@
           } else if (k === 'adblock') {
             const blocked = (val === '1' || val === true);
             color = blocked ? 'text-rose-400' : 'text-emerald-400';
-            display = blocked ? 'نعم (مفقود)' : 'لا';
-          } else if (k === 'country') {
-            color = 'text-indigo-300';
-          }
-
+            display = blocked ? 'نعم' : 'لا';
+          } else if (k === 'country') color = 'text-indigo-300';
           return '<div class="bg-white/5 rounded-lg p-3 border border-white/5">' +
             '<div class="text-[10px] text-slate-500 mb-1 font-bold">' + esc(label) + '</div>' +
             '<div class="font-mono text-xs font-bold ' + color + ' break-all">' + esc(String(display)) + '</div>' +
-            (extra ? '<div class="text-[10px] mt-1 ' + color + '">' + esc(extra) + '</div>' : '') +
-          '</div>';
+            (extra ? '<div class="text-[10px] mt-1 ' + color + '">' + esc(extra) + '</div>' : '') + '</div>';
         }).join('');
       }
-
       document.getElementById('popadsRawPre').textContent = JSON.stringify(raw || {}, null, 2);
-
       const rawEl = document.getElementById('popadsRaw');
       const btn = document.getElementById('toggleRawBtn');
       let isOpen = false;
       btn.onclick = function() {
         isOpen = !isOpen;
         rawEl.classList.toggle('hidden', !isOpen);
-        btn.textContent = isOpen ? '🔒 إخفاء Raw JSON' : '🔍 إظهار Raw JSON';
+        btn.textContent = isOpen ? '🔒 إخفاء Raw JSON' : '🔍 Raw JSON';
       };
     }
 
@@ -321,17 +450,14 @@
       if (!intel) return;
       const cls = intel.classification || 'unknown';
       const style = CLASS_STYLES[cls] || CLASS_STYLES.unknown;
-
       const clsEl = document.getElementById('vClassification');
       clsEl.textContent = style.label;
       clsEl.style.background = style.bg;
       clsEl.style.color = style.color;
-
       document.getElementById('vIpIntelIp').textContent = intel.ip || '—';
       document.getElementById('vIpIntelCountry').textContent = intel.country || '—';
       document.getElementById('vIpIntelIsp').textContent = intel.isp || '—';
       document.getElementById('vIpIntelAsn').textContent = intel.asn || '—';
-
       const risk = Number(intel.risk_score || 0);
       document.getElementById('vIpRiskScore').textContent = risk;
       const riskColor = risk >= 80 ? '#F43F5E' : risk >= 60 ? '#F97316' : risk >= 40 ? '#F59E0B' : '#10B981';
@@ -339,11 +465,10 @@
       bar.style.width = risk + '%';
       bar.style.background = riskColor;
       document.getElementById('vIpRiskScore').style.color = riskColor;
-
       const reasonsEl = document.getElementById('vIpReasons');
       const reasons = intel.reasons || [];
       if (reasons.length === 0) {
-        reasonsEl.innerHTML = '<div class="text-[11px] text-slate-500 text-center py-2">لا توجد أسباب مشبوهة — IP نضيف ✅</div>';
+        reasonsEl.innerHTML = '<div class="text-[11px] text-slate-500 text-center py-2">لا توجد أسباب مشبوهة ✅</div>';
       } else {
         reasonsEl.innerHTML = '<div class="text-[10px] text-slate-500 font-bold mb-2">الأسباب:</div>' +
           reasons.map(r => {
@@ -359,15 +484,11 @@
 
     function renderMismatches(mismatches) {
       const banner = document.getElementById('mismatchBanner');
-      if (!mismatches || mismatches.length === 0) {
-        banner.classList.add('hidden');
-        return;
-      }
+      if (!mismatches || mismatches.length === 0) { banner.classList.add('hidden'); return; }
       const hasHigh = mismatches.some(m => m.severity === 'high');
       const bg = hasHigh ? 'rgba(244,63,94,0.08)' : 'rgba(245,158,11,0.08)';
       const border = hasHigh ? 'rgba(244,63,94,0.35)' : 'rgba(245,158,11,0.35)';
       const color = hasHigh ? '#FDA4AF' : '#FCD34D';
-
       banner.style.background = bg;
       banner.style.border = '1px solid ' + border;
       banner.style.borderRadius = '12px';
@@ -377,22 +498,15 @@
         <div style="display:flex;align-items:flex-start;gap:12px;">
           <span style="font-size:22px;">${hasHigh ? '🚨' : '⚠️'}</span>
           <div style="flex:1;">
-            <div style="font-weight:800;font-size:13px;color:#F8FAFC;margin-bottom:6px;">
-              ${hasHigh ? 'تناقضات في البيانات' : 'ملاحظات على البيانات'}
-            </div>
+            <div style="font-weight:800;font-size:13px;color:#F8FAFC;margin-bottom:6px;">${hasHigh ? 'تناقضات في البيانات' : 'ملاحظات'}</div>
             ${mismatches.map(m => `
               <div style="font-size:11px;margin-top:4px;line-height:1.6;">
                 <b style="color:#F8FAFC;">${esc(m.field.toUpperCase())}:</b>
                 إحنا: <span style="font-family:monospace;">${esc(m.ours)}</span> ·
                 PopAds: <span style="font-family:monospace;">${esc(m.popads)}</span>
-              </div>
-            `).join('')}
-            <div style="font-size:10px;margin-top:8px;opacity:0.8;">
-              ⚠️ الفرق ده ممكن يكون طبيعي (تحديث GeoIP مختلف)، أو دليل على إن الترافيك ده مش من المكان اللي PopAds بتقول عليه.
-            </div>
+              </div>`).join('')}
           </div>
-        </div>
-      `;
+        </div>`;
       banner.classList.remove('hidden');
     }
 
@@ -415,33 +529,19 @@
     async function setGroundTruth(label) {
       try {
         const r = await fetch('/api/visits/' + visitId + '/ground-truth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: label })
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label })
         });
-        if (r.ok) {
-          const d = await r.json();
-          renderGroundTruth(d.ground_truth, d.labeled_at, 'أنت');
-        }
+        if (r.ok) { const d = await r.json(); renderGroundTruth(d.ground_truth, d.labeled_at, 'أنت'); }
       } catch (e) { alert('خطأ في الاتصال'); }
     }
 
     async function clearGroundTruth() {
       if (!confirm('مسح التصنيف؟')) return;
-      try {
-        const r = await fetch('/api/visits/' + visitId + '/ground-truth', { method: 'DELETE' });
-        if (r.ok) renderGroundTruth(null, null, null);
-      } catch (e) {}
+      try { const r = await fetch('/api/visits/' + visitId + '/ground-truth', { method: 'DELETE' }); if (r.ok) renderGroundTruth(null, null, null); } catch (e) {}
     }
 
     function renderCategories(container, categories) {
-      const styles = {
-        critical: 'bg-rose-500/15 text-rose-300',
-        high: 'bg-orange-500/15 text-orange-300',
-        medium: 'bg-amber-500/15 text-amber-300',
-        low: 'bg-yellow-500/15 text-yellow-300',
-        human: 'bg-emerald-500/15 text-emerald-300'
-      };
+      const styles = { critical: 'bg-rose-500/15 text-rose-300', high: 'bg-orange-500/15 text-orange-300', medium: 'bg-amber-500/15 text-amber-300', low: 'bg-yellow-500/15 text-yellow-300', human: 'bg-emerald-500/15 text-emerald-300' };
       const icons = { critical: '🚨', high: '⚠️', medium: '⚡', low: '💡', human: '✅' };
       container.innerHTML = '';
       if (!categories) return;
@@ -455,33 +555,241 @@
       });
     }
 
+    // =========================================================
+    // Decision panel
+    // =========================================================
+    function renderDecision(d) {
+      const dec = d.decision || {};
+      const fus = d.fusion || {};
+      const dq = d.data_quality_report || {};
+
+      // Verdict
+      document.getElementById('decVerdict').textContent = (dec.verdict || d.verdict || '—').toUpperCase();
+      document.getElementById('decMode').textContent = (dec.mode || d.mode || '—').toUpperCase();
+      document.getElementById('decBotProb').textContent = dec.bot_probability != null ? (dec.bot_probability * 100).toFixed(1) + '%' : (d.bot_probability != null ? (d.bot_probability * 100).toFixed(1) + '%' : '—');
+      document.getElementById('decConf').textContent = dec.confidence != null ? (dec.confidence * 100).toFixed(1) + '%' : (d.confidence != null ? (d.confidence * 100).toFixed(1) + '%' : '—');
+      document.getElementById('decReason').textContent = dec.reason || d.reason || '—';
+      document.getElementById('decFilter').textContent = d.filter_reason || '—';
+
+      const reasonDetail = dec.reason_detail;
+      const rdEl = document.getElementById('decReasonDetail');
+      if (reasonDetail) { rdEl.textContent = reasonDetail; rdEl.style.display = 'block'; }
+
+      // Fusion
+      document.getElementById('fusBotEv').textContent = fus.bot_evidence != null ? (fus.bot_evidence * 100).toFixed(1) + '%' : '—';
+      document.getElementById('fusHumanEv').textContent = fus.human_evidence != null ? (fus.human_evidence * 100).toFixed(1) + '%' : '—';
+      document.getElementById('fusPrior').textContent = fus.prior_risk != null ? (fus.prior_risk * 100).toFixed(1) + '%' : '—';
+      document.getElementById('fusImpossible').textContent = fus.has_impossible ? '🚨 نعم' : 'لا';
+      document.getElementById('fusImpossible').style.color = fus.has_impossible ? '#F43F5E' : '#CBD5E1';
+
+      // Data quality
+      document.getElementById('dqLevel').textContent = (dq.level || d.data_quality || '—').toUpperCase();
+      document.getElementById('dqCompleteness').textContent = dq.completeness != null ? (dq.completeness * 100).toFixed(0) + '%' : '—';
+      document.getElementById('dqReliability').textContent = dq.reliability != null ? (dq.reliability * 100).toFixed(0) + '%' : '—';
+      document.getElementById('dqCap').textContent = dq.max_confidence_cap != null ? (dq.max_confidence_cap * 100).toFixed(0) + '%' : '—';
+
+      const missing = dq.missing || [];
+      const weak = dq.weak || [];
+      const fieldsHtml = [];
+      missing.forEach(f => { fieldsHtml.push(`<div class="dq-field"><span class="dq-field-name">${esc(f)}</span><span class="dq-field-tag missing">MISSING</span></div>`); });
+      weak.forEach(f => { fieldsHtml.push(`<div class="dq-field"><span class="dq-field-name">${esc(f)}</span><span class="dq-field-tag weak">WEAK</span></div>`); });
+      if (fieldsHtml.length === 0) {
+        document.getElementById('dqFields').innerHTML = '<div style="text-align:center;color:#10B981;font-size:12px;padding:12px;">✅ كل الحقول موجودة وقوية</div>';
+      } else {
+        document.getElementById('dqFields').innerHTML = fieldsHtml.join('');
+      }
+
+      // Signals
+      renderSignals(d.signals || []);
+
+      // Full payload JSON
+      document.getElementById('fullPayloadJson').textContent = JSON.stringify(d.full_payload || {}, null, 2);
+    }
+
+    function renderSignals(signals) {
+      const listEl = document.getElementById('sigList');
+      const emptyEl = document.getElementById('sigEmpty');
+      const countEl = document.getElementById('sigCount');
+      countEl.textContent = signals.length;
+
+      if (!signals.length) {
+        listEl.innerHTML = '';
+        emptyEl.style.display = 'block';
+        return;
+      }
+      emptyEl.style.display = 'none';
+
+      let filtered = signals.slice();
+      if (sigFilter === 'bot') filtered = filtered.filter(s => s.direction === 'bot');
+      else if (sigFilter === 'human') filtered = filtered.filter(s => s.direction === 'human');
+
+      if (!filtered.length) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748B;font-size:12px;">مفيش signals بالنوع المختار</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(s => {
+        const strength = Number(s.strength || s.base_strength || 0);
+        const pct = Math.round(strength * 100);
+        const dir = s.direction || 'bot';
+        const color = dir === 'human' ? '#10B981' : (pct > 70 ? '#F43F5E' : pct > 40 ? '#F59E0B' : '#94A3B8');
+        return `
+          <div class="sig-item">
+            <div class="sig-code" title="${esc(s.code || '')}">${esc(s.code || 'UNKNOWN')}</div>
+            <div class="sig-dir ${dir}">${dir === 'bot' ? 'BOT' : 'HUMAN'}</div>
+            <div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+            <div class="sig-strength" style="color:${color};">${pct}%</div>
+            ${s.detail ? `<div class="sig-detail">${esc(s.detail)} · <b>${esc(s.severity || '')}</b></div>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    function setupSigFilters() {
+      document.getElementById('sigFilterAll').addEventListener('click', () => { sigFilter = 'all'; updateSigFilterButtons(); renderSignals((fullData.signals || [])); });
+      document.getElementById('sigFilterBot').addEventListener('click', () => { sigFilter = 'bot'; updateSigFilterButtons(); renderSignals((fullData.signals || [])); });
+      document.getElementById('sigFilterHuman').addEventListener('click', () => { sigFilter = 'human'; updateSigFilterButtons(); renderSignals((fullData.signals || [])); });
+    }
+
+    function updateSigFilterButtons() {
+      const btnAll = document.getElementById('sigFilterAll');
+      const btnBot = document.getElementById('sigFilterBot');
+      const btnHuman = document.getElementById('sigFilterHuman');
+      [btnAll, btnBot, btnHuman].forEach(b => {
+        b.className = 'text-[10px] px-3 py-1 rounded bg-white/5 text-slate-400 border border-white/10 font-bold';
+      });
+      const active = sigFilter === 'all' ? btnAll : sigFilter === 'bot' ? btnBot : btnHuman;
+      active.className = 'text-[10px] px-3 py-1 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-bold';
+    }
+
+    // =========================================================
+    // Behavior panel
+    // =========================================================
+    function kv(label, value) {
+      if (value === undefined || value === null || value === '') return '';
+      return `<div class="kv-item"><div class="kv-label">${esc(label)}</div><div class="kv-value">${esc(String(value))}</div></div>`;
+    }
+
+    function renderBehavior(d) {
+      const b = d.behavioral || {};
+      const f30 = d.first_30s || {};
+      const ms = d.milestones || {};
+      const ad = d.ad_events || [];
+      const strikes = d.fingerprint_strikes;
+
+      // Mouse
+      document.getElementById('behMouse').innerHTML = [
+        kv('Mouse Points', b.mouse_points ? b.mouse_points.length : 0),
+        kv('Velocity Variance', b.mouse_velocity_variance),
+        kv('Direction Changes', b.mouse_direction_changes),
+        kv('Total Distance (px)', b.mouse_distance_total),
+        kv('Pauses', b.mouse_pauses),
+        kv('First Move (ms)', b.first_move_delay_ms),
+      ].filter(Boolean).join('') || '<div style="color:#64748B;font-size:12px;grid-column:1/-1;">مفيش بيانات ماوس</div>';
+
+      // Keys + scroll
+      document.getElementById('behKeys').innerHTML = [
+        kv('Keydown Count', b.keydown_count),
+        kv('Backspace Count', b.backspace_count),
+        kv('Typing Bursts', b.typing_bursts),
+        kv('Key Intervals', b.key_intervals ? b.key_intervals.length : 0),
+        kv('Scroll Depth %', b.scroll_depth_pct),
+        kv('Scroll Direction Changes', b.scroll_direction_changes),
+        kv('Scroll Pauses', b.scroll_pauses),
+      ].filter(Boolean).join('') || '<div style="color:#64748B;font-size:12px;grid-column:1/-1;">مفيش بيانات</div>';
+
+      // Events
+      const ev = b.events || {};
+      document.getElementById('behEvents').innerHTML = [
+        kv('Clicks', b.clicks),
+        kv('Wheel Events', b.wheel_events),
+        kv('Mousemove', ev.mousemove),
+        kv('Touchstart', ev.touchstart),
+        kv('Scrolls', ev.scrolls),
+        kv('Keydown', ev.keydown),
+        kv('Total Time (ms)', b.total_time_ms),
+        kv('Visible Time (ms)', b.visible_time_ms),
+        kv('Idle Periods', b.idle_periods_count),
+        kv('Longest Idle (ms)', b.longest_idle_ms),
+      ].filter(Boolean).join('') || '<div style="color:#64748B;font-size:12px;grid-column:1/-1;">مفيش بيانات</div>';
+
+      // First 30s
+      document.getElementById('first30s').innerHTML = [
+        kv('Start (ms)', f30.start_ms),
+        kv('Clicks 30s', f30.clicks_30s),
+        kv('Scrolls 30s', f30.scrolls_30s),
+        kv('Mousemoves 30s', f30.mousemoves_30s),
+        kv('Keys 30s', f30.keys_30s),
+        kv('Has Interaction', f30.has_interaction_30s ? 'نعم' : 'لا'),
+      ].filter(Boolean).join('') || '<div style="color:#64748B;font-size:12px;grid-column:1/-1;">مفيش بيانات</div>';
+
+      // Milestones
+      document.getElementById('milestonesGrid').innerHTML = Object.keys(ms).length
+        ? Object.keys(ms).map(k => kv(k, ms[k] + 'ms')).join('')
+        : '<div style="color:#64748B;font-size:12px;grid-column:1/-1;">مفيش milestones</div>';
+
+      // Ad events
+      if (!ad || ad.length === 0) {
+        document.getElementById('adEventsList').innerHTML = '<div style="color:#64748B;text-align:center;padding:12px;">مفيش ad events مسجلة</div>';
+      } else {
+        document.getElementById('adEventsList').innerHTML = ad.map(e => `
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:4px;">
+            <span style="font-family:'JetBrains Mono',monospace;color:#A5F3FC;font-weight:800;">${esc(e.event || '—')}</span>
+            <span style="color:#64748B;font-family:'JetBrains Mono',monospace;font-size:11px;">${esc(e.t || e.t_ms || '—')}ms</span>
+          </div>`).join('');
+      }
+
+      // Fingerprint strikes
+      document.getElementById('fpStrikesBox').innerHTML = [
+        kv('Strikes', strikes != null ? strikes : '—'),
+        kv('Risk Level', strikes >= 10 ? '🚨 CRITICAL' : strikes >= 5 ? '⚠️ HIGH' : strikes >= 3 ? '⚡ MEDIUM' : strikes >= 1 ? '💡 LOW' : '✅ Clean'),
+        kv('Honeypot', d.is_honeypot_triggered ? '🚨 TRIGGERED' : '✅ لا'),
+        kv('Clock Drift', d.clock_drift_ms + 'ms'),
+        kv('Consent', d.consent_state),
+        kv('DQ Level', (d.data_quality || '—').toUpperCase()),
+      ].filter(Boolean).join('') || '<div style="color:#64748B;font-size:12px;grid-column:1/-1;">مفيش بيانات</div>';
+    }
+
+    // =========================================================
+    // Main loader
+    // =========================================================
     async function loadDetails() {
       try {
         const r = await fetch('/api/visits/' + visitId);
-
-        // Phase 1: proper error handling (no more destroying the page)
         if (!r.ok) {
           if (r.status === 404) showError('الزيارة غير موجودة أو غير مصرح لك بعرضها.');
           else if (r.status === 401) showError('انتهت صلاحية الجلسة. رجاءً سجّل الدخول من جديد.');
           else showError('فشل تحميل الزيارة (HTTP ' + r.status + ')');
           return;
         }
-
         const d = await r.json();
+        fullData = d;
 
         document.getElementById('visitLoading').style.display = 'none';
         document.getElementById('visitContent').style.display = '';
 
         document.getElementById('vId').textContent = '#' + d.id;
         document.getElementById('vTime').textContent = d.timestamp;
+
+        // Session link
+        if (d.session_id) {
+          const link = document.getElementById('vSessionLink');
+          link.href = '/sessions/' + encodeURIComponent(d.session_id);
+          link.style.display = '';
+        }
+
+        // DQ badge
+        const dqLevel = d.data_quality || 'unknown';
+        const dqBadge = document.getElementById('vDqBadge');
+        dqBadge.classList.remove('hidden');
+        dqBadge.textContent = 'DQ: ' + dqLevel.toUpperCase();
+        const dqColor = dqLevel === 'full' ? 'bg-emerald-500/15 text-emerald-300' : dqLevel === 'partial' ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-500/15 text-slate-300';
+        dqBadge.className = 'px-2 py-1 rounded-full text-[10px] font-bold ' + dqColor;
+
         document.getElementById('vScore').textContent = d.score;
         document.getElementById('vIp').textContent = d.ip;
         document.getElementById('vCountry').textContent = d.country;
-        document.getElementById('vCountryPopads').textContent = (d.popads_known && d.popads_known.country) || '—';
         document.getElementById('vIsp').textContent = d.isp;
-        document.getElementById('vIspPopads').textContent = (d.popads_known && (d.popads_known.ispname || d.popads_known.isp)) || '—';
         document.getElementById('vAsn').textContent = d.asn;
-        document.getElementById('vConnType').textContent = d.connection_type;
         document.getElementById('vTimezone').textContent = d.timezone;
         document.getElementById('vOs').textContent = d.os;
         document.getElementById('vBrowser').textContent = d.browser;
@@ -489,7 +797,6 @@
         document.getElementById('vHardware').textContent = d.hardware;
         document.getElementById('vCanvas').textContent = d.canvas_hash;
         document.getElementById('vZone').textContent = d.zone_id;
-
         document.getElementById('vTimeOnPage').textContent = d.time_on_page + 's';
         document.getElementById('vClicks').textContent = d.clicks;
         document.getElementById('vScrolls').textContent = d.scrolls;
@@ -507,11 +814,11 @@
         profitEl.textContent = (profit >= 0 ? '+' : '') + '$' + profit.toFixed(6);
         profitEl.style.color = profit >= 0 ? '#10B981' : '#F43F5E';
 
+        // Verdict badge + score ring
         const badge = document.getElementById('vBadge');
         const circle = document.getElementById('scoreCircle');
         const verdictText = document.getElementById('vVerdictText');
         let color = '';
-
         if (d.verdict === 'valid') {
           color = '#10B981';
           badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
@@ -521,7 +828,7 @@
           color = '#F43F5E';
           badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-rose-500/30 bg-rose-500/10 text-rose-400';
           verdictText.className = 'text-lg font-bold text-rose-400';
-          verdictText.textContent = 'بوت / زيارة وهمية';
+          verdictText.textContent = 'بوت / وهمية';
         } else if (d.verdict === 'pending') {
           color = '#6366F1';
           badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/30 bg-indigo-500/10 text-indigo-400';
@@ -531,25 +838,18 @@
           color = '#F59E0B';
           badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-amber-500/30 bg-amber-500/10 text-amber-400';
           verdictText.className = 'text-lg font-bold text-amber-400';
-          verdictText.textContent = 'زيارة مشبوهة';
+          verdictText.textContent = 'مشبوهة';
         }
         badge.textContent = (d.verdict || 'UNKNOWN').toUpperCase();
         circle.style.stroke = color;
 
         renderCategories(document.getElementById('vCategories'), d.categories);
-
-        const vpnEl = document.getElementById('vVpn');
-        if (d.is_vpn) {
-          vpnEl.className = 'text-rose-400 font-bold';
-          vpnEl.textContent = 'YES';
-        } else {
-          vpnEl.className = 'text-emerald-400';
-          vpnEl.textContent = 'NO';
-        }
-
         renderGroundTruth(d.ground_truth, d.ground_truth_at, d.ground_truth_by);
 
-        // Phase 1 FIX: score is 0-100 (not 0-150)
+        // Render Phase 2 panels
+        renderDecision(d);
+        renderBehavior(d);
+
         setTimeout(function () {
           const percentage = Math.min(Number(d.score || 0) / 100, 1);
           const offset = 408 - (percentage * 408);
@@ -560,6 +860,8 @@
       }
     }
 
+    setupTabs();
+    setupSigFilters();
     loadDetails();
   </script>
 </body>

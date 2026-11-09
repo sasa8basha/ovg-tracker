@@ -15,6 +15,7 @@
     .kpi-value { font-size: 1.6rem; font-weight: 800; font-family: 'Courier New', monospace; line-height: 1.1; margin-top: 4px; }
     .visit-row { transition: all 0.15s; cursor: default; }
     .visit-row:hover { background: rgba(255,255,255,0.03); }
+    .visit-row.selected { background: rgba(99,102,241,0.08); }
     .visit-row.labeled { opacity: 0.35; }
     .btn-human { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); }
     .btn-human:hover { background: rgba(16,185,129,0.25); }
@@ -31,6 +32,58 @@
     table { color: var(--text-primary); }
     thead { background: rgba(0,0,0,0.4) !important; color: var(--text-secondary); }
     kbd { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+
+    /* Bulk selection bar */
+    .bulk-bar {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: #1E293B;
+      border: 1px solid rgba(99,102,241,0.4);
+      border-radius: 14px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 0 0 4px rgba(99,102,241,0.1);
+      transition: transform 250ms cubic-bezier(0.16,1,0.3,1);
+    }
+    .bulk-bar.visible { transform: translateX(-50%) translateY(0); }
+    .bulk-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 800;
+      color: #A5B4FC;
+      padding: 4px 10px;
+      background: rgba(99,102,241,0.15);
+      border-radius: 6px;
+    }
+    .bulk-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      transition: all 120ms;
+    }
+    .bulk-btn:active { transform: scale(0.97); }
+    .bulk-btn.human { background: #10B981; color: white; }
+    .bulk-btn.human:hover { background: #059669; }
+    .bulk-btn.bot { background: #F43F5E; color: white; }
+    .bulk-btn.bot:hover { background: #DC2626; }
+    .bulk-btn.clear { background: transparent; color: #94A3B8; border: 1px solid #334155; }
+    .bulk-btn.clear:hover { color: #F1F5F9; border-color: #64748B; }
+    .bulk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    input[type="checkbox"].row-check {
+      width: 16px; height: 16px;
+      cursor: pointer;
+      accent-color: #6366f1;
+    }
   </style>
 </head>
 <body class="min-h-screen p-6">
@@ -39,7 +92,7 @@
     <div class="flex justify-between items-center mb-6">
       <div>
         <h1 class="text-3xl font-extrabold text-white">🏷️ المراجعة اليدوية</h1>
-        <p class="text-slate-400 text-sm mt-1">الزيارات الحدّية (40-80) اللي محتاجة نظر بشري — كل تصنيف بيحسّن دقة النظام</p>
+        <p class="text-slate-400 text-sm mt-1">الزيارات الحدّية (40-80) اللي محتاجة نظر بشري</p>
       </div>
       <button onclick="window.location.href='/dashboard'" class="btn-ghost border border-slate-600">← العودة</button>
     </div>
@@ -95,7 +148,7 @@
         </select>
         <span class="flex-1"></span>
         <span class="text-xs text-slate-500">
-          اختصارات: <kbd>H</kbd> يوزر · <kbd>B</kbd> بوت · <kbd>S</kbd> تخطي
+          اختصارات: <kbd>H</kbd> يوزر · <kbd>B</kbd> بوت · <kbd>S</kbd> تخطي · <kbd>A</kbd> تحديد الكل
         </span>
       </div>
 
@@ -103,6 +156,9 @@
         <table class="w-full text-sm text-right">
           <thead class="text-xs">
             <tr>
+              <th class="px-3 py-3" style="width:40px;">
+                <input type="checkbox" id="selectAllCheck" class="row-check">
+              </th>
               <th class="px-3 py-3">#</th>
               <th class="px-3 py-3 text-center">Score</th>
               <th class="px-3 py-3">الحكم</th>
@@ -116,15 +172,15 @@
           <tbody id="queueBody" class="divide-y divide-white/5"></tbody>
         </table>
         <div id="queueEmpty" class="hidden p-10 text-center text-slate-500 text-sm">
-          🎉 مفيش زيارات محتاجة مراجعة حالياً. النظام نظيف.
+          🎉 مفيش زيارات محتاجة مراجعة حالياً.
         </div>
       </div>
     </div>
 
     <div id="tab-rules" class="hidden">
       <div class="glass p-4 mb-4 text-xs text-slate-400">
-        <p>💡 Precision = TP / (TP + FP) — من الزيارات اللي فعّلت الـ rule، كام % كانت فعلاً بوت (بناءً على تصنيفاتك).</p>
-        <p class="mt-1">الـ rules مرتبة من الأسوأ precision للأفضل — عشان تعدّل الأوزان اللي بتغلط كتير.</p>
+        <p>💡 Precision = TP / (TP + FP) — من الزيارات اللي فعّلت الـ rule، كام % كانت بوت.</p>
+        <p class="mt-1">الـ rules مرتبة من الأسوأ precision للأفضل.</p>
         <p id="rulesSampleInfo" class="mt-2 text-[11px] text-amber-400"></p>
       </div>
       <div class="glass overflow-hidden">
@@ -147,15 +203,24 @@
 
   </div>
 
+  <!-- Bulk Action Bar -->
+  <div class="bulk-bar" id="bulkBar">
+    <span class="bulk-count" id="bulkCount">0 محدد</span>
+    <button class="bulk-btn human" id="bulkHumanBtn" type="button">✓ إنسان</button>
+    <button class="bulk-btn bot" id="bulkBotBtn" type="button">✗ بوت</button>
+    <button class="bulk-btn clear" id="bulkClearBtn" type="button">إلغاء التحديد</button>
+  </div>
+
   <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 hidden bg-slate-800 text-white border border-slate-600 px-6 py-3 rounded-xl font-semibold text-sm shadow-2xl z-[100]"></div>
 
   <script>
     const siteKey = new URL(location.href).searchParams.get('site');
     let queueItems = [];
     let currentFocusIdx = 0;
+    let selectedIds = new Set();
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-    function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.remove('hidden'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 2000); }
+    function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.remove('hidden'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 2200); }
     function pct(n) { return n === null || n === undefined ? '—' : n.toFixed(1) + '%'; }
 
     function switchTab(tab) {
@@ -200,6 +265,8 @@
         const d = await r.json();
         queueItems = d.items;
         currentFocusIdx = 0;
+        selectedIds.clear();
+        updateBulkBar();
         renderQueue();
       } catch (e) { console.error(e); }
     }
@@ -220,16 +287,18 @@
       empty.classList.add('hidden');
       tb.innerHTML = queueItems.map((v, idx) => {
         const scoreColor = v.score >= 70 ? 'text-rose-400' : v.score >= 55 ? 'text-amber-400' : 'text-yellow-400';
-        const verdictBadge = v.verdict === 'suspicious'
-          ? 'bg-amber-500/10 text-amber-400'
-          : v.verdict === 'valid'
-            ? 'bg-emerald-500/10 text-emerald-400'
+        const verdictBadge = v.verdict === 'suspicious' ? 'bg-amber-500/10 text-amber-400'
+          : v.verdict === 'valid' ? 'bg-emerald-500/10 text-emerald-400'
             : 'bg-rose-500/10 text-rose-400';
         const chips = (v.top_evidence || []).slice(0, 4).map(e =>
           `<span class="ev-chip ${evChipClass(e.severity)}" title="${esc(e.detail)}">${esc(e.code)} ${e.score > 0 ? '+' : ''}${e.score}</span>`
         ).join('');
+        const isSelected = selectedIds.has(v.id);
         return `
-          <tr class="visit-row" id="row-${v.id}" data-visit-id="${v.id}">
+          <tr class="visit-row ${isSelected ? 'selected' : ''}" id="row-${v.id}" data-visit-id="${v.id}">
+            <td class="px-3 py-3" style="width:40px;">
+              <input type="checkbox" class="row-check" data-id="${v.id}" ${isSelected ? 'checked' : ''}>
+            </td>
             <td class="px-3 py-3">
               <a href="/visits/${v.id}" target="_blank" class="font-mono text-indigo-300 text-xs hover:underline">#${v.id}</a>
               <div class="text-[10px] text-slate-500 mt-0.5">${esc(v.time)}</div>
@@ -241,30 +310,95 @@
             <td class="px-3 py-3 text-xs font-mono text-slate-400">${esc(v.asn || '—')}</td>
             <td class="px-3 py-3">${chips || '<span class="text-slate-500 text-xs">—</span>'}</td>
             <td class="px-3 py-3 text-center">
-              <button onclick="labelVisit(${v.id}, 'human')" class="btn-human px-2 py-1 rounded text-xs font-bold mr-1">✓ إنسان</button>
-              <button onclick="labelVisit(${v.id}, 'bot')" class="btn-bot px-2 py-1 rounded text-xs font-bold">✗ بوت</button>
+              <button onclick="labelVisit(${v.id}, 'human')" class="btn-human px-2 py-1 rounded text-xs font-bold mr-1">✓</button>
+              <button onclick="labelVisit(${v.id}, 'bot')" class="btn-bot px-2 py-1 rounded text-xs font-bold">✗</button>
             </td>
           </tr>`;
       }).join('');
+
+      // Bind checkboxes
+      tb.querySelectorAll('.row-check').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const id = Number(e.target.dataset.id);
+          if (e.target.checked) selectedIds.add(id);
+          else selectedIds.delete(id);
+          const row = document.getElementById(`row-${id}`);
+          if (row) row.classList.toggle('selected', e.target.checked);
+          updateBulkBar();
+          updateSelectAllCheck();
+        });
+      });
+    }
+
+    function updateBulkBar() {
+      const bar = document.getElementById('bulkBar');
+      const count = document.getElementById('bulkCount');
+      count.textContent = `${selectedIds.size} محدد`;
+      if (selectedIds.size > 0) bar.classList.add('visible');
+      else bar.classList.remove('visible');
+    }
+
+    function updateSelectAllCheck() {
+      const selectAll = document.getElementById('selectAllCheck');
+      if (!selectAll) return;
+      const total = queueItems.length;
+      const selected = selectedIds.size;
+      selectAll.checked = total > 0 && selected === total;
+      selectAll.indeterminate = selected > 0 && selected < total;
     }
 
     async function labelVisit(visitId, label) {
       try {
         const r = await fetch(`/api/visits/${visitId}/ground-truth`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ label }),
         });
         if (!r.ok) { toast('فشل التصنيف'); return; }
         const row = document.getElementById(`row-${visitId}`);
         if (row) row.classList.add('labeled');
-        toast(label === 'human' ? '✓ تم التصنيف: إنسان' : '✗ تم التصنيف: بوت');
+        toast(label === 'human' ? '✓ إنسان' : '✗ بوت');
         setTimeout(() => {
           queueItems = queueItems.filter(x => x.id !== visitId);
+          selectedIds.delete(visitId);
           renderQueue();
           loadStats();
+          updateBulkBar();
+          updateSelectAllCheck();
         }, 400);
       } catch (e) { toast('خطأ في الاتصال'); }
+    }
+
+    async function bulkLabel(label) {
+      if (selectedIds.size === 0) return;
+      const ids = Array.from(selectedIds);
+      const btnHuman = document.getElementById('bulkHumanBtn');
+      const btnBot = document.getElementById('bulkBotBtn');
+      btnHuman.disabled = true; btnBot.disabled = true;
+
+      try {
+        const r = await fetch('/api/labeling/visits/bulk-label', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visit_ids: ids, label }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          toast('فشل: ' + (d.detail || 'خطأ'));
+          btnHuman.disabled = false; btnBot.disabled = false;
+          return;
+        }
+        toast(`✓ ${d.updated} زيارة اتصنفت`);
+        queueItems = queueItems.filter(x => !selectedIds.has(x.id));
+        selectedIds.clear();
+        renderQueue();
+        loadStats();
+        updateBulkBar();
+        updateSelectAllCheck();
+      } catch (e) {
+        toast('خطأ في الاتصال');
+      } finally {
+        btnHuman.disabled = false; btnBot.disabled = false;
+      }
     }
 
     async function loadRules() {
@@ -273,29 +407,21 @@
         if (!r.ok) return;
         const d = await r.json();
         const sampleInfo = document.getElementById('rulesSampleInfo');
-        if (d.truncated) {
-          sampleInfo.textContent = `⚠️ تم استخدام عينة من ${d.labeled_sample_size} زيارة مصنّفة فقط (حد أقصى 20,000)`;
-        } else {
-          sampleInfo.textContent = `📊 تحليل ${d.labeled_sample_size} زيارة مصنّفة`;
-        }
+        if (d.truncated) sampleInfo.textContent = `⚠️ عينة من ${d.labeled_sample_size} زيارة مصنّفة (حد أقصى 20,000)`;
+        else sampleInfo.textContent = `📊 تحليل ${d.labeled_sample_size} زيارة مصنّفة`;
 
         const tb = document.getElementById('rulesBody');
         if (!d.rules.length) {
-          tb.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-slate-500">مفيش بيانات — ابدأ بتصنيف زيارات أولاً</td></tr>';
+          tb.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-slate-500">مفيش بيانات</td></tr>';
           return;
         }
         tb.innerHTML = d.rules.map(r => {
-          const precisionColor = r.precision === null
-            ? 'text-slate-500'
+          const precisionColor = r.precision === null ? 'text-slate-500'
             : r.precision >= 90 ? 'text-emerald-400'
-              : r.precision >= 70 ? 'text-amber-400'
-                : 'text-rose-400';
-          const status = r.precision === null
-            ? '<span class="text-[10px] text-slate-500">لا توجد تصنيفات</span>'
-            : !r.reliable
-              ? '<span class="text-[10px] text-amber-400">عينة صغيرة</span>'
-              : r.precision < 70
-                ? '<span class="text-[10px] text-rose-400">⚠️ يحتاج تعديل</span>'
+              : r.precision >= 70 ? 'text-amber-400' : 'text-rose-400';
+          const status = r.precision === null ? '<span class="text-[10px] text-slate-500">لا تصنيفات</span>'
+            : !r.reliable ? '<span class="text-[10px] text-amber-400">عينة صغيرة</span>'
+              : r.precision < 70 ? '<span class="text-[10px] text-rose-400">⚠️ يحتاج تعديل</span>'
                 : '<span class="text-[10px] text-emerald-400">✓ جيد</span>';
           return `
             <tr>
@@ -311,9 +437,38 @@
       } catch (e) { console.error(e); }
     }
 
+    // Bulk bar buttons
+    document.getElementById('bulkHumanBtn').addEventListener('click', () => bulkLabel('human'));
+    document.getElementById('bulkBotBtn').addEventListener('click', () => bulkLabel('bot'));
+    document.getElementById('bulkClearBtn').addEventListener('click', () => {
+      selectedIds.clear();
+      renderQueue();
+      updateBulkBar();
+      updateSelectAllCheck();
+    });
+
+    // Select all
+    document.getElementById('selectAllCheck').addEventListener('change', (e) => {
+      if (e.target.checked) queueItems.forEach(v => selectedIds.add(v.id));
+      else selectedIds.clear();
+      renderQueue();
+      updateBulkBar();
+    });
+
     document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
       if (!queueItems.length) return;
+      if (e.key === 'a' || e.key === 'A') {
+        // Select all toggle
+        if (selectedIds.size === queueItems.length) selectedIds.clear();
+        else queueItems.forEach(v => selectedIds.add(v.id));
+        renderQueue();
+        updateBulkBar();
+        updateSelectAllCheck();
+        e.preventDefault();
+        return;
+      }
+      if (selectedIds.size > 0) return; // bulk mode active
       const v = queueItems[currentFocusIdx];
       if (!v) return;
       if (e.key === 'h' || e.key === 'H') { labelVisit(v.id, 'human'); e.preventDefault(); }
@@ -327,4 +482,4 @@
     loadQueue();
   </script>
 </body>
-  </html>
+</html>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · حالة النظام</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; font-size: 13px; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    .sh-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .sh-title { font-size: 22px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.02em; margin: 0; }
+    .sh-sub { font-size: 12px; color: #7B8496; margin-top: 4px; }
+    .sh-last-updated { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #4A5263; }
+
+    .sh-overall {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 20px;
+      background: #0F1117;
+      border: 1px solid #232734;
+      border-radius: 14px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .sh-overall::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--status-color, #10B981);
+      opacity: 0.7;
+    }
+    .sh-overall.ok::before { background: #10B981; }
+    .sh-overall.warn::before { background: #F59E0B; }
+    .sh-overall.critical::before { background: #F43F5E; }
+    .sh-overall.unknown::before { background: #94A3B8; }
+
+    .sh-overall-emoji { font-size: 40px; flex-shrink: 0; }
+    .sh-overall-body { flex: 1; }
+    .sh-overall-title { font-size: 16px; font-weight: 800; color: #F8FAFC; margin-bottom: 4px; }
+    .sh-overall-desc { font-size: 12px; color: #7B8496; }
+
+    .sh-workers {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 12px;
+    }
+
+    .sh-worker {
+      background: #0F1117;
+      border: 1px solid #232734;
+      border-radius: 14px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 120ms;
+    }
+    .sh-worker:hover { border-color: #2E3446; }
+    .sh-worker::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      opacity: 0.6;
+    }
+    .sh-worker.ok::before { background: #10B981; }
+    .sh-worker.warn::before { background: #F59E0B; }
+    .sh-worker.critical::before { background: #F43F5E; }
+    .sh-worker.unknown::before { background: #94A3B8; }
+
+    .sh-worker-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .sh-worker-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #F8FAFC;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .sh-worker-emoji { font-size: 16px; flex-shrink: 0; }
+    .sh-worker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sh-worker-interval {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      color: #4A5263;
+      padding: 2px 6px;
+      background: #161822;
+      border-radius: 4px;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+
+    .sh-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.03em;
+    }
+    .sh-status-badge.ok { background: rgba(16,185,129,0.15); color: #10B981; }
+    .sh-status-badge.warn { background: rgba(245,158,11,0.15); color: #F59E0B; }
+    .sh-status-badge.critical { background: rgba(244,63,94,0.15); color: #F43F5E; }
+    .sh-status-badge.unknown { background: rgba(148,163,184,0.15); color: #94A3B8; }
+
+    .sh-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .sh-metric {
+      padding: 8px 10px;
+      background: #08090D;
+      border-radius: 6px;
+    }
+    .sh-metric-label {
+      font-size: 9px;
+      font-weight: 700;
+      color: #4A5263;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 3px;
+    }
+    .sh-metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 800;
+      color: #F8FAFC;
+    }
+
+    .sh-feeds {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #1A1D29;
+    }
+    .sh-feed-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 11px;
+    }
+    .sh-feed-name {
+      font-family: 'JetBrains Mono', monospace;
+      color: #CBD5E1;
+      font-weight: 700;
+    }
+    .sh-feed-count {
+      font-family: 'JetBrains Mono', monospace;
+      color: #7B8496;
+      font-size: 10px;
+    }
+    .sh-feed-status {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+    }
+    .sh-feed-status.ok { background: rgba(16,185,129,0.15); color: #10B981; }
+    .sh-feed-status.stale { background: rgba(245,158,11,0.15); color: #F59E0B; }
+
+    .sh-actions {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #1A1D29;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .sh-btn-sm {
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #161822;
+      border: 1px solid #232734;
+      color: #CBD5E1;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    .sh-btn-sm:hover { background: #1C1F2E; color: #F8FAFC; border-color: #2E3446; }
+
+    .sh-error {
+      padding: 60px 20px;
+      text-align: center;
+      color: #7B8496;
+    }
+    .sh-error-icon { font-size: 48px; opacity: 0.4; display: block; margin-bottom: 12px; }
+    .sh-error-title { font-size: 16px; font-weight: 800; color: #F8FAFC; margin-bottom: 6px; }
+
+    .sh-skel { background: linear-gradient(90deg, #161822 0%, #232734 50%, #161822 100%); background-size: 1000px 100%; animation: sh-shimmer 1.6s infinite linear; border-radius: 12px; height: 180px; }
+    @keyframes sh-shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+
+    .sh-auto-refresh {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(124,92,255,0.1);
+      border: 1px solid rgba(124,92,255,0.3);
+      color: #9B80FF;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .sh-auto-refresh .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #9B80FF;
+      animation: sh-pulse 2s ease-in-out infinite;
+    }
+    @keyframes sh-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+      <div class="sh-header">
+        <div>
+          <h1 class="sh-title">🩺 حالة النظام</h1>
+          <p class="sh-sub">مراقبة كل الـ background workers والـ infrastructure</p>
+          <div class="sh-last-updated" id="shLastUpdated">—</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="sh-auto-refresh"><span class="dot"></span> تلقائي كل 30s</span>
+          <button class="sh-btn sh-btn-ghost" id="refreshBtn" type="button">🔄 تحديث</button>
+        </div>
+      </div>
+
+      <div class="sh-overall" id="shOverall">
+        <div class="sh-overall-emoji" id="shOverallEmoji">✅</div>
+        <div class="sh-overall-body">
+          <div class="sh-overall-title" id="shOverallTitle">جاري الفحص…</div>
+          <div class="sh-overall-desc" id="shOverallDesc">—</div>
+        </div>
+      </div>
+
+      <div id="shWorkersSkeleton" class="sh-workers">
+        <div class="sh-skel"></div>
+        <div class="sh-skel"></div>
+        <div class="sh-skel"></div>
+        <div class="sh-skel"></div>
+      </div>
+
+      <div id="shWorkers" class="sh-workers" style="display:none;"></div>
+
+      <div id="shError" class="sh-error" style="display:none;">
+        <span class="sh-error-icon">⚠️</span>
+        <div class="sh-error-title">فشل تحميل حالة النظام</div>
+        <div style="font-size:12px;" id="shErrorMsg">—</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const SH = {
+      data: null,
+      autoRefreshTimer: null,
+    };
+
+    const STATUS_LABELS = {
+      ok: { text: 'سليم', cls: 'ok' },
+      warn: { text: 'تحذير', cls: 'warn' },
+      critical: { text: 'حرج', cls: 'critical' },
+      unknown: { text: 'غير معروف', cls: 'unknown' },
+    };
+
+    function statusBadge(status) {
+      const m = STATUS_LABELS[status] || STATUS_LABELS.unknown;
+      return `<span class="sh-status-badge ${m.cls}">${m.text}</span>`;
+    }
+
+    function renderWorkerCard(key, w) {
+      const feeds = w.feeds || [];
+      const feedsHtml = feeds.length > 0 ? `
+        <div class="sh-feeds">
+          ${feeds.map(f => `
+            <div class="sh-feed-row">
+              <span class="sh-feed-name">${Shell.esc(f.name)}</span>
+              <span class="sh-feed-count">${Shell.fmtNum(f.record_count)}</span>
+              <span class="sh-feed-status ${f.status}">${f.status === 'ok' ? '✓' : '⚠️'} ${f.age_hours != null ? f.age_hours + 'h' : '—'}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : '';
+
+      const metricsHtml = (w.metrics || []).map(m => `
+        <div class="sh-metric">
+          <div class="sh-metric-label">${Shell.esc(m.label)}</div>
+          <div class="sh-metric-value">${Shell.esc(String(m.value))}</div>
+        </div>
+      `).join('');
+
+      return `
+        <div class="sh-worker ${w.status}">
+          <div class="sh-worker-head">
+            <div class="sh-worker-title">
+              <span class="sh-worker-emoji">${w.emoji || '⚙️'}</span>
+              <span class="sh-worker-name">${Shell.esc(w.name_ar || w.name)}</span>
+            </div>
+            <span class="sh-worker-interval">${Shell.esc(w.interval || '')}</span>
+          </div>
+          <div style="margin-bottom:10px;">${statusBadge(w.status)}</div>
+          <div class="sh-metrics">${metricsHtml}</div>
+          ${feedsHtml}
+        </div>`;
+    }
+
+    function render(data) {
+      SH.data = data;
+
+      // Overall banner
+      const overall = data.overall_status || 'unknown';
+      const banner = document.getElementById('shOverall');
+      banner.className = `sh-overall ${overall}`;
+
+      const emojiMap = { ok: '✅', warn: '⚠️', critical: '🚨', unknown: '❓' };
+      const titleMap = {
+        ok: 'كل حاجة شغالة تمام',
+        warn: 'في حاجة محتاجة انتباه',
+        critical: 'في مشكلة حرجة — تدخل فوري',
+        unknown: 'حالة غير معروفة',
+      };
+      document.getElementById('shOverallEmoji').textContent = emojiMap[overall] || '❓';
+      document.getElementById('shOverallTitle').textContent = titleMap[overall] || '—';
+
+      // Count workers per status
+      const workers = data.workers || {};
+      const statuses = Object.values(workers).map(w => w.status);
+      const okCount = statuses.filter(s => s === 'ok').length;
+      const warnCount = statuses.filter(s => s === 'warn').length;
+      const criticalCount = statuses.filter(s => s === 'critical').length;
+      document.getElementById('shOverallDesc').textContent =
+        `${okCount} سليم · ${warnCount} تحذير · ${criticalCount} حرج (من ${statuses.length} workers)`;
+
+      // Last updated
+      const now = new Date();
+      document.getElementById('shLastUpdated').textContent =
+        'آخر تحديث: ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      // Workers grid
+      const workersEl = document.getElementById('shWorkers');
+      workersEl.innerHTML = Object.entries(workers).map(([k, w]) => renderWorkerCard(k, w)).join('');
+
+      document.getElementById('shWorkersSkeleton').style.display = 'none';
+      workersEl.style.display = 'grid';
+      document.getElementById('shError').style.display = 'none';
+    }
+
+    async function loadHealth() {
+      try {
+        const data = await Shell.api('/api/system/health');
+        render(data);
+      } catch (e) {
+        document.getElementById('shWorkersSkeleton').style.display = 'none';
+        document.getElementById('shWorkers').style.display = 'none';
+        document.getElementById('shError').style.display = '';
+        document.getElementById('shErrorMsg').textContent = e.message;
+      }
+    }
+
+    (async function boot() {
+      try {
+        await Shell.mount({ active: 'system-health', lang: 'ar', breadcrumb: [{ label: 'حالة النظام' }] });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+
+        document.getElementById('refreshBtn').addEventListener('click', loadHealth);
+
+        await loadHealth();
+        // Auto-refresh every 30s
+        SH.autoRefreshTimer = setInterval(loadHealth, 30000);
+      } catch (e) {
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
