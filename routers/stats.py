@@ -1,5 +1,6 @@
 """
 routers/stats.py — Stats, visits, visit detail (with IP intelligence), CSV export.
+Phase 2: enriched visit detail with full_payload / decision / fusion / signals.
 """
 import io
 import csv
@@ -129,6 +130,9 @@ def get_visits(
     return {"items": items, "total": total, "page": page, "pages": pages}
 
 
+# =========================================================
+# VISIT DETAIL — Phase 2: full payload + decision + fusion + signals
+# =========================================================
 @router.get("/visits/{visit_id}")
 async def get_visit_detail(
     visit_id: int,
@@ -142,9 +146,10 @@ async def get_visit_detail(
         raise HTTPException(404, "غير مصرح لك بعرض هذه الزيارة")
 
     evidence = v.evidence or []
-    signals = normalize_stored_evidence(evidence)
+    signals_legacy = normalize_stored_evidence(evidence)
     trace = build_explainability_trace(evidence)
 
+    # ---- PopAds macros normalization ----
     popads_data = v.popads_data or {}
     popads_known = {}
     if isinstance(popads_data, dict):
@@ -186,7 +191,7 @@ async def get_visit_detail(
                     popads_known[canonical] = lowered[alias]
                     break
 
-    # Classify IP (cached after first time)
+    # ---- IP intelligence ----
     ip_intel = None
     try:
         ip_intel = await classify_ip(v.ip or "", db=db)
@@ -198,7 +203,7 @@ async def get_visit_detail(
             "rtt_gap_ms": None, "last_checked": None,
         }
 
-    # Mismatch detection: our IP intel vs PopAds macros
+    # ---- Mismatch detection ----
     mismatches = []
     if ip_intel and popads_known:
         our_country = (ip_intel.get("country") or "").upper().strip()
@@ -226,8 +231,17 @@ async def get_visit_detail(
                     "detail": f"PopAds says '{popads_isp_raw}', ours says '{our_isp_raw}'",
                 })
 
+    # ---- Phase 2: unpack full_payload ----
+    fp = v.full_payload if isinstance(v.full_payload, dict) else {}
+    decision = fp.get("decision") if isinstance(fp.get("decision"), dict) else {}
+    fusion = fp.get("fusion") if isinstance(fp.get("fusion"), dict) else {}
+    dq_report = fp.get("data_quality_report") if isinstance(fp.get("data_quality_report"), dict) else (v.data_quality_report if isinstance(v.data_quality_report, dict) else {})
+    rich_signals = fp.get("signals") if isinstance(fp.get("signals"), list) else []
+    fp_strikes = fp.get("fingerprint_strikes")
+
     return {
         "id": v.id,
+        "session_id": v.session_id,
         "timestamp": v.timestamp.strftime("%Y-%m-%d %H:%M:%S") if v.timestamp else "",
         "ip": v.ip,
         "zone_id": v.zone_id,
@@ -251,14 +265,22 @@ async def get_visit_detail(
         "time_on_page": round(v.time_on_page / 1000, 1) if v.time_on_page else 0,
         "clicks": v.clicks,
         "scrolls": v.scrolls,
-        "confidence": calc_confidence(signals),
-        "raw_score": sum(s.get("score", 0) for s in signals),
-        "categories": count_categories(signals),
+        # Confidence: stored (decision engine) + recomputed (legacy)
+        "confidence": float(v.confidence) if v.confidence is not None else None,
+        "confidence_recomputed": calc_confidence(signals_legacy),
+        "bot_probability": float(v.bot_probability) if v.bot_probability is not None else None,
+        "mode": v.mode,
+        "reason": v.reason,
+        "filter_reason": v.filter_reason,
+        "raw_score": sum(s.get("score", 0) for s in signals_legacy),
+        "categories": count_categories(signals_legacy),
         "ground_truth": v.ground_truth,
         "ground_truth_at": v.ground_truth_at.isoformat() if v.ground_truth_at else None,
         "ground_truth_by": v.ground_truth_by,
         "bid": float(v.bid or 0),
         "revenue": float(v.revenue or 0),
+        "impressions": int(v.impressions or 0),
+        "counting_type": v.counting_type,
         "popads_impression_id": v.popads_impression_id,
         "popads_website_id": v.popads_website_id,
         "popads_quality": v.popads_quality,
@@ -267,6 +289,21 @@ async def get_visit_detail(
         "popads_known": popads_known,
         "ip_intel": ip_intel,
         "mismatches": mismatches,
+        # ===== Phase 2: enriched fields =====
+        "data_quality": v.data_quality,
+        "data_quality_report": dq_report,
+        "decision": decision,
+        "fusion": fusion,
+        "full_payload": fp,
+        "signals": rich_signals,
+        "fingerprint_strikes": fp_strikes,
+        "behavioral": v.behavioral,
+        "first_30s": v.first_30s,
+        "milestones": v.milestones,
+        "ad_events": v.ad_events,
+        "clock_drift_ms": int(v.clock_drift_ms or 0),
+        "is_honeypot_triggered": bool(v.is_honeypot_triggered),
+        "consent_state": v.consent_state,
     }
 
 
