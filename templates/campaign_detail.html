@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · تفاصيل الحملة</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif; color: #CBD5E1; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .db-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; z-index: 9998; }
+    .db-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: db-spin 0.8s linear infinite; }
+    @keyframes db-spin { to { transform: rotate(360deg); } }
+
+    .cd-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .cd-title { font-size: 22px; font-weight: 900; color: #F8FAFC; margin: 0 0 6px 0; }
+    .cd-sub { font-size: 12px; color: #7B8496; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cd-badge { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+    .cd-badge.active { background: rgba(16,185,129,0.15); color: #10B981; }
+    .cd-badge.paused { background: rgba(245,158,11,0.15); color: #F59E0B; }
+    .cd-badge.archived { background: rgba(100,116,139,0.15); color: #94A3B8; }
+
+    .cd-hero { background: linear-gradient(135deg, #0F1117 0%, #161822 100%); border: 1px solid #232734; border-radius: 16px; padding: 22px 26px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 24px; position: relative; overflow: hidden; }
+    .cd-hero::before { content: ''; position: absolute; top: -50%; right: -30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(34,211,238,0.2) 0%, transparent 70%); pointer-events: none; }
+    .cd-hero.neg::before { background: radial-gradient(circle, rgba(244,63,94,0.2) 0%, transparent 70%); }
+    .cd-hero-label { font-size: 10px; font-weight: 700; color: #7B8496; text-transform: uppercase; letter-spacing: 0.1em; }
+    .cd-hero-val { font-family: 'JetBrains Mono', monospace; font-size: 40px; font-weight: 900; line-height: 1; margin-top: 8px; letter-spacing: -0.03em; color: #22D3EE; }
+    .cd-hero.neg .cd-hero-val { color: #F43F5E; }
+    .cd-hero-roi { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+    .cd-hero-roi.pos { background: rgba(34,211,238,0.12); color: #22D3EE; }
+    .cd-hero-roi.neg { background: rgba(244,63,94,0.12); color: #F43F5E; }
+    .cd-hero-stats { display: grid; grid-template-columns: repeat(3, auto); gap: 24px; align-items: end; position: relative; }
+    .cd-hero-stat-label { font-size: 9px; color: #4A5263; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .cd-hero-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; color: #F8FAFC; }
+
+    .cd-section { background: #0F1117; border: 1px solid #232734; border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+    .cd-section-title { font-size: 13px; font-weight: 800; color: #F8FAFC; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px; }
+
+    /* ============ NEW: Tracking URL Hero ============ */
+    .cd-url-hero {
+      background: linear-gradient(135deg, rgba(124,92,255,0.10) 0%, rgba(34,211,238,0.06) 100%);
+      border: 2px solid #7C5CFF;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cd-url-hero::before {
+      content: '';
+      position: absolute;
+      top: -80px; right: -80px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(124,92,255,0.25) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cd-url-hero-head {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 14px; position: relative;
+    }
+    .cd-url-hero-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #7C5CFF, #9B80FF);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .cd-url-hero-title {
+      font-size: 15px; font-weight: 900; color: #F8FAFC;
+      margin: 0; line-height: 1.2;
+    }
+    .cd-url-hero-sub {
+      font-size: 11px; color: #A5B4FC;
+      margin-top: 2px; line-height: 1.4;
+    }
+    .cd-url-box-big {
+      background: #08090D;
+      border: 1px solid #232734;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #10B981;
+      word-break: break-all;
+      line-height: 1.7;
+      margin-bottom: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      direction: ltr;
+      text-align: left;
+      position: relative;
+    }
+    .cd-url-box-big::-webkit-scrollbar { width: 6px; }
+    .cd-url-box-big::-webkit-scrollbar-thumb { background: #232734; border-radius: 3px; }
+    .cd-url-actions { display: flex; gap: 8px; flex-wrap: wrap; position: relative; }
+    .cd-btn-big {
+      height: 40px; padding: 0 20px;
+      border-radius: 8px;
+      font-family: inherit; font-size: 13px; font-weight: 800;
+      cursor: pointer; border: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px; transition: all 120ms;
+      min-width: 140px;
+    }
+    .cd-btn-big:active { transform: scale(0.97); }
+    .cd-btn-big.copied { background: #10B981 !important; color: white !important; }
+    .cd-btn-primary { background: #7C5CFF; color: white; }
+    .cd-btn-primary:hover { background: #9B80FF; transform: translateY(-1px); }
+    .cd-btn-success { background: #10B981; color: white; }
+    .cd-btn-success:hover { background: #059669; transform: translateY(-1px); }
+    .cd-btn-ghost {
+      background: transparent; color: #CBD5E1;
+      border: 1px solid #232734;
+    }
+    .cd-btn-ghost:hover { background: #161822; color: #F8FAFC; border-color: #2E3446; }
+
+    .cd-hint-box {
+      background: rgba(34,211,238,0.08);
+      border: 1px solid rgba(34,211,238,0.25);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 11.5px;
+      color: #67E8F9;
+      line-height: 1.7;
+      margin-top: 12px;
+      position: relative;
+    }
+    .cd-hint-box b { color: #A5F3FC; }
+    .cd-hint-box code {
+      background: rgba(34,211,238,0.15);
+      color: #A5F3FC;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+    }
+    .cd-hint-box.warn {
+      background: rgba(245,158,11,0.08);
+      border-color: rgba(245,158,11,0.25);
+      color: #FCD34D;
+    }
+    .cd-hint-box.warn b, .cd-hint-box.warn code { color: #FDE68A; }
+
+    /* ============ Adsterra KPI ============ */
+    .cd-adsterra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .cd-adsterra-kpi { background: #08090D; border: 1px solid #232734; border-radius: 10px; padding: 12px; }
+    .cd-adsterra-kpi-label { font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+    .cd-adsterra-kpi-value { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 900; color: #F8FAFC; }
+
+    .cd-adsterra-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 12px; }
+    .cd-adsterra-table th { padding: 8px; text-align: right; font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid #1A1D29; }
+    .cd-adsterra-table td { padding: 8px; border-bottom: 1px solid #1A1D29; }
+    .cd-adsterra-table td.num { font-family: 'JetBrains Mono', monospace; text-align: right; }
+
+    .cd-inline-form { display: flex; gap: 8px; align-items: stretch; margin-top: 12px; }
+    .cd-inline-form input {
+      flex: 1; height: 36px; padding: 0 12px;
+      background: #08090D; border: 1px solid #232734;
+      border-radius: 6px; color: #F8FAFC;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      outline: none;
+    }
+    .cd-inline-form input:focus { border-color: #7C5CFF; }
+
+    .cd-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .cd-info-item { padding: 10px 12px; background: #08090D; border-radius: 8px; }
+    .cd-info-label { font-size: 10px; color: #4A5263; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+    .cd-info-value { font-size: 12px; color: #F8FAFC; font-weight: 700; font-family: 'JetBrains Mono', monospace; word-break: break-all; }
+
+    .cd-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .cd-danger-zone { background: rgba(244,63,94,0.06); border: 1px solid rgba(244,63,94,0.25); border-radius: 12px; padding: 14px 16px; margin-top: 16px; }
+    .cd-danger-title { font-size: 12px; font-weight: 800; color: #F43F5E; margin: 0 0 6px 0; }
+    .cd-danger-desc { font-size: 11px; color: #FDA4AF; margin: 0 0 12px 0; line-height: 1.6; }
+
+    /* Code block */
+    .cd-code-box { background: #08090D; border: 1px solid #232734; border-radius: 8px; padding: 14px; position: relative; margin-top: 10px; }
+    .cd-code-box pre { margin: 0; color: #10B981; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 250px; overflow-y: auto; }
+    .cd-code-copy-btn { position: absolute; top: 10px; left: 10px; height: 28px; padding: 0 12px; background: #7C5CFF; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 120ms; font-family: inherit; }
+    .cd-code-copy-btn:hover { background: #9B80FF; }
+    .cd-code-copy-btn.copied { background: #10B981; }
+
+    .cd-chart-wrap { height: 220px; position: relative; margin-top: 12px; }
+
+    .cd-loading-inline { text-align: center; padding: 24px; color: #7B8496; font-size: 12px; }
+
+    /* Adsterra section variants */
+    .cd-adsterra-off {
+      background: rgba(124,92,255,0.06);
+      border: 1px dashed rgba(124,92,255,0.4);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .cd-adsterra-off-title { font-size: 14px; font-weight: 800; color: #F8FAFC; margin-bottom: 6px; }
+    .cd-adsterra-off-desc { font-size: 11.5px; color: #7B8496; line-height: 1.6; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="db-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+      <div class="cd-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
+            <h1 class="cd-title" id="cdTitle">—</h1>
+            <span id="cdBadge" class="cd-badge">—</span>
+          </div>
+          <div class="cd-sub" id="cdSub">—</div>
+        </div>
+        <a href="/campaigns" class="sh-btn sh-btn-ghost">← كل الحملات</a>
+      </div>
+
+      <div id="cdLoading" style="text-align:center;padding:40px;color:#7B8496;">جاري التحميل…</div>
+
+      <div id="cdContent" style="display:none;">
+
+        <!-- HERO: P&L من الزيارات الداخلية -->
+        <div class="cd-hero" id="cdHero">
+          <div>
+            <div class="cd-hero-label">صافي الربح (من الزيارات)</div>
+            <div class="cd-hero-val" id="heroProfit">$0.00</div>
+            <div class="cd-hero-roi pos" id="heroRoi">ROI 0%</div>
+          </div>
+          <div class="cd-hero-stats">
+            <div>
+              <div class="cd-hero-stat-label">التكلفة (BID)</div>
+              <div class="cd-hero-stat-val" id="heroCost">$0.00</div>
+            </div>
+            <div>
+              <div class="cd-hero-stat-label">الإيراد</div>
+              <div class="cd-hero-stat-val" id="heroRev">$0.00</div>
+            </div>
+            <div>
+              <div class="cd-hero-stat-label">الزيارات</div>
+              <div class="cd-hero-stat-val" id="heroTotal">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 🔗 TRACKING URL — القسم الأهم                 -->
+        <!-- ============================================ -->
+        <div class="cd-url-hero" id="trackingUrlHero">
+          <div class="cd-url-hero-head">
+            <div class="cd-url-hero-icon">🔗</div>
+            <div style="min-width:0;flex:1;">
+              <h2 class="cd-url-hero-title" id="trackingUrlTitle">الرابط اللي تحطه في PopAds</h2>
+              <div class="cd-url-hero-sub" id="trackingUrlSub">—</div>
+            </div>
+          </div>
+
+          <div class="cd-url-box-big" id="trackingUrlBox" dir="ltr">—</div>
+
+          <div class="cd-url-actions">
+            <button class="cd-btn-big cd-btn-primary" id="copyTrackingUrlBtn" type="button">📋 نسخ الرابط</button>
+            <button class="cd-btn-big cd-btn-ghost" id="downloadTrackingUrlBtn" type="button">⬇ تحميل كملف</button>
+          </div>
+
+          <div class="cd-hint-box" id="trackingUrlHint">
+            💡 <b>خطوات الاستخدام:</b> ادخل على PopAds، اعمل حملة، والصق هذا الرابط في خانة "URL". PopAds هيستبدل كل <code>[MACRO]</code> بالقيمة الحقيقية للزائر.
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 🎯 DESTINATION — للـ Direct/Hybrid            -->
+        <!-- ============================================ -->
+        <div class="cd-section" id="destinationSection" style="display:none;">
+          <h3 class="cd-section-title">🎯 الوجهة (Adsterra Direct Link)</h3>
+          <div id="destinationBody"></div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 📄 TRACKING CODE — للـ Landing/Hybrid         -->
+        <!-- ============================================ -->
+        <div class="cd-section" id="trackingCodeSection" style="display:none;">
+          <h3 class="cd-section-title">📄 كود التتبع (لصفحة الهبوط)</h3>
+          <div id="trackingCodeBody"></div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 💰 ADSTERRA API INSIGHTS                     -->
+        <!-- ============================================ -->
+        <div class="cd-section" id="adsterraSection">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <h3 class="cd-section-title" style="margin:0;">💰 أرباح Adsterra (API)</h3>
+            <button class="sh-btn sh-btn-ghost sh-btn-sm" id="syncAdsterraBtn" type="button" style="display:none;">🔄 مزامنة الزيارات</button>
+          </div>
+          <div id="adsterraBody">
+            <div class="cd-loading-inline">جاري التحميل…</div>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- ⚙️ CAMPAIGN SETTINGS                          -->
+        <!-- ============================================ -->
+        <div class="cd-section">
+          <h3 class="cd-section-title">⚙️ الإعدادات</h3>
+          <div class="cd-info-grid">
+            <div class="cd-info-item"><div class="cd-info-label">نوع الحملة</div><div class="cd-info-value" id="infoType">—</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">المصدر</div><div class="cd-info-value" id="infoSource">—</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">الوجهة</div><div class="cd-info-value" id="infoDest">—</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">Buy CPM</div><div class="cd-info-value" id="infoBuyCpm">$0.00</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">Sell CPM</div><div class="cd-info-value" id="infoSellCpm">$0.00</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">Zone ID</div><div class="cd-info-value" id="infoZoneId">—</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">Bot Block Threshold</div><div class="cd-info-value" id="infoThreshold">—</div></div>
+            <div class="cd-info-item"><div class="cd-info-label">Campaign Key</div><div class="cd-info-value" id="infoKey">—</div></div>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 🎬 ACTIONS                                    -->
+        <!-- ============================================ -->
+        <div class="cd-section">
+          <h3 class="cd-section-title">🎬 الإجراءات</h3>
+          <div class="cd-actions">
+            <a href="#" id="btnViewVisits" class="sh-btn sh-btn-ghost">👁 عرض الزيارات</a>
+            <button class="sh-btn sh-btn-ghost" id="btnRotateKey">🔄 تجديد المفتاح</button>
+            <button class="sh-btn sh-btn-ghost" id="btnTogglePause">⏸ إيقاف</button>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- ⚠️ DANGER ZONE                                -->
+        <!-- ============================================ -->
+        <div class="cd-danger-zone">
+          <h3 class="cd-danger-title">⚠️ حذف الحملة</h3>
+          <p class="cd-danger-desc">هتحذف الحملة وكل زياراتها نهائيًا. مفيش رجوع بعد التأكيد.</p>
+          <button class="sh-btn sh-btn-danger" id="btnDelete" style="background:rgba(244,63,94,0.15);border-color:rgba(244,63,94,0.3);">🗑 حذف الحملة</button>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const CD = {
+      campaignId: null,
+      data: null,
+      adsterraChart: null,
+    };
+
+    function fmtMoney(n) {
+      const v = Number(n || 0);
+      if (Math.abs(v) < 0.005) return '$0.00';
+      return (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2);
+    }
+    function fmtUSD(n) {
+      return '$' + Number(n || 0).toFixed(4);
+    }
+    function fmtNum(n) {
+      return Number(n || 0).toLocaleString('en-US');
+    }
+
+    function copyText(text, btn, labelOk) {
+      if (!text) { Shell.toast('مفيش محتوى للنسخ', 'error'); return; }
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = labelOk || '✓ تم النسخ';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.classList.remove('copied');
+        }, 1800);
+      }).catch(() => Shell.toast('فشل النسخ', 'error'));
+    }
+
+    function downloadText(text, filename) {
+      try {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        Shell.toast('فشل التحميل: ' + e.message, 'error');
+      }
+    }
+
+    // ============================================================
+    // RENDER: TRACKING URL — القسم الأهم
+    // ============================================================
+    function renderTrackingUrl(c) {
+      const titleEl = document.getElementById('trackingUrlTitle');
+      const subEl = document.getElementById('trackingUrlSub');
+      const boxEl = document.getElementById('trackingUrlBox');
+      const hintEl = document.getElementById('trackingUrlHint');
+      const copyBtn = document.getElementById('copyTrackingUrlBtn');
+      const dlBtn = document.getElementById('downloadTrackingUrlBtn');
+
+      const url = c.tracking_url || '';
+
+      if (!url) {
+        titleEl.textContent = '⚠️ الرابط غير متوفر';
+        subEl.textContent = 'محتاج تعدل الحملة وتضيف الرابط المطلوب';
+        boxEl.textContent = '—';
+        copyBtn.disabled = true;
+        dlBtn.disabled = true;
+        hintEl.className = 'cd-hint-box warn';
+        hintEl.innerHTML = '⚠️ <b>ملاحظة:</b> الرابط مش هيتولد. تأكد من نوع الحملة وإنك ضفت <code>landing_url</code> (للـ Landing) أو <code>destination_url</code> (للـ Direct).';
+        return;
+      }
+
+      // Title + description حسب النوع
+      if (c.type === 'direct') {
+        titleEl.textContent = '🔗 الرابط اللي تحطه في PopAds (Direct Link)';
+        subEl.textContent = 'PopAds هيستبدل الماكروز ← السيرفر بتاعنا هيستقبلها ويسجلها ← بعدين redirect لـ Adsterra';
+        hintEl.className = 'cd-hint-box';
+        hintEl.innerHTML = '💡 <b>خطوات الاستخدام:</b><br>1. انسخ الرابط كامل<br>2. الصقه في خانة الـ URL في حملة PopAds<br>3. لما الزائر يدخل، هيظهرله صفحة تحميل صغيرة (Spinner) حوالي 1-2 ثانية<br>4. بعدين يتم redirect تلقائي لصفحة Adsterra مع sub_id بتاع الزيارة';
+      } else if (c.type === 'landing') {
+        titleEl.textContent = '🔗 الرابط اللي تحطه في PopAds (Landing Page)';
+        subEl.textContent = 'الماكروز هتظهر في URL صفحة الهبوط بتاعتك، وكود التتبع هيسجلها';
+        hintEl.className = 'cd-hint-box';
+        hintEl.innerHTML = '💡 <b>خطوات الاستخدام:</b><br>1. انسخ الرابط ده وحطه في PopAds<br>2. كمان انسخ <b>"كود التتبع"</b> اللي تحت وحطه في صفحة الهبوط HTML<br>3. الكود هيقرأ الماكروز من الـ URL ويسجلها، ويراقب السلوك<br>4. لما الزائر يدوس على زرار في صفحتك، إنت (أو الكود) هيعمل redirect لـ Adsterra';
+      } else {
+        titleEl.textContent = '🔗 الرابط اللي تحطه في PopAds (Hybrid)';
+        subEl.textContent = 'صفحة هبوط + redirect لـ Adsterra';
+        hintEl.className = 'cd-hint-box';
+        hintEl.innerHTML = '💡 حملة Hybrid بتحتاج <b>الرابط</b> + <b>كود التتبع</b>. استخدمهم مع بعض.';
+      }
+
+      boxEl.textContent = url;
+
+      // Copy handler
+      copyBtn.disabled = false;
+      copyBtn.textContent = '📋 نسخ الرابط';
+      copyBtn.onclick = function() { copyText(url, this, '✓ تم النسخ'); };
+
+      // Download handler
+      dlBtn.disabled = false;
+      dlBtn.textContent = '⬇ تحميل كملف';
+      dlBtn.onclick = function() {
+        const filename = `popads-url-${c.campaign_key.substring(0, 8)}.txt`;
+        downloadText(url, filename);
+        Shell.toast('تم التحميل ✅', 'success');
+      };
+    }
+
+    // ============================================================
+    // RENDER: DESTINATION (Direct/Hybrid)
+    // ============================================================
+    function renderDestination(c) {
+      const section = document.getElementById('destinationSection');
+      const body = document.getElementById('destinationBody');
+
+      if (c.type === 'landing') {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = '';
+
+      if (!c.destination_url) {
+        body.innerHTML = '<div class="cd-hint-box warn">⚠️ مفيش رابط وجهة متسجل. عدّل الحملة وأضف رابط Adsterra.</div>';
+        return;
+      }
+
+      const escapedUrl = Shell.esc(c.destination_url);
+      body.innerHTML = `
+        <div class="cd-info-item" style="margin-bottom:12px;">
+          <div class="cd-info-label">رابط Adsterra (بيتم إضافة sub_id تلقائيًا)</div>
+          <div class="cd-info-value" style="direction:ltr;text-align:left;">${escapedUrl}</div>
+        </div>
+        <div class="cd-hint-box">
+          💡 السيرفر بيضيف <code>?${Shell.esc(c.adsterra_tracking_param || 'sub_id')}={session_id}</code> تلقائيًا لما يحول الزائر لـ Adsterra. كده بنقدر نربط كل impression بالزيارة الأصلية في الـ sync.
+        </div>
+      `;
+    }
+
+    // ============================================================
+    // RENDER: TRACKING CODE (Landing/Hybrid)
+    // ============================================================
+    async function renderTrackingCode(c) {
+      const section = document.getElementById('trackingCodeSection');
+      const body = document.getElementById('trackingCodeBody');
+
+      if (c.type === 'direct') {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = '';
+      body.innerHTML = '<div class="cd-loading-inline">جاري جلب الكود…</div>';
+
+      try {
+        const codeData = await Shell.api(`/api/campaigns/${c.id}/tracker-code-v3`);
+        const sizeKb = Math.round((codeData.size_bytes || 0) / 1024);
+        const lines = codeData.lines || 0;
+
+        body.innerHTML = `
+          <div class="cd-hint-box" style="margin-bottom:12px;">
+            📌 <b>طريقة التركيب:</b> افتح ملف HTML بتاع صفحة الهبوط، والصق الكود قبل <code>&lt;/body&gt;</code> أو جوه <code>&lt;head&gt;</code>. الكود هيشتغل تلقائيًا لما الصفحة تفتح.
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="sh-btn sh-btn-primary sh-btn-sm" id="dlCodeBtn" type="button">⬇ تحميل الكود (.txt)</button>
+            <button class="sh-btn sh-btn-ghost sh-btn-sm" id="copyCodeFullBtn" type="button">📋 نسخ الكود كامل</button>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <div style="font-size:10px;color:#7B8496;margin-bottom:6px;">📄 الجزء 1</div>
+              <div class="cd-code-box">
+                <button class="cd-code-copy-btn" id="copyPart1Btn" type="button">📋 نسخ</button>
+                <pre id="codePart1">${Shell.esc(codeData.part1 || '')}</pre>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#7B8496;margin-bottom:6px;">📄 الجزء 2</div>
+              <div class="cd-code-box">
+                <button class="cd-code-copy-btn" id="copyPart2Btn" type="button">📋 نسخ</button>
+                <pre id="codePart2">${Shell.esc(codeData.part2 || '')}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:10px;color:#4A5263;margin-top:12px;">
+            نسخة الكود: ${Shell.esc(codeData.version || 'v7.1')} · ${sizeKb} KB · ${lines} سطر
+          </div>
+        `;
+
+        // Handlers
+        document.getElementById('copyPart1Btn').onclick = function() {
+          copyText(codeData.part1 || '', this);
+        };
+        document.getElementById('copyPart2Btn').onclick = function() {
+          copyText(codeData.part2 || '', this);
+        };
+        document.getElementById('copyCodeFullBtn').onclick = function() {
+          copyText(codeData.full || '', this);
+        };
+        document.getElementById('dlCodeBtn').onclick = async function() {
+          try {
+            const btn = this;
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ جاري التحميل...';
+
+            const url = `/api/campaigns/${c.id}/tracker-code-v3/download`;
+            const response = await fetch(url, { credentials: 'same-origin' });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            let filename = `ovg-tracker-${c.campaign_key.substring(0, 8)}.txt`;
+            const disp = response.headers.get('Content-Disposition');
+            if (disp) {
+              const m = disp.match(/filename="?([^";]+)"?/);
+              if (m) filename = m[1];
+            }
+
+            const blob = await response.blob();
+            const objUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(objUrl), 1500);
+
+            btn.textContent = '✓ تم التحميل';
+            setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+          } catch (err) {
+            Shell.toast('فشل التحميل: ' + err.message, 'error');
+            this.disabled = false;
+            this.textContent = '⬇ تحميل الكود (.txt)';
+          }
+        };
+      } catch (err) {
+        body.innerHTML = `<div class="cd-hint-box warn">⚠️ فشل جلب الكود: ${Shell.esc(err.message)}</div>`;
+      }
+    }
+
+    // ============================================================
+    // RENDER: ADSTERRA INSIGHTS
+    // ============================================================
+    async function renderAdsterra(c) {
+      const body = document.getElementById('adsterraBody');
+      const syncBtn = document.getElementById('syncAdsterraBtn');
+
+      if (!c.adsterra_api_key_set) {
+        syncBtn.style.display = 'none';
+        body.innerHTML = `
+          <div class="cd-adsterra-off">
+            <div class="cd-adsterra-off-title">🔑 مفتاح Adsterra API غير مسجل</div>
+            <div class="cd-adsterra-off-desc">
+              عشان نقدر نسحب الأرباح والـ Impressions من حسابك في Adsterra تلقائيًا، محتاج تضيف مفتاح الـ API بتاعك.
+              تلاقيه في لوحة Adsterra → API → Token.
+            </div>
+            <div class="cd-inline-form" style="max-width:500px;margin:0 auto;">
+              <input type="text" id="adsterraKeyInput" placeholder="الصق الـ API Key هنا...">
+              <button class="sh-btn sh-btn-primary" id="saveAdsterraKeyBtn" type="button">حفظ</button>
+            </div>
+            <div id="adsterraKeyMsg" style="font-size:11px;margin-top:10px;min-height:16px;"></div>
+          </div>
+        `;
+
+        document.getElementById('saveAdsterraKeyBtn').onclick = async function() {
+          const key = (document.getElementById('adsterraKeyInput').value || '').trim();
+          const msgEl = document.getElementById('adsterraKeyMsg');
+          if (!key) {
+            msgEl.style.color = '#F43F5E';
+            msgEl.textContent = 'لازم تلصق المفتاح';
+            return;
+          }
+          this.disabled = true;
+          this.textContent = 'جاري التحقق...';
+          msgEl.style.color = '#7B8496';
+          msgEl.textContent = 'جاري التحقق من Adsterra...';
+
+          try {
+            // 1) Verify with Adsterra
+            const verify = await fetch('/api/adsterra/verify', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ api_key: key }),
+            }).then(r => r.json());
+
+            if (!verify.ok) {
+              msgEl.style.color = '#F43F5E';
+              msgEl.textContent = '❌ ' + (verify.error || 'المفتاح غير صالح');
+              this.disabled = false;
+              this.textContent = 'حفظ';
+              return;
+            }
+
+            msgEl.style.color = '#67E8F9';
+            msgEl.textContent = `✓ المفتاح شغال — عندك ${verify.domains_count} domain(s)`;
+
+            // 2) Save to campaign
+            await Shell.api('/api/campaigns/' + c.id, {
+              method: 'PATCH',
+              body: JSON.stringify({ adsterra_api_key: key }),
+            });
+
+            Shell.toast('تم حفظ المفتاح ✅', 'success');
+            setTimeout(() => loadCampaign(), 600);
+          } catch (err) {
+            msgEl.style.color = '#F43F5E';
+            msgEl.textContent = 'فشل: ' + err.message;
+            this.disabled = false;
+            this.textContent = 'حفظ';
+          }
+        };
+        return;
+      }
+
+      // API key موجود
+      syncBtn.style.display = '';
+      body.innerHTML = '<div class="cd-loading-inline">جاري جلب الإحصائيات من Adsterra...</div>';
+
+      try {
+        const overview = await Shell.api(`/api/adsterra/${c.id}/overview?days=7`);
+        const t = overview.totals || {};
+
+        body.innerHTML = `
+          <div class="cd-adsterra-grid">
+            <div class="cd-adsterra-kpi">
+              <div class="cd-adsterra-kpi-label">Impressions (7ي)</div>
+              <div class="cd-adsterra-kpi-value">${fmtNum(t.impressions)}</div>
+            </div>
+            <div class="cd-adsterra-kpi">
+              <div class="cd-adsterra-kpi-label">Clicks</div>
+              <div class="cd-adsterra-kpi-value">${fmtNum(t.clicks)}</div>
+            </div>
+            <div class="cd-adsterra-kpi">
+              <div class="cd-adsterra-kpi-label">Revenue</div>
+              <div class="cd-adsterra-kpi-value" style="color:#10B981;">${fmtUSD(t.revenue)}</div>
+            </div>
+            <div class="cd-adsterra-kpi">
+              <div class="cd-adsterra-kpi-label">CPM</div>
+              <div class="cd-adsterra-kpi-value" style="color:#22D3EE;">${fmtUSD(t.cpm)}</div>
+            </div>
+            <div class="cd-adsterra-kpi">
+              <div class="cd-adsterra-kpi-label">CTR</div>
+              <div class="cd-adsterra-kpi-value">${Number(t.ctr || 0).toFixed(2)}%</div>
+            </div>
+          </div>
+
+          <div class="cd-chart-wrap">
+            <canvas id="adsterraChart"></canvas>
+          </div>
+
+          <div style="margin-top:20px;">
+            <h4 style="font-size:12px;font-weight:800;color:#F8FAFC;margin:0 0 8px 0;">🌍 أعلى الدول</h4>
+            <table class="cd-adsterra-table">
+              <thead><tr><th>Country</th><th>Impressions</th><th>Revenue</th></tr></thead>
+              <tbody>
+                ${(overview.top_countries || []).slice(0, 10).map(r => `
+                  <tr>
+                    <td>${Shell.esc(r.country || '—')}</td>
+                    <td class="num">${fmtNum(r.impression)}</td>
+                    <td class="num" style="color:#10B981;">${fmtUSD(r.revenue)}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="3" style="text-align:center;color:#7B8496;">لا توجد بيانات</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top:20px;">
+            <h4 style="font-size:12px;font-weight:800;color:#F8FAFC;margin:0 0 8px 0;">📊 أعلى Placements</h4>
+            <table class="cd-adsterra-table">
+              <thead><tr><th>Placement ID</th><th>Impressions</th><th>Revenue</th><th>CPM</th></tr></thead>
+              <tbody>
+                ${(overview.top_placements || []).slice(0, 10).map(r => `
+                  <tr>
+                    <td class="num">${Shell.esc(r.placement || r.placement_id || '—')}</td>
+                    <td class="num">${fmtNum(r.impression)}</td>
+                    <td class="num" style="color:#10B981;">${fmtUSD(r.revenue)}</td>
+                    <td class="num" style="color:#22D3EE;">${fmtUSD(r.cpm)}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="4" style="text-align:center;color:#7B8496;">لا توجد بيانات</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="cd-hint-box" style="margin-top:14px;">
+            💡 الأرقام دي مباشرة من Adsterra API. اضغط <b>"مزامنة الزيارات"</b> تحت عشان تحدّث الأرباح على كل زيارة (باستخدام placement_sub_id).
+          </div>
+        `;
+
+        // Chart
+        renderAdsterraChart(overview.series || []);
+
+        // Sync button handler
+        syncBtn.onclick = async function() {
+          const btn = this;
+          const orig = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = '⏳ جاري المزامنة...';
+          try {
+            const result = await fetch(`/api/adsterra/${c.id}/sync-visits?days=3`, {
+              method: 'POST',
+              credentials: 'same-origin',
+            }).then(r => r.json());
+
+            if (result.ok) {
+              Shell.toast(`✓ تم تحديث ${result.updated} زيارة (تخطي ${result.skipped})`, 'success', 4000);
+              loadCampaign();
+            } else {
+              Shell.toast('فشل المزامنة', 'error');
+            }
+          } catch (err) {
+            Shell.toast('فشل: ' + err.message, 'error');
+          } finally {
+            btn.disabled = false;
+            btn.textContent = orig;
+          }
+        };
+
+      } catch (err) {
+        body.innerHTML = `
+          <div class="cd-hint-box warn">
+            ⚠️ فشل جلب البيانات من Adsterra: <b>${Shell.esc(err.message)}</b><br>
+            <span style="font-size:10px;">تأكد إن الـ API key شغال. ممكن تجدد المفتاح من حسابك.</span>
+          </div>
+          <div class="cd-inline-form" style="max-width:500px;margin-top:12px;">
+            <input type="text" id="adsterraKeyInput2" placeholder="الصق API Key جديد...">
+            <button class="sh-btn sh-btn-primary" id="updateAdsterraKeyBtn" type="button">تحديث</button>
+          </div>
+          <div id="adsterraKeyMsg2" style="font-size:11px;margin-top:10px;min-height:16px;"></div>
+        `;
+        document.getElementById('updateAdsterraKeyBtn').onclick = async function() {
+          const key = (document.getElementById('adsterraKeyInput2').value || '').trim();
+          if (!key) return;
+          try {
+            await Shell.api('/api/campaigns/' + c.id, {
+              method: 'PATCH',
+              body: JSON.stringify({ adsterra_api_key: key }),
+            });
+            Shell.toast('تم التحديث ✅', 'success');
+            setTimeout(() => loadCampaign(), 500);
+          } catch (e) {
+            document.getElementById('adsterraKeyMsg2').textContent = 'فشل: ' + e.message;
+          }
+        };
+      }
+    }
+
+    function renderAdsterraChart(series) {
+      const canvas = document.getElementById('adsterraChart');
+      if (!canvas) return;
+      if (CD.adsterraChart) {
+        try { CD.adsterraChart.destroy(); } catch (e) {}
+        CD.adsterraChart = null;
+      }
+      if (!series || series.length === 0) return;
+
+      const labels = series.map(s => s.date || s.day || '');
+      const impressions = series.map(s => Number(s.impression || 0));
+      const revenue = series.map(s => Number(s.revenue || 0));
+
+      CD.adsterraChart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Impressions',
+              data: impressions,
+              backgroundColor: 'rgba(124,92,255,0.4)',
+              borderColor: '#7C5CFF',
+              borderWidth: 1,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Revenue ($)',
+              data: revenue,
+              type: 'line',
+              backgroundColor: 'rgba(16,185,129,0.1)',
+              borderColor: '#10B981',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 3,
+              yAxisID: 'y1',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#CBD5E1', font: { family: 'Inter', size: 11 } } },
+            tooltip: { backgroundColor: '#161822', borderColor: '#2E3446', borderWidth: 1, titleColor: '#F8FAFC', bodyColor: '#CBD5E1', padding: 10, cornerRadius: 6 },
+          },
+          scales: {
+            x: { ticks: { color: '#7B8496', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { position: 'left', ticks: { color: '#7B8496', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, title: { display: true, text: 'Impressions', color: '#7B8496', font: { size: 10 } } },
+            y1: { position: 'right', ticks: { color: '#10B981', font: { size: 10 } }, grid: { display: false }, title: { display: true, text: 'Revenue ($)', color: '#10B981', font: { size: 10 } } },
+          },
+        },
+      });
+    }
+
+    // ============================================================
+    // RENDER: SETTINGS
+    // ============================================================
+    function renderSettings(c) {
+      document.getElementById('infoType').textContent = c.type;
+      document.getElementById('infoSource').textContent = c.traffic_source_slug;
+      document.getElementById('infoDest').textContent = c.destination_slug;
+      document.getElementById('infoBuyCpm').textContent = '$' + Number(c.buy_cpm).toFixed(2);
+      document.getElementById('infoSellCpm').textContent = '$' + Number(c.sell_cpm).toFixed(2);
+      document.getElementById('infoZoneId').textContent = c.destination_zone_id || '—';
+      document.getElementById('infoThreshold').textContent = (c.bot_block_threshold || 100) + ' (score)';
+      document.getElementById('infoKey').textContent = c.campaign_key;
+      document.getElementById('btnViewVisits').href = '/visits?campaign_id=' + c.id;
+    }
+
+    // ============================================================
+    // RENDER: HERO (P&L)
+    // ============================================================
+    function renderHero(c) {
+      const st = c.stats || {};
+      const pl = st.pl || { profit: 0, roi: 0, cost: 0, revenue: 0 };
+      document.getElementById('heroProfit').textContent = fmtMoney(pl.profit);
+      document.getElementById('heroCost').textContent = '$' + Number(pl.cost || 0).toFixed(2);
+      document.getElementById('heroRev').textContent = '$' + Number(pl.revenue || 0).toFixed(2);
+      document.getElementById('heroTotal').textContent = fmtNum(st.total || 0);
+
+      const roiEl = document.getElementById('heroRoi');
+      roiEl.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`;
+      roiEl.className = 'cd-hero-roi ' + (pl.profit >= 0 ? 'pos' : 'neg');
+
+      const hero = document.getElementById('cdHero');
+      hero.classList.toggle('neg', pl.profit < 0);
+    }
+
+    // ============================================================
+    // LOAD CAMPAIGN
+    // ============================================================
+    async function loadCampaign() {
+      try {
+        CD.data = await Shell.api('/api/campaigns/' + CD.campaignId);
+        const c = CD.data;
+
+        document.getElementById('cdTitle').textContent = c.name;
+        const badge = document.getElementById('cdBadge');
+        badge.className = 'cd-badge ' + c.status;
+        badge.textContent = c.status === 'active' ? 'نشطة' : c.status === 'paused' ? 'موقوفة' : 'مؤرشفة';
+
+        document.getElementById('cdSub').innerHTML =
+          `<span>${Shell.esc(c.type)}</span> · <span>${Shell.esc(c.traffic_source_slug)} → ${Shell.esc(c.destination_slug)}</span>`;
+
+        renderHero(c);
+        renderTrackingUrl(c);
+        renderDestination(c);
+        await renderTrackingCode(c);
+        await renderAdsterra(c);
+        renderSettings(c);
+
+        // Toggle pause button
+        const toggleBtn = document.getElementById('btnTogglePause');
+        toggleBtn.textContent = c.status === 'active' ? '⏸ إيقاف' : '▶ تشغيل';
+
+        document.getElementById('cdLoading').style.display = 'none';
+        document.getElementById('cdContent').style.display = '';
+      } catch (e) {
+        document.getElementById('cdLoading').innerHTML =
+          `<span style="color:#F43F5E;">فشل التحميل: ${Shell.esc(e.message)}</span>`;
+      }
+    }
+
+    // ============================================================
+    // ACTIONS
+    // ============================================================
+    async function togglePause() {
+      const newStatus = CD.data.status === 'active' ? 'paused' : 'active';
+      try {
+        await Shell.api('/api/campaigns/' + CD.campaignId, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: newStatus }),
+        });
+        Shell.toast('تم التحديث', 'success');
+        loadCampaign();
+      } catch (e) {
+        Shell.toast('فشل', 'error');
+      }
+    }
+
+    async function rotateKey() {
+      if (!confirm('تجديد المفتاح هيبطّل الرابط القديم. متأكد؟')) return;
+      try {
+        await Shell.api('/api/campaigns/' + CD.campaignId + '/rotate-key', { method: 'POST' });
+        Shell.toast('تم التجديد — حدّث الرابط في PopAds', 'success', 5000);
+        loadCampaign();
+      } catch (e) {
+        Shell.toast('فشل', 'error');
+      }
+    }
+
+    async function deleteCampaign() {
+      if (!confirm('هتحذف الحملة وكل زياراتها. متأكد؟')) return;
+      if (!confirm('تأكيد أخير: هل أنت متأكد 100%؟')) return;
+      try {
+        await Shell.api('/api/campaigns/' + CD.campaignId, { method: 'DELETE' });
+        Shell.toast('تم الحذف', 'success');
+        setTimeout(() => window.location.href = '/campaigns', 500);
+      } catch (e) {
+        Shell.toast('فشل', 'error');
+      }
+    }
+
+    // ============================================================
+    // BOOT
+    // ============================================================
+    (async function boot() {
+      try {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        CD.campaignId = parseInt(parts[parts.length - 1]) || 0;
+        if (!CD.campaignId) throw new Error('Campaign ID غير صالح');
+
+        await Shell.mount({
+          active: 'campaigns',
+          lang: 'ar',
+          breadcrumb: [
+            { label: 'الحملات', href: '/campaigns' },
+            { label: 'تفاصيل' },
+          ],
+        });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+
+        document.getElementById('btnTogglePause').addEventListener('click', togglePause);
+        document.getElementById('btnRotateKey').addEventListener('click', rotateKey);
+        document.getElementById('btnDelete').addEventListener('click', deleteCampaign);
+
+        await loadCampaign();
+      } catch (e) {
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
