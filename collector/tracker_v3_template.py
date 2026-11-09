@@ -1,14 +1,31 @@
 """
-collector/tracker_v3_template.py — V3 tracker (v8.2 — Beacon fix + rebrowser hardening)
+collector/tracker_v3_template.py — V3 tracker (v8.5 — 3 medium-severity fixes)
 
-CRITICAL FIXES in v8.2:
-  1. sendBeacon now uses text/plain (no preflight)
-  2. RB_NAV_OWN_PROPS — REMOVED entirely
-     (modern Chrome has 50+ own props on navigator → 100% false positive)
-  3. RB_DOCUMENT_INTERCEPTION — hardened
-     Now requires deliveryType !== 'cache' AND no cache headers
-     to avoid false positive on reloads / back button
-  4. RB_IFRAME_REALM_SHARED — timeout extended to 300ms
+CRITICAL FIXES in v8.4 (2025-11):
+=====================================
+  1. visibilitychange hidden: NO LONGER finalizes the session.
+  2. getCDP(): detects actual CDP Runtime.addBinding leaks.
+  3. BOTD_DETECTPLUGINSARRAY: checks typeof length (not Array.isArray).
+  4. WRONGCHROMEORDER: checks loadTimes is native (not key ordering).
+  5. Native tampering: flags ONLY when setPrototypeOf throws (proxy behavior).
+
+MEDIUM FIXES in v8.5 (2025-11):
+=====================================
+  6. HEARTBEAT_JITTER_MS: 2000 → 4000
+     The old ±2s jitter produced a CoV of ~0.115 after filtering, which
+     tripped HEARTBEAT_TOO_REGULAR (threshold 0.10) for real users who
+     stayed 100+ seconds. New ±4s jitter raises CoV to ~0.23 (raw) which
+     survives the p10/p90 filter cleanly for humans.
+
+  7. BOTD_DETECTWEBGL (Mesa OffScreen): whitelist desktop Linux users.
+     Linux VMs, RDP sessions, and PCs without GPU legitimately use
+     software rendering (Brian Paul + Mesa OffScreen). Only flag when
+     the UA is NOT Linux desktop.
+
+  8. PLAYWRIGHTORIENTATION: require Playwright confirmation.
+     Plain Chrome users on rotated displays can have angle=90 without
+     chrome.runtime (extensions disabled). Now requires __pwInitScripts
+     or __playwright__binding__ before flagging.
 """
 TRACKER_V3_JS = r"""(function () {
   'use strict';
@@ -17,7 +34,8 @@ TRACKER_V3_JS = r"""(function () {
   var ENDPOINT      = '__OVG_ENDPOINT_BASE__';
   var HANDSHAKE_DELAY_MS    = 500;
   var HEARTBEAT_INTERVAL_MS = 10000;
-  var HEARTBEAT_JITTER_MS   = 2000;
+  // ✅ v8.5 FIX #6: raised from 2000 to 4000 to avoid HEARTBEAT_TOO_REGULAR
+  var HEARTBEAT_JITTER_MS   = 4000;
   var FINAL_TIMEOUT_MS      = 90 * 1000;
   var RESOLUTION_MS         = 500;
 
@@ -114,9 +132,6 @@ TRACKER_V3_JS = r"""(function () {
     return d.substring(0, 8) + '-' + r.substring(0, 27);
   }
 
-  // =========================================================
-  // safeSend — text/plain for sendBeacon (no preflight)
-  // =========================================================
   function safeSend(url, body, useBeacon) {
     var bodyStr;
     try { bodyStr = JSON.stringify(body); } catch (e) { return Promise.reject(e); }
@@ -164,9 +179,6 @@ TRACKER_V3_JS = r"""(function () {
     catch (e) { return false; }
   }
 
-  // =========================================================
-  // FLAGON — Selector / Path / Rect
-  // =========================================================
   function getSelector(ele) {
     try {
       if (ele instanceof HTMLElement || ele instanceof Element) {
@@ -341,9 +353,6 @@ TRACKER_V3_JS = r"""(function () {
     return milestones;
   }
 
-  // =========================================================
-  // Stack trace traps
-  // =========================================================
   function installTrap(obj, method) {
     try {
       var original = obj[method];
@@ -394,9 +403,6 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
   }
 
-  // =========================================================
-  // Honeypots
-  // =========================================================
   function randomFieldName() {
     var prefixes = ['email', 'username', 'name', 'phone', 'address', 'zip', 'city', 'website', 'company', 'comment'];
     return prefixes[Math.floor(Math.random() * prefixes.length)] + '_' + Math.random().toString(36).slice(2, 6);
@@ -431,9 +437,6 @@ TRACKER_V3_JS = r"""(function () {
     } catch (e) {}
   }
 
-  // =========================================================
-  // Behavior analysis
-  // =========================================================
   function analyzeMouseBehavior() {
     if (mousePoints.length < 5) return 0;
     var angleChanges = 0, straightSegments = 0, pauses = 0, speedJitter = 0;
@@ -528,9 +531,6 @@ TRACKER_V3_JS = r"""(function () {
     return 0;
   }
 
-  // =========================================================
-  // BOTD DETECTORS
-  // =========================================================
   function runBotDDetectors() {
     var det = {};
     var w = window, n = navigator, d = document, s = screen;
@@ -555,8 +555,9 @@ TRACKER_V3_JS = r"""(function () {
         if (/Electron/i.test(n.userAgent)) det.userAgentElectron = 1;
       }
     } catch (e) {}
-    try { if (!Array.isArray(n.plugins)) det.pluginsArray = 1; } catch (e) {}
+    try { if (!n.plugins || typeof n.plugins.length !== 'number') det.pluginsArray = 1; } catch (e) {}
     try { if (n.languages && n.languages.length === 0) det.languagesEmpty = 1; } catch (e) {}
+    // ✅ v8.5 FIX #7: whitelist desktop Linux (software rendering is legit)
     try {
       var c = d.createElement('canvas');
       var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
@@ -565,7 +566,12 @@ TRACKER_V3_JS = r"""(function () {
         if (ext) {
           var v = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
           var r = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
-          if (v === 'Brian Paul' && r === 'Mesa OffScreen') det.webglMesa = 1;
+          if (v === 'Brian Paul' && r === 'Mesa OffScreen') {
+            var plat = (n.platform || '').toLowerCase();
+            var ua = (n.userAgent || '').toLowerCase();
+            var isLikelyLegitLinux = (plat.indexOf('linux') === 0 || plat.indexOf('x11') === 0) && ua.indexOf('chrome') !== -1;
+            if (!isLikelyLegitLinux) det.webglMesa = 1;
+          }
         }
       }
     } catch (e) {}
@@ -613,9 +619,6 @@ TRACKER_V3_JS = r"""(function () {
     return det;
   }
 
-  // =========================================================
-  // VI-BOT DETECTORS
-  // =========================================================
   function runVIBotDetectors() {
     var det = {};
     var w = window, n = navigator, d = document, s = screen;
@@ -664,16 +667,22 @@ TRACKER_V3_JS = r"""(function () {
       if (!isNativeFn(gcsStr) && gcsStr.length > 200) det.stealthCanvas = 1;
     } catch (e) {}
     try {
-      if (w.chrome && typeof w.chrome === 'object') {
-        var chromeKeys = Object.keys(w.chrome);
-        if (chromeKeys.indexOf('loadTimes') !== -1 && chromeKeys[0] !== 'loadTimes') det.wrongChromeOrder = 1;
+      if (w.chrome && typeof w.chrome === 'object' && typeof w.chrome.loadTimes === 'function') {
+        if (!isNativeFn(w.chrome.loadTimes.toString())) det.wrongChromeOrder = 1;
       }
     } catch (e) {}
+    // ✅ v8.5 FIX #8: require Playwright confirmation before flagging
+    // (plain Chrome on rotated displays can have angle=90 without chrome.runtime)
     try {
       var isChromium3 = n.vendor && n.vendor.indexOf('Google') === 0;
       if (isChromium3 && s.orientation && s.orientation.type === 'landscape-primary' && s.orientation.angle === 90) {
         var hasChromeRt = w.chrome && w.chrome.runtime;
-        if (!hasChromeRt && 'SharedWorker' in w) det.playwrightOrientation = 1;
+        if (!hasChromeRt && 'SharedWorker' in w) {
+          // Require explicit Playwright signatures
+          if (w.__pwInitScripts !== undefined || w.__playwright__binding__ !== undefined) {
+            det.playwrightOrientation = 1;
+          }
+        }
       }
     } catch (e) {}
     try {
@@ -766,23 +775,15 @@ TRACKER_V3_JS = r"""(function () {
     return det;
   }
 
-  // =========================================================
-  // REBROWSER TESTS (v8.2 — hardened)
-  // =========================================================
   function runRebrowserTests() {
     var rb = {};
     var w = window, n = navigator, d = document;
 
-    // 1) pwInitScripts + pwBinding — Playwright only (100%)
     try {
       if (typeof w.__pwInitScripts !== 'undefined') rb.pwInitScripts = 1;
       if (typeof w.__playwright__binding__ !== 'undefined') rb.pwBinding = 1;
     } catch (e) {}
 
-    // 2) documentInterception — HARDENED (only flag when deliveryType is set
-    //    and is NOT 'cache'. Skip entirely on older browsers where deliveryType
-    //    is undefined, because nextHopProtocol can legitimately be '' on cache
-    //    hits or some CDN paths).
     try {
       var navEntries = performance.getEntriesByType('navigation');
       if (navEntries && navEntries.length > 0) {
@@ -792,8 +793,6 @@ TRACKER_V3_JS = r"""(function () {
         var workerStart = navEntry.workerStart || 0;
         var deliveryType = navEntry.deliveryType;
 
-        // Only flag when we KNOW deliveryType is not 'cache'
-        // (deliveryType is a newer field; on older browsers it's undefined)
         var deliveryTypeIsKnown = (typeof deliveryType !== 'undefined');
         var isFromCache = deliveryTypeIsKnown && (deliveryType === 'cache');
 
@@ -802,13 +801,9 @@ TRACKER_V3_JS = r"""(function () {
             rb.documentInterception = 1;
           }
         }
-        // If deliveryType is undefined → skip the check entirely
-        // (too risky — false positives on cache hits / older browsers)
       }
     } catch (e) {}
 
-    // 3) runtimeEnableLeak — HARDENED (skip if console.debug is not native,
-    //    which means DevTools or a logging library is intercepting)
     try {
       var consoleDebugIsNative = false;
       try {
@@ -861,7 +856,6 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 4) sourceUrlLeak
     try {
       var srcErr = new Error('Detection Error');
       var stackStr = srcErr.stack ? srcErr.stack.toString() : '';
@@ -869,7 +863,6 @@ TRACKER_V3_JS = r"""(function () {
       else if (stackStr.indexOf('UtilityScript.') !== -1) { rb.sourceUrlLeak = 1; rb.sourceUrlKind = 'playwright'; }
     } catch (e) {}
 
-    // 5) nativeTampering
     try {
       var tampered = [];
       var automationFrames = [];
@@ -899,9 +892,8 @@ TRACKER_V3_JS = r"""(function () {
         var origProto = Object.getPrototypeOf(fn);
         try {
           Object.setPrototypeOf(fn, Object.create(fn));
-          reasons.push('proxy detected');
         } catch (ce) {
-          // Expected for native functions
+          reasons.push('setPrototypeOf throws (proxy wrapper)');
         } finally {
           try {
             if (Object.getPrototypeOf(fn) !== origProto) Object.setPrototypeOf(fn, origProto);
@@ -941,7 +933,6 @@ TRACKER_V3_JS = r"""(function () {
       if (automationFrames.length > 0) rb.automationFrames = automationFrames.slice(0, 5);
     } catch (e) {}
 
-    // 6) exposeFunctionLeak
     try {
       var keyList = Object.keys(window);
       for (var ki = 0; ki < keyList.length; ki++) {
@@ -956,7 +947,6 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 7) cdpBindingGlobals
     try {
       var unnamed = [];
       var props = Object.getOwnPropertyNames(window);
@@ -972,7 +962,6 @@ TRACKER_V3_JS = r"""(function () {
       if (unnamed.length >= 2) rb.cdpBindingGlobals = unnamed.slice(0, 5);
     } catch (e) {}
 
-    // 8) Headless indicators
     try {
       var isDesktop = !(navigator.userAgentData && navigator.userAgentData.mobile) && !/Android|iPhone|iPad|Mobile/.test(navigator.userAgent);
       var isChromium = n.vendor && n.vendor.indexOf('Google') === 0;
@@ -990,7 +979,6 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 9) Mobile emulation
     try {
       var isMobileUA = /Android|iPhone|iPad|iPod|Mobile/.test(navigator.userAgent);
       if (isMobileUA) {
@@ -1001,7 +989,6 @@ TRACKER_V3_JS = r"""(function () {
       }
     } catch (e) {}
 
-    // 10) Platform mismatch — still collected but NOT in CRITICAL_RULES
     try {
       var uaLower = navigator.userAgent.toLowerCase();
       var platformLower = (navigator.platform || '').toLowerCase();
@@ -1018,7 +1005,6 @@ TRACKER_V3_JS = r"""(function () {
       else if (platformLower.indexOf('linux') === 0) platOS = 'linux';
       else if (platformLower.indexOf('iphone') === 0 || platformLower.indexOf('ipad') === 0) platOS = 'ios';
 
-      // iPad desktop mode: UA says macintosh, platform says iPad — that's OK
       var isIpadDesktopMode = (uaOS === 'macos' && platOS === 'ios');
 
       if (uaOS !== 'unknown' && platOS !== 'unknown' && uaOS !== platOS && !isIpadDesktopMode) {
@@ -1038,15 +1024,9 @@ TRACKER_V3_JS = r"""(function () {
       } catch (e) {}
     } catch (e) {}
 
-    // NOTE: navOwnProps INTENTIONALLY REMOVED — false positive 100%
-    // (Chrome has 50+ own props on navigator even for real humans)
-
     return rb;
   }
 
-  // =========================================================
-  // Event listeners
-  // =========================================================
   function setupListeners() {
     document.addEventListener('mousemove', function (e) {
       counters.mousemove++;
@@ -1169,15 +1149,29 @@ TRACKER_V3_JS = r"""(function () {
     }, { passive: true });
 
     window.addEventListener('blur', function () { markActivity(); });
-    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') finalize('hidden'); });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') {
+        markActivity();
+        if (!finalSent && handshakeDone && seq < 990) {
+          seq++;
+          safeSend(ENDPOINT + '/api/collect/heartbeat', {
+            v: 3, session_id: sessionId, seq: seq, t_ms: Math.round(now()),
+            clicks: counters.clicks, scrolls: counters.scrolls,
+            mousemoves: counters.mousemove, keydowns: counters.keydown,
+            is_visible: false, is_focused: false
+          }, false).catch(function () {});
+        }
+      } else {
+        markActivity();
+      }
+    });
+
     window.addEventListener('pagehide', function () { finalize('pagehide'); });
     window.addEventListener('beforeunload', function () { finalize('beforeunload'); });
     setInterval(checkIdle, 5000);
   }
 
-  // =========================================================
-  // Fingerprint builders
-  // =========================================================
   function getCanvasHash() {
     try {
       var c = document.createElement('canvas'); c.width = 220; c.height = 40;
@@ -1235,11 +1229,18 @@ TRACKER_V3_JS = r"""(function () {
 
   function getCDP() {
     try {
-      var detected = false;
-      var err = new Error();
-      Object.defineProperty(err, 'stack', { get: function () { detected = true; return ''; } });
-      if (console.debug) console.debug(err);
-      return detected;
+      var bindingCount = 0;
+      var props = Object.getOwnPropertyNames(window);
+      for (var i = 0; i < props.length; i++) {
+        try {
+          var desc = Object.getOwnPropertyDescriptor(window, props[i]);
+          if (!desc || !('value' in desc)) continue;
+          if (typeof desc.value === 'function' && desc.value.name === '' && /\{\s*\[native code\]\s*\}\s*$/.test(Function.prototype.toString.call(desc.value))) {
+            bindingCount++;
+          }
+        } catch (e) {}
+      }
+      return bindingCount >= 2;
     } catch (e) { return false; }
   }
 

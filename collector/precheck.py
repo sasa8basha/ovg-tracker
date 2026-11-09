@@ -1,18 +1,30 @@
 """
-collector/precheck.py — Fast pre-check rules (v8.3)
+collector/precheck.py — Fast pre-check rules (v8.4)
 
-CRITICAL FIX in v8.3:
-  - `action: "block"` NOW only fires on `has_critical` (a real impossible /
-    critical signal like WEBDRIVER_FLAG, TOSTRINGSPOOFED, ERRORTRAPPATCHRIGHT).
-  - Score-based blocking is REMOVED from precheck entirely.
-    The score is still computed and returned for logging / reporting,
-    but the ACTION will always be "redirect" unless a critical rule fires.
-  - Reason: on real Chrome (esp. on Google-owned domains like Blogger),
-    third-party scripts inject noise that triggers RB_RUNTIME_ENABLE_LEAK,
-    RB_CDP_BINDING_GLOBALS, etc. Those pushed the score to 100 and caused
-    false-positive blocks (redirect to /404).
-  - The proper score-based decision happens in analyze_full() at final,
-    where we have full behavior data.
+CRITICAL FIXES in v8.4:
+  1. CDP_DETECTED — REMOVED from CRITICAL_RULES
+     Reason: getCDP() in the tracker was triggering on ANY user with
+     DevTools open (F12), because console.debug() serializes Error
+     objects which invokes the stack getter. This blocked every developer
+     and power user. The new getCDP() (v8.4 tracker) uses a much more
+     specific check (CDP Runtime.addBinding bindings), so CDP_DETECTED
+     is now a normal bot signal, not a critical block.
+
+  2. WRONGCHROMEORDER — REMOVED from CRITICAL_RULES
+     Reason: Modern Chrome (v100+) has different key ordering in
+     window.chrome. The check was firing for EVERY modern Chrome user.
+     It's now a "high" severity signal, not critical.
+
+  3. STEALTHDETECTION — reclassified from critical to high (in registry)
+     Reason: It was a generic catch-all signal that could fire on
+     innocent browser extensions.
+
+PHILOSOPHY (unchanged):
+  - `action: "block"` fires ONLY on has_critical (impossible signals
+    that no real browser can produce).
+  - Score is still computed for logging/reporting.
+  - Non-critical signals flow into analyze_full() at final where full
+    behavior data is available.
 """
 from __future__ import annotations
 
@@ -27,6 +39,7 @@ from collector.signals import (
 # =========================================================
 # CRITICAL RULES — only these block instantly
 # =========================================================
+# v8.4: Removed CDP_DETECTED and WRONGCHROMEORDER (false positives).
 CRITICAL_RULES = frozenset([
     # Core
     "WEBDRIVER_FLAG",
@@ -35,7 +48,6 @@ CRITICAL_RULES = frozenset([
     "SELENIUM_DETECTED",
     "NIGHTMARE_DETECTED",
     "PHANTOM_DETECTED",
-    "CDP_DETECTED",
     "HONEYPOT_CLICK",
     "HONEYPOT_FORM_FILL",
     "HEADLESS_UA",
@@ -46,6 +58,8 @@ CRITICAL_RULES = frozenset([
     "BOTD_DETECTDISTINCTIVEPROPERTIES",
     "BOTD_DETECTDOCUMENTATTRIBUTES",
     "BOTD_DETECTWINDOWEXTERNAL",
+    "BOTD_DETECTAPPVERSION",
+    "BOTD_DETECTUSERAGENT",
 
     # vi-bot — 100% impossible signals only
     "WEBDRIVER",
@@ -55,8 +69,7 @@ CRITICAL_RULES = frozenset([
     "NIGHTMAREDETECTED",
     "FAKECREATEELEMENT",
     "TOSTRINGSPOOFED",
-    "STEALTHDETECTION",
-    "WRONGCHROMEORDER",
+    "STEALTHCANVAS",
     "IFRAMECHROMERUNTIME",
 
     # Stack traps — all impossible
@@ -76,6 +89,8 @@ CRITICAL_RULES = frozenset([
     "RB_PW_BINDING",
     "RB_HEADLESS_UA",
     "RB_EXPOSE_FUNCTION_LEAK",
+    "RB_IFRAME_REALM_SHARED",
+    "RB_AUTOMATION_FRAME",
 ])
 
 
@@ -274,15 +289,12 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
     """
     Fast pre-check. Reads the full tracker fingerprint.
 
-    v8.3 BEHAVIOR:
-        - `action: "block"` fires ONLY on `has_critical` (impossible signals).
+    v8.4 BEHAVIOR:
+        - `action: "block"` fires ONLY on has_critical (impossible signals).
+        - CDP_DETECTED and WRONGCHROMEORDER are NO LONGER critical rules
+          (they were causing false positives on devs and modern Chrome).
         - Score is still computed and returned for logging/reporting.
-        - Non-critical signals no longer cause a block at handshake time —
-          they flow into `analyze_full()` at final, where the full behavior
-          data is available.
-        - This is CRITICAL for landing pages (Blogger, WordPress, etc.) where
-          third-party scripts (Analytics, AdSense) trigger false positives
-          in the rebrowser tests.
+        - Non-critical signals flow into analyze_full() at final.
     """
     nav = nav or {}
     fp = fp or {}
@@ -306,6 +318,8 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
     if automation.get("phantom"):
         reasons.append("PHANTOM_DETECTED")
 
+    # v8.4: cdp_detected from getCDP() is no longer critical.
+    # It's still recorded as a normal bot signal (score-based).
     if fp.get("cdp_detected") is True:
         reasons.append("CDP_DETECTED")
 
@@ -407,10 +421,10 @@ def quick_precheck(nav: dict, fp: dict, threshold: int = 100) -> dict:
             counts[sev] += 1
 
     # ---------------------------------------------------------
-    # 8) ACTION — CRITICAL FIX v8.3
+    # 8) ACTION
     # ---------------------------------------------------------
-    # Only block on impossible signals. Non-critical reasons are recorded
-    # but don't trigger a redirect to /404 at handshake time.
+    # v8.4: Only block on impossible signals. Non-critical reasons
+    # are recorded but don't trigger a redirect at handshake time.
     should_block = has_critical
 
     return {

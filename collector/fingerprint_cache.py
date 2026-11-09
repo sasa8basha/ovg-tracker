@@ -1,5 +1,14 @@
 """
-fingerprint_cache.py — Known-bad fingerprint cache (v3.2)
+fingerprint_cache.py — Known-bad fingerprint cache (v3.3)
+
+v3.3 FIX:
+  - `record()` no longer drops a new strike when the existing entry
+    has expired. Previously:
+        if self._is_expired(entry):
+            self._cache.pop(fp_hash, None)
+            return          # ← dropped the new strike
+    Now: expired entry is removed, then a fresh entry is created with
+    strikes=1, preserving the new signal.
 
 In-memory cache of fingerprints that were confirmed as bots.
 On repeat, boosts confidence dramatically.
@@ -34,26 +43,33 @@ class FingerprintCache:
 
         with self._lock:
             now = time.time()
+
             if fp_hash in self._cache:
                 entry = self._cache[fp_hash]
                 if self._is_expired(entry):
+                    # v3.3 FIX: remove expired entry, then fall through
+                    # to create a fresh entry below (do NOT return).
                     self._cache.pop(fp_hash, None)
+                else:
+                    # Existing, non-expired entry → increment
+                    entry["strikes"] += 1
+                    entry["last_seen"] = now
+                    if evidence_codes:
+                        for code in evidence_codes[:10]:
+                            if code not in entry["evidence_codes"]:
+                                entry["evidence_codes"].append(code)
+                        entry["evidence_codes"] = entry["evidence_codes"][:20]
+                    self._cache.move_to_end(fp_hash)
+                    self._evict()
                     return
-                entry["strikes"] += 1
-                entry["last_seen"] = now
-                if evidence_codes:
-                    for code in evidence_codes[:10]:
-                        if code not in entry["evidence_codes"]:
-                            entry["evidence_codes"].append(code)
-                    entry["evidence_codes"] = entry["evidence_codes"][:20]
-                self._cache.move_to_end(fp_hash)
-            else:
-                self._cache[fp_hash] = {
-                    "strikes": 1,
-                    "first_seen": now,
-                    "last_seen": now,
-                    "evidence_codes": list((evidence_codes or [])[:10]),
-                }
+
+            # Create fresh entry (either brand new or replacing expired)
+            self._cache[fp_hash] = {
+                "strikes": 1,
+                "first_seen": now,
+                "last_seen": now,
+                "evidence_codes": list((evidence_codes or [])[:10]),
+            }
             self._evict()
 
     def get_stats(self, fp_hash):

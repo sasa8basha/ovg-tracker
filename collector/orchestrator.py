@@ -1,9 +1,22 @@
 """
-collector/orchestrator.py — Full analysis pipeline (v4.0)
+collector/orchestrator.py — Full analysis pipeline (v4.1)
+
+v4.1 FIXES (2025-11):
+  - `_prep_base_signals`: enforcement of severity from SIGNAL_REGISTRY
+    Prevents analysis.py's "critical" from downgrading a signal that the
+    registry marks as "impossible" (e.g. WEBDRIVER_FLAG). The registry
+    is the floor — you can only raise severity, never lower it.
+
+  - `has_impossible` propagation: now passed from BOTH contradiction engine
+    AND fusion layer to `decide()`. If analysis.py emits an impossible signal
+    (via the registry enforcement above), the decision layer will bypass
+    the data quality gate.
+
+  - `_collect_headers`: skips header analysis entirely when `_headers is None`.
+    This prevents the "MISSING_SEC_CH_UA" false positive on stale sessions
+    where we don't have the original HTTP headers.
 
 The orchestrator is the SINGLE entry point for visit analysis.
-It replaces the old threshold-based `_recompute_verdict` with the new
-Multi-Layer Probabilistic Risk Engine.
 
 Pipeline:
     1. evaluate_data_quality      → understand how much we trust the data
@@ -39,6 +52,21 @@ from collector.signals import SIGNAL_REGISTRY
 
 
 # =========================================================
+# SEVERITY RANKING (v4.1)
+# =========================================================
+# Prevents analysis.py's legacy "critical" from downgrading a signal
+# the registry marks as "impossible". Higher rank = stricter severity.
+_SEV_RANK = {
+    "human":      0,
+    "low":        1,
+    "medium":     2,
+    "high":       3,
+    "critical":   4,
+    "impossible": 5,
+}
+
+
+# =========================================================
 # DB-COMPAT DATA QUALITY MAP
 # =========================================================
 # The `visits.data_quality` column is a String(20), but the UI styles
@@ -59,12 +87,20 @@ def _to_db_quality(level: str) -> str:
 
 
 # =========================================================
-# BASE-SIGNAL PREPARATION
+# BASE-SIGNAL PREPARATION (v4.1 — severity enforcement)
 # =========================================================
 def _prep_base_signals(base_evidence: list) -> list:
     """
-    Convert analyze_visit()'s legacy evidence (with `score` field)
-    into the new signal format that fusion understands.
+    Convert analyze_visit()'s legacy evidence (with `score` field) into
+    the new signal format that fusion understands.
+
+    v4.1 FIX:
+      - Registry severity is the FLOOR.
+      - If analysis.py says "critical" but registry says "impossible",
+        the signal is escalated to "impossible".
+      - This preserves the human_reduction protection: impossible signals
+        cap the max human reduction at 0.10 (a fake "natural mouse" can't
+        save a WEBDRIVER_FLAG bot).
 
     Registry strength wins over score-derived strength when the code
     is registered — this prevents legacy scoring from inflating values.
@@ -82,6 +118,10 @@ def _prep_base_signals(base_evidence: list) -> list:
         reg = SIGNAL_REGISTRY.get(str(code).upper())
         if reg:
             base_strength = float(reg.get("base", 0.5))
+            reg_sev = str(reg.get("sev", "medium"))
+            # ✅ v4.1: Registry is the floor — can only raise severity
+            if _SEV_RANK.get(reg_sev, 2) > _SEV_RANK.get(severity, 2):
+                severity = reg_sev
         else:
             score = abs(float(e.get("score", 0) or 0))
             if direction == "human":
@@ -232,8 +272,17 @@ def _collect_base(data: dict, ip_info: dict) -> tuple[dict, list]:
 
 
 def _collect_headers(data: dict) -> list:
+    """
+    v4.1 FIX: Skip entirely when headers are None (stale finalization).
+
+    Passing empty `{}` to analyze_headers causes every Chrome UA to emit
+    MISSING_SEC_CH_UA (high, 0.55), MISSING_SEC_FETCH, MISSING_ACCEPT_LANGUAGE.
+    Combined, these pushed legit-but-network-delayed sessions to "invalid".
+    """
+    headers = data.get("_headers")
+    if headers is None:
+        return []
     try:
-        headers = _safe_dict(data.get("_headers"))
         http_version = data.get("_http_version") or "1.1"
         nav = _safe_dict(data.get("nav"))
         ua = str(nav.get("ua") or "")
@@ -354,11 +403,18 @@ def analyze_full(
     )
 
     # ---------- 11) Decision ----------
+    # v4.1 FIX: Propagate has_impossible from BOTH the contradiction engine
+    # AND the fusion layer. Fusion computes its own has_impossible after
+    # registry-enforced severity, so if analysis.py emits WEBDRIVER_FLAG
+    # (which _prep_base_signals escalates to "impossible"), the decision
+    # layer will correctly bypass the data quality gate.
+    combined_has_impossible = has_impossible or bool(fusion.get("has_impossible", False))
+
     decision = decide(
         fusion,
         dq,
         campaign_mode=campaign_mode,
-        has_impossible=has_impossible,
+        has_impossible=combined_has_impossible,
     )
 
     # ---------- 12) Record strike on invalid ----------
@@ -399,7 +455,7 @@ def analyze_full(
         "wasted_impression": base_result.get("wasted_impression", False),
         "data_quality":     _to_db_quality(dq.level),
         "filter_reason":    filter_reason,
-        "contradiction_impossible": has_impossible,
+        "contradiction_impossible": combined_has_impossible,
 
         # ===== New fields =====
         "bot_probability":  decision["bot_probability"],
@@ -412,7 +468,7 @@ def analyze_full(
             "bot_evidence":   fusion.get("bot_evidence", 0.0),
             "human_evidence": fusion.get("human_evidence", 0.0),
             "prior_risk":     fusion.get("prior_risk", 0.15),
-            "has_impossible": has_impossible,
+            "has_impossible": combined_has_impossible,
             "reasoning":      fusion.get("reasoning", {}),
         },
         "decision":         decision,

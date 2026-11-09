@@ -1,5 +1,5 @@
 """
-contradiction_engine.py — Impossibility & Contradiction Detection (v8.0)
+contradiction_engine.py — Impossibility & Contradiction Detection (v8.1)
 
 Philosophy:
   NOT "does it look like a bot" — but "is this PHYSICALLY IMPOSSIBLE for a
@@ -12,14 +12,12 @@ Severity tiers:
   - medium:     unusual pattern worth noting
   - low:        slightly odd
 
-v8.0 additions (vs v4.0):
-  - Patchright / Puppeteer / Playwright specific signatures
-  - Chromium runtime-enable leak detection (from error stack analysis)
-  - iframe realm sharing (from puppeteer-extra-plugin-stealth)
-  - CDP binding globals detection
-  - ActiveText OS spoofing detection
-  - Document interception (Fetch.fulfillRequest) detection
-  - Every finding carries direction + base_strength (v4.0 kept)
+v8.1 FIX (2025-11):
+  - rule_iphone_wide_screen: threshold raised from 500 to 1200
+    Real iPhone landscape max = 932px (Pro Max). 500 was blocking
+    every real iPhone user in landscape mode.
+  - Added secondary check for both dimensions > 932 (catch true spoofing)
+  - Preserved all v8.0 Patchright/Puppeteer/Playwright signatures
 """
 import re
 
@@ -245,13 +243,34 @@ def rule_sec_ch_ua_mobile_mismatch(ctx):
 
 
 def rule_iphone_wide_screen(ctx):
+    """
+    v8.1 FIX: Real iPhones max out at ~932x430 (Pro Max landscape).
+    Previous threshold of 500 was blocking every real iPhone user in landscape.
+
+    New logic:
+      - > 1200px width = definitely impossible (no iPhone)
+      - > 932px in BOTH dimensions = impossible (no iPhone has that)
+    """
     ua = (_get(ctx, "ua") or "").lower()
     screen_w = _safe_int(_get(ctx, "screen.width"), 0)
+    screen_h = _safe_int(_get(ctx, "screen.height"), 0)
     is_iphone = "iphone" in ua
-    if is_iphone and screen_w > 500:
+
+    if not is_iphone:
+        return None
+
+    # Primary check: width > 1200 is impossible for any iPhone
+    if screen_w > 1200:
         return {"severity": "impossible", "score": 100,
-                "detail": f"iPhone UA + screen.width={screen_w}",
+                "detail": f"iPhone UA + screen.width={screen_w} (max is 932)",
                 "category": "screen"}
+
+    # Secondary check: both dimensions > 932 = impossible
+    if screen_w > 932 and screen_h > 932:
+        return {"severity": "impossible", "score": 100,
+                "detail": f"iPhone UA + screen {screen_w}x{screen_h} (both > 932)",
+                "category": "screen"}
+
     return None
 
 

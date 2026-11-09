@@ -1,23 +1,12 @@
 """
-collector/signals.py — Signal Registry & Normalization (v8.0)
+collector/signals.py — Signal Registry & Normalization (v8.2)
 
-Every signal — from any source (analysis, headers, temporal, behavior,
-contradiction, fingerprint cache, BotD, vi-bot, rebrowser, Flagon, AdVerify-inspired)
-— MUST be normalized through this module before it enters the fusion layer.
-
-Canonical signal shape (produced by normalize_signal):
-    {
-        "code": str,
-        "category": str,
-        "source": str,
-        "direction": "bot" | "human",
-        "severity": str,   # impossible|critical|high|medium|low|human
-        "base_strength": float,
-        "evidence_quality": float,
-        "context_multiplier": float,
-        "strength": float,
-        "detail": str,
-    }
+v8.2 FIX (2025-11):
+  - Added OS_MISMATCH_LINUX (v3.3 analysis.py can now detect Linux UA
+    with spoofed Win32/Mac platform).
+  - All v8.1 fixes preserved (CDP_DETECTED downgrade, WRONGCHROMEORDER
+    downgrade, BOTD_DETECTPLUGINSARRAY downgrade, BOT_UA upgrade,
+    DATACENTER_IP base raise).
 """
 from __future__ import annotations
 
@@ -36,10 +25,10 @@ SEVERITY_BASE = {
 
 SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # =========================================================
-    # AUTOMATION FLAGS (impossible)
+    # AUTOMATION FLAGS
     # =========================================================
     "WEBDRIVER_FLAG":            {"base": 0.99, "dir": "bot", "sev": "impossible", "cat": "automation"},
-    "CDP_DETECTED":              {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "CDP_DETECTED":              {"base": 0.92, "dir": "bot", "sev": "critical",   "cat": "automation"},
     "PUPPETEER_DETECTED":        {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "PLAYWRIGHT_DETECTED":       {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "SELENIUM_DETECTED":         {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
@@ -76,7 +65,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "BOTD_DETECTWINDOWSIZE":         {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "automation"},
     "BOTD_DETECTAPPVERSION":         {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "ua"},
     "BOTD_DETECTUSERAGENT":          {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "ua"},
-    "BOTD_DETECTPLUGINSARRAY":       {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "fingerprint"},
+    "BOTD_DETECTPLUGINSARRAY":       {"base": 0.60, "dir": "bot", "sev": "high",       "cat": "fingerprint"},
     "BOTD_DETECTLANGUAGESLENGTHINCONSISTENCY": {"base": 0.95, "dir": "bot", "sev": "critical", "cat": "fingerprint"},
     "BOTD_DETECTWEBGL":              {"base": 0.95, "dir": "bot", "sev": "critical",   "cat": "webgl"},
     "BOTD_DETECTPROCESS":            {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
@@ -99,11 +88,11 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "NIGHTMAREDETECTED":     {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "FAKECREATEELEMENT":     {"base": 0.95, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "TOSTRINGSPOOFED":       {"base": 0.95, "dir": "bot", "sev": "impossible", "cat": "automation"},
-    "STEALTHDETECTION":      {"base": 0.92, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "STEALTHDETECTION":      {"base": 0.75, "dir": "bot", "sev": "high",       "cat": "automation"},
     "STEALTHNOTIFICATION":   {"base": 0.90, "dir": "bot", "sev": "critical",   "cat": "automation"},
     "STEALTHPLUGINS":        {"base": 0.90, "dir": "bot", "sev": "critical",   "cat": "automation"},
     "STEALTHCANVAS":         {"base": 0.92, "dir": "bot", "sev": "impossible", "cat": "automation"},
-    "WRONGCHROMEORDER":      {"base": 0.90, "dir": "bot", "sev": "impossible", "cat": "automation"},
+    "WRONGCHROMEORDER":      {"base": 0.70, "dir": "bot", "sev": "high",       "cat": "automation"},
     "PLAYWRIGHTORIENTATION": {"base": 0.85, "dir": "bot", "sev": "critical",   "cat": "automation"},
     "IFRAMECHROMERUNTIME":   {"base": 0.90, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "CANVASFINGERPRINT":     {"base": 0.70, "dir": "bot", "sev": "high",       "cat": "fingerprint"},
@@ -132,7 +121,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "FONTFEW":               {"base": 0.55, "dir": "bot", "sev": "medium",     "cat": "fingerprint"},
 
     # =========================================================
-    # REBROWSER-BOT-DETECTOR (modern tests — catches Patchright/Puppeteer/Playwright)
+    # REBROWSER-BOT-DETECTOR
     # =========================================================
     "RB_PW_INIT_SCRIPTS":        {"base": 0.99, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "RB_PW_BINDING":             {"base": 0.99, "dir": "bot", "sev": "impossible", "cat": "automation"},
@@ -172,7 +161,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "ERRORTRAPUTILITYSCRIPT":    {"base": 0.99, "dir": "bot", "sev": "impossible", "cat": "trap"},
 
     # =========================================================
-    # CRITICAL / HIGH (classic)
+    # CRITICAL / HIGH
     # =========================================================
     "CHROME_MISSING_SEC_CH_UA":   {"base": 0.85, "dir": "bot", "sev": "critical", "cat": "headers"},
     "UA_BRANDS_MISMATCH":         {"base": 0.82, "dir": "bot", "sev": "critical", "cat": "headers"},
@@ -185,7 +174,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "IDLE_VISIBLE_LONG":          {"base": 0.78, "dir": "bot", "sev": "critical", "cat": "behavior"},
     "WEBGL2_NO_WEBGL1":           {"base": 0.78, "dir": "bot", "sev": "critical", "cat": "webgl"},
 
-    "BOT_UA":                     {"base": 0.75, "dir": "bot", "sev": "high", "cat": "ua"},
+    "BOT_UA":                     {"base": 0.90, "dir": "bot", "sev": "critical", "cat": "ua"},
     "VPN_DATACENTER":             {"base": 0.72, "dir": "bot", "sev": "high", "cat": "network"},
     "DATACENTER_ASN":             {"base": 0.70, "dir": "bot", "sev": "high", "cat": "network"},
     "WEBRTC_LEAK":                {"base": 0.75, "dir": "bot", "sev": "high", "cat": "network"},
@@ -250,7 +239,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "CLICK_OUTSIDE_VIEWPORT":     {"base": 0.55, "dir": "bot", "sev": "medium", "cat": "behavior"},
 
     # =========================================================
-    # ADVERIFY-INSPIRED (web adaptation)
+    # ADVERIFY-INSPIRED
     # =========================================================
     "ML_FEATURE_ANOMALY":         {"base": 0.65, "dir": "bot", "sev": "high",   "cat": "ml"},
     "ML_FEATURE_SUSPICIOUS":      {"base": 0.45, "dir": "bot", "sev": "medium", "cat": "ml"},
@@ -263,7 +252,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # =========================================================
     # MEDIUM / LOW
     # =========================================================
-    "DATACENTER_IP":              {"base": 0.55, "dir": "bot", "sev": "high",   "cat": "network"},
+    "DATACENTER_IP":              {"base": 0.65, "dir": "bot", "sev": "high",   "cat": "network"},
     "VPN_PROXY":                  {"base": 0.45, "dir": "bot", "sev": "medium", "cat": "network"},
     "WEBRTC_VPN_DIFF":            {"base": 0.35, "dir": "bot", "sev": "medium", "cat": "network"},
     "LANGUAGES_EMPTY":            {"base": 0.30, "dir": "bot", "sev": "medium", "cat": "fingerprint"},
@@ -287,6 +276,8 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "INNER_TALLER_THAN_SCREEN":   {"base": 0.35, "dir": "bot", "sev": "medium", "cat": "screen"},
     "OS_MISMATCH_WIN":            {"base": 0.40, "dir": "bot", "sev": "medium", "cat": "os"},
     "OS_MISMATCH_MAC":            {"base": 0.40, "dir": "bot", "sev": "medium", "cat": "os"},
+    # ✅ v8.2: new signal for Linux UA + Win32/Mac platform
+    "OS_MISMATCH_LINUX":          {"base": 0.40, "dir": "bot", "sev": "medium", "cat": "os"},
     "TOUCH_UA_MISMATCH":          {"base": 0.35, "dir": "bot", "sev": "medium", "cat": "contradictions"},
     "FIRST_LANG_MISMATCH":        {"base": 0.15, "dir": "bot", "sev": "low",    "cat": "contradictions"},
     "INTL_LOCALE_MISMATCH":       {"base": 0.18, "dir": "bot", "sev": "low",    "cat": "contradictions"},
@@ -317,7 +308,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "MISSING_USER_AGENT_HEADER":  {"base": 0.65, "dir": "bot", "sev": "high",   "cat": "headers"},
 
     # =========================================================
-    # HUMAN (positive, strong)
+    # HUMAN
     # =========================================================
     "HUMAN_NATURAL_MOUSE":        {"base": 0.65, "dir": "human", "sev": "human", "cat": "human"},
     "HUMAN_SCROLL_PHYSICS":       {"base": 0.60, "dir": "human", "sev": "human", "cat": "human"},
@@ -416,7 +407,6 @@ def normalize_signal(
     elif base_f > 1.0:
         base_f = 1.0
 
-    # Legacy score fallback
     if base is None and "score" in raw:
         try:
             sc = float(raw.get("score", 0))
@@ -526,15 +516,10 @@ def strongest_bot(signals: List[dict]) -> Optional[dict]:
 # REBROWSER → SIGNAL ADAPTER
 # =========================================================
 def convert_rebrowser_to_signals(rb: dict) -> List[dict]:
-    """
-    Convert rebrowser-bot-detector test results into raw signals.
-    Input is the `fp["rebrowser"]` dict from the tracker.
-    """
     if not isinstance(rb, dict):
         return []
     out = []
 
-    # Simple flags
     if rb.get("pwInitScripts"):
         out.append({"code": "RB_PW_INIT_SCRIPTS", "detail": "Playwright's window.__pwInitScripts present"})
     if rb.get("pwBinding"):
@@ -560,14 +545,12 @@ def convert_rebrowser_to_signals(rb: dict) -> List[dict]:
     if rb.get("activeTextMismatch") == 0.5:
         out.append({"code": "RB_ACTIVE_TEXT_MISMATCH", "detail": "Claims Windows but renders Linux/macOS ActiveText"})
 
-    # Runtime.enable leak (either hard 1 or soft 0.7)
     rl = rb.get("runtimeEnableLeak")
     if rl == 1:
         out.append({"code": "RB_RUNTIME_ENABLE_LEAK", "detail": "CDP Runtime.enable detected (console serialization)"})
     elif rl == 0.7:
         out.append({"code": "RB_RUNTIME_ENABLE_SOFT", "detail": "Possible Runtime.enable (stack lookup happened)"})
 
-    # sourceUrlLeak
     sl = rb.get("sourceUrlLeak")
     if sl == 1:
         kind = rb.get("sourceUrlKind", "unknown")
@@ -576,33 +559,27 @@ def convert_rebrowser_to_signals(rb: dict) -> List[dict]:
         bare = rb.get("bareFiles", [])
         out.append({"code": "RB_SOURCE_URL_BARE_FILE", "detail": f"Bare file names in stack: {bare[:3]}"})
 
-    # nativeTampered
     nt = rb.get("nativeTampered")
     if isinstance(nt, list) and nt:
         names = [t.get("name") for t in nt if isinstance(t, dict)]
         out.append({"code": "RB_NATIVE_TAMPERED", "detail": f"Tampered: {', '.join(names[:3])}"})
 
-    # automationFrames
     af = rb.get("automationFrames")
     if isinstance(af, list) and af:
         out.append({"code": "RB_AUTOMATION_FRAME", "detail": f"Automation frames in: {', '.join(af[:3])}"})
 
-    # cdpBindingGlobals
     cb = rb.get("cdpBindingGlobals")
     if isinstance(cb, list) and cb:
         out.append({"code": "RB_CDP_BINDING_GLOBALS", "detail": f"Unnamed native globals: {cb[:3]}"})
 
-    # exposeFunctionLeak
     if rb.get("exposeFunctionLeak"):
         kind = rb.get("exposeKind", "unknown")
         out.append({"code": "RB_EXPOSE_FUNCTION_LEAK", "detail": f"exposeFunction leak ({kind})"})
 
-    # navOwnProps
     nop = rb.get("navOwnProps")
     if isinstance(nop, list) and nop:
         out.append({"code": "RB_NAV_OWN_PROPS", "detail": f"navigator has own props: {nop[:3]}"})
 
-    # platformMismatch
     pm = rb.get("platformMismatch")
     if isinstance(pm, dict):
         out.append({
@@ -614,10 +591,9 @@ def convert_rebrowser_to_signals(rb: dict) -> List[dict]:
 
 
 # =========================================================
-# GENERIC FINGERPRINT → SIGNALS ADAPTER (BotD + vi-bot + traps + honeypot)
+# GENERIC FINGERPRINT → SIGNALS ADAPTER
 # =========================================================
 def _iter_botd(botd: dict):
-    """Yield (signal_code, detail) for each triggered BotD detection."""
     if not isinstance(botd, dict):
         return
     mapping = {
@@ -651,7 +627,6 @@ def _iter_botd(botd: dict):
 
 
 def _iter_vib(vib: dict):
-    """Yield (signal_code, detail) for each triggered vi-bot detection."""
     if not isinstance(vib, dict):
         return
     mapping = {
@@ -691,10 +666,6 @@ def _iter_vib(vib: dict):
 
 
 def convert_fingerprint_to_signals(fp: dict) -> List[dict]:
-    """
-    Convert the full `fingerprint` dict from tracker payload into raw signals.
-    Handles: botd, vib, rebrowser, trap_triggers, honeypot_triggered.
-    """
     if not isinstance(fp, dict):
         return []
 
@@ -708,19 +679,15 @@ def convert_fingerprint_to_signals(fp: dict) -> List[dict]:
 
     out.extend(convert_rebrowser_to_signals(fp.get("rebrowser") or {}))
 
-    # Stack trace traps
     traps = fp.get("trap_triggers") or {}
     if isinstance(traps, dict):
         for trap_name, triggered in traps.items():
             if not triggered:
                 continue
             code = str(trap_name).upper()
-            # Our tracker uses camelCase keys (errorTrapPuppeteer). Normalize.
             code = code.replace("ERRortrap", "ERRORTRAP")
-            # Ensure exact registry key match
             registry_key = code if code in SIGNAL_REGISTRY else None
             if registry_key is None:
-                # Try a best-effort match
                 candidate = code.upper().replace("_", "")
                 for rk in SIGNAL_REGISTRY.keys():
                     if rk.startswith("ERRORTRAP") and rk.replace("_", "") == candidate:
@@ -729,7 +696,6 @@ def convert_fingerprint_to_signals(fp: dict) -> List[dict]:
             if registry_key:
                 out.append({"code": registry_key, "detail": f"Stack trap fired: {trap_name}"})
 
-    # Honeypot
     if fp.get("honeypot_triggered") is True:
         out.append({"code": "HONEYPOT_CLICK", "detail": "Hidden honeypot field interacted with"})
 

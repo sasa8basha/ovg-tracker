@@ -1,17 +1,17 @@
 """
-collector/temporal_analyzer.py — Heartbeat rhythm analysis (v4.0)
+collector/temporal_analyzer.py — Heartbeat rhythm analysis (v4.1)
+
+v4.1 FIX:
+  - `_sum_events` now ignores heartbeats with `is_visible=False`.
+    After the tracker fix (v8.5), users who minimize/switch tabs will
+    send hidden heartbeats with zero events. Without this filter, the
+    late-half of such sessions would register 0 events, tripping
+    ENGAGEMENT_COLLAPSE for real users.
 
 Humans have organic heartbeat variance.
 Bots: either too regular (timer) or too random (jitter simulator).
 
-Produces signals in the unified format:
-    {
-        "code", "severity", "direction", "category",
-        "base_strength",   # from SIGNAL_REGISTRY
-        "score",           # legacy compat
-        "detail"
-    }
-
+Produces signals in the unified format.
 Uses coefficient of variation (CoV) of heartbeat gaps.
 """
 import math
@@ -84,10 +84,20 @@ def _extract_gaps(heartbeats) -> list:
 
 
 def _sum_events(hbs) -> int:
-    """Weighted event sum across heartbeat samples."""
+    """
+    Weighted event sum across heartbeat samples.
+
+    v4.1 FIX: Ignore heartbeats where `is_visible=False`.
+      When a user minimizes or switches tabs, the tracker sends a
+      "hidden" heartbeat with zero event counts. Without this filter,
+      any user who leaves the tab for >30s would register as
+      ENGAGEMENT_COLLAPSE (high severity, 0.55).
+    """
     total = 0
     for hb in hbs or []:
         if isinstance(hb, dict):
+            if not hb.get("is_visible", True):
+                continue
             total += (
                 int(hb.get("clicks") or 0) * 3
                 + int(hb.get("scrolls") or 0) * 2
@@ -95,6 +105,13 @@ def _sum_events(hbs) -> int:
                 + int(hb.get("keydowns") or 0) * 3
             )
         else:
+            # Handle ORM objects
+            try:
+                is_visible = getattr(hb, "is_visible", True)
+                if not is_visible:
+                    continue
+            except Exception:
+                pass
             total += (
                 int(getattr(hb, "clicks", 0) or 0) * 3
                 + int(getattr(hb, "scrolls", 0) or 0) * 2
@@ -111,7 +128,7 @@ def analyze_temporal_rhythm(heartbeats, total_duration_ms):
     """
     Analyze heartbeat gap rhythm. Returns unified signals.
 
-    heartbeats: list of dicts with 't_ms'
+    heartbeats: list of dicts with 't_ms' and 'is_visible'
     total_duration_ms: overall session duration
     """
     signals = []
@@ -139,6 +156,8 @@ def analyze_temporal_rhythm(heartbeats, total_duration_ms):
     cov = s / m
 
     # ---------- BOT signals ----------
+    # v8.5: with jitter ±4000ms, human CoV is ~0.23 (raw) / ~0.18 (filtered).
+    # Threshold 0.10 only catches bots with near-perfect timers.
     if cov < 0.10:
         signals.append(_make_signal(
             "HEARTBEAT_TOO_REGULAR",
@@ -170,6 +189,7 @@ def analyze_temporal_rhythm(heartbeats, total_duration_ms):
         second_half = heartbeats[half:]
         early = _sum_events(first_half)
         late = _sum_events(second_half)
+        # v4.1: only fire if early was active AND late had NO visible events
         if early >= 10 and late == 0:
             signals.append(_make_signal(
                 "ENGAGEMENT_COLLAPSE",
