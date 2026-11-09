@@ -60,6 +60,7 @@
     .cp-form-row input, .cp-form-row select { width: 100%; height: 36px; padding: 0 12px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 13px; outline: none; box-sizing: border-box; }
     .cp-form-row input:focus, .cp-form-row select:focus { border-color: #7C5CFF; }
     .cp-form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .cp-hint { font-size: 10px; color: #7B8496; margin-top: 4px; }
     
     .cp-type-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
     .cp-type-btn { padding: 12px 8px; background: #0F1117; border: 2px solid #232734; border-radius: 10px; cursor: pointer; text-align: center; transition: all 150ms; }
@@ -113,15 +114,38 @@
           </div>
         </div>
         <div class="cp-form-row"><label>اسم الحملة *</label><input type="text" id="newName" placeholder="مثال: PopAds EG → Adsterra 10245" maxlength="200"></div>
+        
         <div class="cp-form-grid-2">
           <div class="cp-form-row"><label>مصدر الترافيك</label><select id="newSource"></select></div>
           <div class="cp-form-row"><label>CPM الشراء ($)</label><input type="number" id="newBuyCpm" step="0.01" min="0" value="1.00"></div>
         </div>
+        
         <div class="cp-form-grid-2">
-          <div class="cp-form-row"><label>الوجهة</label><select id="newDest"></select></div>
+          <div class="cp-form-row"><label>الوجهة (شركة الإعلانات)</label><select id="newDest"></select></div>
           <div class="cp-form-row"><label>CPM البيع ($)</label><input type="number" id="newSellCpm" step="0.01" min="0" value="2.00"></div>
         </div>
-        <div id="destUrlWrap" class="cp-form-row" style="display:none;"><label>رابط الوجهة (Direct Link) *</label><input type="text" id="newDestUrl" placeholder="https://..."></div>
+
+        <!-- Landing URL Field (Shows for Landing / Hybrid) -->
+        <div id="landingUrlWrap" class="cp-form-row" style="display:none;">
+          <label>رابط صفحة الهبوط (Landing Page URL) *</label>
+          <input type="text" id="newLandingUrl" placeholder="https://your-landing-page.com">
+          <div class="cp-hint">الرابط اللي هتحط فيه كود التتبع بتاعنا والماكروز.</div>
+        </div>
+
+        <!-- Destination URL Field (Shows for Direct / Hybrid) -->
+        <div id="destUrlWrap" class="cp-form-row" style="display:none;">
+          <label>رابط الوجهة (Direct Link) *</label>
+          <input type="text" id="newDestUrl" placeholder="https://www.effectivegatecpm.com/...">
+          <div class="cp-hint">الرابط اللي جاي من Adsterra.</div>
+        </div>
+
+        <!-- Adsterra API Key (Shows for all, but especially if dest is Adsterra) -->
+        <div class="cp-form-row">
+          <label>Adsterra API Key (لفحص الأرباح)</label>
+          <input type="text" id="newAdsterraApiKey" placeholder="الصق مفتاح API بتاعك هنا...">
+          <div class="cp-hint">هنسحب بيه الأرباح والإحصائيات من حسابك في Adsterra.</div>
+        </div>
+
         <div id="zoneIdWrap" class="cp-form-row"><label>Zone ID (اختياري)</label><input type="text" id="newZoneId" placeholder="10245"></div>
       </div>
       <div class="cp-modal-foot">
@@ -174,7 +198,13 @@
     function updateTypeButtons(type) {
       CP.newCampaignType = type;
       document.querySelectorAll('.cp-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
-      document.getElementById('destUrlWrap').style.display = type === 'direct' ? '' : 'none';
+      
+      const isDirect = type === 'direct';
+      const isLanding = type === 'landing';
+      const isHybrid = type === 'hybrid';
+
+      document.getElementById('destUrlWrap').style.display = (isDirect || isHybrid) ? '' : 'none';
+      document.getElementById('landingUrlWrap').style.display = (isLanding || isHybrid) ? '' : 'none';
     }
 
     async function openNewCampaign() {
@@ -185,6 +215,14 @@
         document.getElementById('newSource').innerHTML = CP.sources.map(s => `<option value="${Shell.esc(s.slug)}">${Shell.esc(s.name)}</option>`).join('');
         document.getElementById('newDest').innerHTML = CP.destinations.map(d => `<option value="${Shell.esc(d.slug)}">${Shell.esc(d.name)}</option>`).join('');
         
+        // Reset form
+        document.getElementById('newName').value = '';
+        document.getElementById('newLandingUrl').value = '';
+        document.getElementById('newDestUrl').value = '';
+        document.getElementById('newAdsterraApiKey').value = '';
+        document.getElementById('newZoneId').value = '';
+        updateTypeButtons('landing');
+
         document.getElementById('newCampaignModal').classList.add('is-open');
       } catch (e) { Shell.toast('فشل تحميل القوائم', 'error'); }
     }
@@ -199,19 +237,33 @@
         buy_cpm: parseFloat(document.getElementById('newBuyCpm').value) || 0,
         destination_slug: document.getElementById('newDest').value,
         sell_cpm: parseFloat(document.getElementById('newSellCpm').value) || 0,
+        landing_url: document.getElementById('newLandingUrl').value.trim(),
         destination_url: document.getElementById('newDestUrl').value.trim(),
+        adsterra_api_key: document.getElementById('newAdsterraApiKey').value.trim(),
         destination_zone_id: document.getElementById('newZoneId').value.trim(),
       };
+
       if (!body.name) { Shell.toast('اسم الحملة مطلوب', 'error'); return; }
-      if (body.type === 'direct' && !body.destination_url) { Shell.toast('حملات Direct محتاجة رابط وجهة', 'error'); return; }
+      if ((body.type === 'landing' || body.type === 'hybrid') && !body.landing_url) { Shell.toast('حملات Landing محتاجة رابط صفحة الهبوط', 'error'); return; }
+      if ((body.type === 'direct' || body.type === 'hybrid') && !body.destination_url) { Shell.toast('حملات Direct محتاجة رابط الوجهة', 'error'); return; }
       
-      const btn = document.getElementById('createCampaignBtn'); btn.disabled = true;
+      const btn = document.getElementById('createCampaignBtn'); 
+      btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = 'جاري الإنشاء...';
+
       try {
         const res = await Shell.api('/api/campaigns', { method: 'POST', body: JSON.stringify(body) });
-        closeNewCampaign(); Shell.toast('تم إنشاء الحملة ✅', 'success');
+        closeNewCampaign(); 
+        Shell.toast('تم إنشاء الحملة ✅', 'success');
         window.location.href = '/campaigns/' + res.id;
-      } catch (e) { Shell.toast('فشل: ' + e.message, 'error'); }
-      finally { btn.disabled = false; }
+      } catch (e) { 
+        Shell.toast('فشل: ' + e.message, 'error'); 
+      }
+      finally { 
+        btn.disabled = false; 
+        btn.textContent = origText;
+      }
     }
 
     (async function boot() {
@@ -226,4 +278,4 @@
     })();
   </script>
 </body>
-                                                                           </html>
+          </html>
