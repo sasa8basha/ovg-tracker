@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG Neo · Component Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .comp-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .comp-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: neo-spin 0.8s linear infinite;
+    }
+
+    /* Storybook sections */
+    .comp-section {
+      margin-bottom: var(--neo-sp-10);
+    }
+    .comp-section-head {
+      margin-bottom: var(--neo-sp-4);
+      padding-bottom: var(--neo-sp-3);
+      border-bottom: 1px solid var(--neo-border-subtle);
+    }
+    .comp-section-title {
+      font-size: var(--neo-fs-xl);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin: 0 0 var(--neo-sp-1) 0;
+    }
+    .comp-section-desc {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      margin: 0;
+    }
+    .comp-subsection {
+      margin-bottom: var(--neo-sp-6);
+    }
+    .comp-subsection-title {
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: var(--neo-sp-3);
+    }
+    .comp-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--neo-sp-3);
+      align-items: center;
+    }
+    .comp-grid-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--neo-sp-3);
+    }
+    .comp-stack {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--neo-sp-3);
+    }
+    .comp-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--neo-sp-3);
+    }
+    .comp-page-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      margin: 0 0 var(--neo-sp-2) 0;
+      letter-spacing: -0.02em;
+    }
+    .comp-page-desc {
+      font-size: var(--neo-fs-md);
+      color: var(--neo-fg-tertiary);
+      margin: 0 0 var(--neo-sp-8) 0;
+      line-height: 1.6;
+    }
+    .comp-toc {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-4) var(--neo-sp-5);
+      margin-bottom: var(--neo-sp-8);
+    }
+    .comp-toc-title {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+      margin: 0 0 var(--neo-sp-3) 0;
+    }
+    .comp-toc-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--neo-sp-2);
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .comp-toc-list a {
+      color: var(--neo-fg-secondary);
+      text-decoration: none;
+      font-size: var(--neo-fs-sm);
+      padding: var(--neo-sp-1) var(--neo-sp-2);
+      border-radius: var(--neo-r-sm);
+      transition: background var(--neo-dur-fast), color var(--neo-dur-fast);
+      display: block;
+    }
+    .comp-toc-list a:hover {
+      background: var(--neo-bg-elevated);
+      color: var(--neo-accent-hover);
+    }
+    .comp-sparkline {
+      width: 100%;
+      height: 100%;
+    }
+    .comp-code {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-subtle);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-accent-hover);
+      margin-top: var(--neo-sp-2);
+      overflow-x: auto;
+      white-space: pre;
+      direction: ltr;
+      text-align: left;
+    }
+    @keyframes neo-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div class="comp-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري التحميل…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+      <div style="max-width: var(--neo-content-max); margin: 0 auto;">
+
+        <h1 class="comp-page-title">🎨 مكتبة المكونات</h1>
+        <p class="comp-page-desc">
+          OVG Neo Design System v1.0 — كل مكوّن في كل الحالات. اضغط على أي زر لتجربته.
+          بدّل بين الوضع الفاتح والغامق من أعلى الشاشة.
+        </p>
+
+        <div class="comp-toc">
+          <h3 class="comp-toc-title">📑 المحتويات</h3>
+          <ul class="comp-toc-list">
+            <li><a href="#buttons">🔘 الأزرار</a></li>
+            <li><a href="#inputs">⌨️ المدخلات</a></li>
+            <li><a href="#cards">📇 الكروت</a></li>
+            <li><a href="#badges">🏷️ الشارات</a></li>
+            <li><a href="#tables">📊 الجداول</a></li>
+            <li><a href="#charts">📈 كروت الرسوم</a></li>
+            <li><a href="#modals">🪟 المودالات</a></li>
+            <li><a href="#drawers">📂 الأدراج</a></li>
+            <li><a href="#alerts">🚨 التنبيهات</a></li>
+            <li><a href="#kpis">💎 مؤشرات KPI</a></li>
+            <li><a href="#empty">📭 الحالات الفارغة</a></li>
+            <li><a href="#skeletons">💀 Skeletons</a></li>
+            <li><a href="#icons">🎯 الأيقونات</a></li>
+          </ul>
+        </div>
+
+        <!-- ==================== BUTTONS ==================== -->
+        <section class="comp-section" id="buttons">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">🔘 الأزرار</h2>
+            <p class="comp-section-desc">7 variants × 4 sizes × icon/loading/block states.</p>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">Variants (Medium size)</div>
+            <div class="comp-grid">
+              <button class="neo-btn neo-btn-primary">Primary</button>
+              <button class="neo-btn neo-btn-secondary">Secondary</button>
+              <button class="neo-btn neo-btn-ghost">Ghost</button>
+              <button class="neo-btn neo-btn-outline">Outline</button>
+              <button class="neo-btn neo-btn-danger">Danger</button>
+              <button class="neo-btn neo-btn-danger-ghost">Danger Ghost</button>
+              <button class="neo-btn neo-btn-success">Success</button>
+            </div>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">Sizes</div>
+            <div class="comp-grid">
+              <button class="neo-btn neo-btn-primary neo-btn-xs">Extra Small</button>
+              <button class="neo-btn neo-btn-primary neo-btn-sm">Small</button>
+              <button class="neo-btn neo-btn-primary">Medium</button>
+              <button class="neo-btn neo-btn-primary neo-btn-lg">Large</button>
+              <button class="neo-btn neo-btn-primary neo-btn-xl">Extra Large</button>
+            </div>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">With Icons & Loading</div>
+            <div class="comp-grid">
+              <button class="neo-btn neo-btn-primary" onclick="Neo.toast('تم!', 'success')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                حفظ
+              </button>
+              <button class="neo-btn neo-btn-danger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                حذف
+              </button>
+              <button class="neo-btn neo-btn-primary neo-btn-loading">جاري...</button>
+              <button class="neo-btn neo-btn-icon neo-btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">States</div>
+            <div class="comp-grid">
+              <button class="neo-btn neo-btn-primary">Normal</button>
+              <button class="neo-btn neo-btn-primary" disabled>Disabled</button>
+            </div>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">Block</div>
+            <button class="neo-btn neo-btn-primary neo-btn-block">Full Width Button</button>
+          </div>
+        </section>
+
+        <!-- ==================== INPUTS ==================== -->
+        <section class="comp-section" id="inputs">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">⌨️ المدخلات</h2>
+            <p class="comp-section-desc">Text, textarea, select — with labels, hints, and error states.</p>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">Basic Inputs</div>
+            <div class="comp-grid-col" style="max-width: 400px;">
+              <div class="neo-field">
+                <label class="neo-field-label">Username</label>
+                <input type="text" class="neo-input" placeholder="ahmed">
+              </div>
+              <div class="neo-field">
+                <label class="neo-field-label neo-field-label-required">Email</label>
+                <input type="email" class="neo-input" placeholder="you@example.com">
+                <span class="neo-field-hint">We'll never share your email.</span>
+              </div>
+              <div class="neo-field neo-has-error">
+                <label class="neo-field-label">Password</label>
+                <input type="password" class="neo-input" value="123">
+                <span class="neo-field-error">Password is too short (min 8 chars).</span>
+              </div>
+              <div class="neo-field">
+                <label class="neo-field-label">Search</label>
+                <div class="neo-input-wrap">
+                  <svg class="neo-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="search" class="neo-input" placeholder="Search...">
+                </div>
+              </div>
+              <div class="neo-field">
+                <label class="neo-field-label">Notes</label>
+                <textarea class="neo-textarea" placeholder="Write something..."></textarea>
+              </div>
+              <div class="neo-field">
+                <label class="neo-field-label">Country</label>
+                <select class="neo-select">
+                  <option>Egypt</option>
+                  <option>Saudi Arabia</option>
+                  <option>UAE</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">Sizes</div>
+            <div class="comp-grid" style="max-width: 600px;">
+              <input type="text" class="neo-input neo-input-sm" placeholder="Small">
+              <input type="text" class="neo-input" placeholder="Medium (default)">
+              <input type="text" class="neo-input neo-input-lg" placeholder="Large">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== CARDS ==================== -->
+        <section class="comp-section" id="cards">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">📇 الكروت</h2>
+            <p class="comp-section-desc">Default, interactive, accent-top, flat variants.</p>
+          </div>
+
+          <div class="comp-stack">
+            <div class="neo-card">
+              <div class="neo-fg-primary neo-font-bold" style="margin-bottom: 6px;">Default Card</div>
+              <div class="neo-fg-tertiary neo-text-sm">Standard surface card with border.</div>
+            </div>
+            <a class="neo-card neo-card-interactive" href="#" onclick="event.preventDefault(); Neo.toast('Card clicked!', 'info');">
+              <div class="neo-fg-primary neo-font-bold" style="margin-bottom: 6px;">Interactive Card</div>
+              <div class="neo-fg-tertiary neo-text-sm">Hover me — I lift up and glow.</div>
+            </a>
+            <div class="neo-card neo-card-accent-top" style="--neo-card-accent: var(--neo-success);">
+              <div class="neo-fg-primary neo-font-bold" style="margin-bottom: 6px;">Accent Top</div>
+              <div class="neo-fg-tertiary neo-text-sm">Green accent bar on top.</div>
+            </div>
+            <div class="neo-card neo-card-flat">
+              <div class="neo-fg-primary neo-font-bold" style="margin-bottom: 6px;">Flat Card</div>
+              <div class="neo-fg-tertiary neo-text-sm">Elevated surface — no border.</div>
+            </div>
+          </div>
+
+          <div class="comp-subsection" style="margin-top: var(--neo-sp-6);">
+            <div class="comp-subsection-title">Sizes</div>
+            <div class="comp-stack">
+              <div class="neo-card neo-card-sm">Small padding</div>
+              <div class="neo-card neo-card-md">Medium padding</div>
+              <div class="neo-card neo-card-lg">Large padding</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== BADGES ==================== -->
+        <section class="comp-section" id="badges">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">🏷️ الشارات</h2>
+            <p class="comp-section-desc">6 variants × 3 sizes × dot/pulse.</p>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">Variants</div>
+            <div class="comp-grid">
+              <span class="neo-badge neo-badge-default">Default</span>
+              <span class="neo-badge neo-badge-accent">Accent</span>
+              <span class="neo-badge neo-badge-success">✓ Valid</span>
+              <span class="neo-badge neo-badge-warning">⚠ Warning</span>
+              <span class="neo-badge neo-badge-danger">✕ Invalid</span>
+              <span class="neo-badge neo-badge-info">ℹ Info</span>
+            </div>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">With Dots</div>
+            <div class="comp-grid">
+              <span class="neo-badge neo-badge-success neo-badge-dot">Online</span>
+              <span class="neo-badge neo-badge-danger neo-badge-dot neo-badge-dot-pulse">Live</span>
+              <span class="neo-badge neo-badge-warning neo-badge-dot">Degraded</span>
+            </div>
+          </div>
+
+          <div class="comp-subsection">
+            <div class="comp-subsection-title">Sizes</div>
+            <div class="comp-grid">
+              <span class="neo-badge neo-badge-success neo-badge-sm">Small</span>
+              <span class="neo-badge neo-badge-success">Medium</span>
+              <span class="neo-badge neo-badge-success neo-badge-lg">Large</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TABLES ==================== -->
+        <section class="comp-section" id="tables">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">📊 الجداول</h2>
+            <p class="comp-section-desc">Full-featured table with pagination, checkboxes, and numeric cells.</p>
+          </div>
+
+          <div class="neo-table-wrap">
+            <table class="neo-table">
+              <thead>
+                <tr>
+                  <th class="neo-cell-check"><input type="checkbox" class="neo-table-checkbox"></th>
+                  <th class="neo-sortable neo-sorted-desc">Campaign</th>
+                  <th>Zone</th>
+                  <th class="neo-cell-center">Visits</th>
+                  <th class="neo-cell-center">Valid %</th>
+                  <th>Revenue</th>
+                  <th class="neo-cell-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="neo-cell-check"><input type="checkbox" class="neo-table-checkbox"></td>
+                  <td class="neo-fg-primary neo-font-semibold">PopAds EG → Adsterra</td>
+                  <td class="neo-mono">10245</td>
+                  <td class="neo-cell-center neo-mono">12,483</td>
+                  <td class="neo-cell-center neo-mono">87.6%</td>
+                  <td class="neo-cell-num neo-fg-success">+$145.80</td>
+                  <td class="neo-cell-center"><span class="neo-badge neo-badge-success">Active</span></td>
+                </tr>
+                <tr class="neo-row-selected">
+                  <td class="neo-cell-check"><input type="checkbox" class="neo-table-checkbox" checked></td>
+                  <td class="neo-fg-primary neo-font-semibold">PopAds SA → Monetag</td>
+                  <td class="neo-mono">9981</td>
+                  <td class="neo-cell-center neo-mono">8,220</td>
+                  <td class="neo-cell-center neo-mono">91.2%</td>
+                  <td class="neo-cell-num neo-fg-success">+$92.40</td>
+                  <td class="neo-cell-center"><span class="neo-badge neo-badge-success">Active</span></td>
+                </tr>
+                <tr>
+                  <td class="neo-cell-check"><input type="checkbox" class="neo-table-checkbox"></td>
+                  <td class="neo-fg-primary neo-font-semibold">Galaksion → Adsterra</td>
+                  <td class="neo-mono">11700</td>
+                  <td class="neo-cell-center neo-mono">4,102</td>
+                  <td class="neo-cell-center neo-mono">62.1%</td>
+                  <td class="neo-cell-num neo-fg-danger">-$18.20</td>
+                  <td class="neo-cell-center"><span class="neo-badge neo-badge-warning">Paused</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="neo-pagination">
+              <div class="neo-pagination-info">عرض 1–3 من 124</div>
+              <div class="neo-pagination-controls">
+                <button class="neo-btn neo-btn-ghost neo-btn-sm" disabled>← السابق</button>
+                <span class="neo-pagination-pages">1 / 42</span>
+                <button class="neo-btn neo-btn-ghost neo-btn-sm">التالي →</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== CHART CARDS ==================== -->
+        <section class="comp-section" id="charts">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">📈 كروت الرسوم</h2>
+            <p class="comp-section-desc">Chart cards with loading, empty, and error states.</p>
+          </div>
+
+          <div class="neo-grid-cols-2 neo-gap-4" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+            <div class="neo-chart-card">
+              <div class="neo-chart-head">
+                <div class="neo-chart-head-main">
+                  <h3 class="neo-chart-title">Revenue vs Cost</h3>
+                  <p class="neo-chart-subtitle">آخر 14 يوم</p>
+                </div>
+                <div class="neo-chart-actions">
+                  <button class="neo-btn neo-btn-ghost neo-btn-sm">7d</button>
+                  <button class="neo-btn neo-btn-secondary neo-btn-sm">14d</button>
+                  <button class="neo-btn neo-btn-ghost neo-btn-sm">30d</button>
+                </div>
+              </div>
+              <div class="neo-chart-body">
+                <div class="neo-chart-canvas-wrap">
+                  <canvas id="demoChart"></canvas>
+                </div>
+              </div>
+              <div class="neo-chart-footer">
+                <span>Total: <b class="neo-fg-primary">$1,245.80</b></span>
+                <span class="neo-fg-success">↑ 18% vs prev</span>
+              </div>
+            </div>
+
+            <div class="neo-chart-card">
+              <div class="neo-chart-head">
+                <div class="neo-chart-head-main">
+                  <h3 class="neo-chart-title">Loading State</h3>
+                  <p class="neo-chart-subtitle">Skeleton placeholder</p>
+                </div>
+              </div>
+              <div class="neo-chart-body">
+                <div class="neo-chart-skeleton"></div>
+              </div>
+            </div>
+
+            <div class="neo-chart-card">
+              <div class="neo-chart-head">
+                <div class="neo-chart-head-main">
+                  <h3 class="neo-chart-title">Empty State</h3>
+                </div>
+              </div>
+              <div class="neo-chart-body">
+                <div class="neo-chart-empty">
+                  <div class="neo-chart-empty-icon">📊</div>
+                  <div>مفيش بيانات في الفترة دي</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="neo-chart-card">
+              <div class="neo-chart-head">
+                <div class="neo-chart-head-main">
+                  <h3 class="neo-chart-title">Error State</h3>
+                </div>
+              </div>
+              <div class="neo-chart-body">
+                <div class="neo-chart-error">
+                  <div style="font-size: 40px;">⚠️</div>
+                  <div>فشل تحميل البيانات</div>
+                  <button class="neo-btn neo-btn-secondary neo-btn-sm" style="margin-top: 8px;">🔄 إعادة المحاولة</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== MODALS ==================== -->
+        <section class="comp-section" id="modals">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">🪟 المودالات</h2>
+            <p class="comp-section-desc">Modal dialogs with sizes, head/body/foot sections.</p>
+          </div>
+
+          <div class="comp-grid">
+            <button class="neo-btn neo-btn-primary" onclick="Neo.openModal('demoModalSm')">Small Modal</button>
+            <button class="neo-btn neo-btn-primary" onclick="Neo.openModal('demoModal')">Default Modal</button>
+            <button class="neo-btn neo-btn-primary" onclick="Neo.openModal('demoModalLg')">Large Modal</button>
+          </div>
+
+          <div class="neo-modal-wrap" id="demoModalSm">
+            <div class="neo-modal neo-modal-sm">
+              <div class="neo-modal-head">
+                <h3 class="neo-modal-title">Delete Campaign?</h3>
+                <button class="neo-modal-close" onclick="Neo.closeModal('demoModalSm')">✕</button>
+              </div>
+              <div class="neo-modal-body">
+                <p style="margin: 0; color: var(--neo-fg-secondary); line-height: 1.6;">
+                  This action cannot be undone. All visits and reports will be permanently deleted.
+                </p>
+              </div>
+              <div class="neo-modal-foot">
+                <button class="neo-btn neo-btn-ghost" onclick="Neo.closeModal('demoModalSm')">Cancel</button>
+                <button class="neo-btn neo-btn-danger" onclick="Neo.closeModal('demoModalSm'); Neo.toast('Campaign deleted', 'success')">Delete</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="neo-modal-wrap" id="demoModal">
+            <div class="neo-modal">
+              <div class="neo-modal-head">
+                <h3 class="neo-modal-title">Campaign Settings</h3>
+                <button class="neo-modal-close" onclick="Neo.closeModal('demoModal')">✕</button>
+              </div>
+              <div class="neo-modal-body">
+                <div class="neo-field" style="margin-bottom: 16px;">
+                  <label class="neo-field-label">Campaign Name</label>
+                  <input type="text" class="neo-input" value="PopAds EG → Adsterra">
+                </div>
+                <div class="neo-field">
+                  <label class="neo-field-label">Daily Budget</label>
+                  <input type="number" class="neo-input" value="50">
+                  <span class="neo-field-hint">0 = no daily limit.</span>
+                </div>
+              </div>
+              <div class="neo-modal-foot">
+                <button class="neo-btn neo-btn-ghost" onclick="Neo.closeModal('demoModal')">Cancel</button>
+                <button class="neo-btn neo-btn-primary" onclick="Neo.closeModal('demoModal'); Neo.toast('Saved', 'success')">Save Changes</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="neo-modal-wrap" id="demoModalLg">
+            <div class="neo-modal neo-modal-lg">
+              <div class="neo-modal-head">
+                <h3 class="neo-modal-title">Full Report Preview</h3>
+                <button class="neo-modal-close" onclick="Neo.closeModal('demoModalLg')">✕</button>
+              </div>
+              <div class="neo-modal-body">
+                <p style="color: var(--neo-fg-secondary); line-height: 1.7; margin-top: 0;">
+                  This is a large modal for previewing detailed content. It supports any combination of
+                  inputs, tables, alerts, or charts inside the body.
+                </p>
+                <div class="neo-alert neo-alert-info" style="margin-top: 16px;">
+                  <span class="neo-alert-icon">ℹ️</span>
+                  <div class="neo-alert-body">
+                    <div class="neo-alert-title">Note</div>
+                    <div>Large modals are for deep content, not for quick confirmations.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="neo-modal-foot">
+                <button class="neo-btn neo-btn-secondary" onclick="Neo.closeModal('demoModalLg')">Close</button>
+                <button class="neo-btn neo-btn-primary" onclick="Neo.toast('Exported', 'success'); Neo.closeModal('demoModalLg')">Export</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== DRAWERS ==================== -->
+        <section class="comp-section" id="drawers">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">📂 الأدراج</h2>
+            <p class="comp-section-desc">Side drawers for deep detail — clicking any row here opens one.</p>
+          </div>
+
+          <div class="comp-grid">
+            <button class="neo-btn neo-btn-primary" onclick="Neo.openDrawer('demoDrawerSm')">Small Drawer</button>
+            <button class="neo-btn neo-btn-primary" onclick="Neo.openDrawer('demoDrawer')">Default Drawer</button>
+            <button class="neo-btn neo-btn-primary" onclick="Neo.openDrawer('demoDrawerLg')">Large Drawer</button>
+          </div>
+
+          <div class="neo-drawer-wrap" id="demoDrawerSm">
+            <div class="neo-drawer neo-drawer-sm">
+              <div class="neo-drawer-head">
+                <div>
+                  <h3 class="neo-drawer-title">Filter Options</h3>
+                  <p class="neo-drawer-subtitle">Refine your view</p>
+                </div>
+                <button class="neo-modal-close" onclick="Neo.closeDrawer('demoDrawerSm')">✕</button>
+              </div>
+              <div class="neo-drawer-body">
+                <div class="neo-field" style="margin-bottom: 16px;">
+                  <label class="neo-field-label">Status</label>
+                  <select class="neo-select">
+                    <option>All</option>
+                    <option>Active</option>
+                    <option>Paused</option>
+                  </select>
+                </div>
+                <div class="neo-field">
+                  <label class="neo-field-label">Min Bot Rate</label>
+                  <input type="number" class="neo-input" value="20">
+                </div>
+              </div>
+              <div class="neo-drawer-foot">
+                <button class="neo-btn neo-btn-primary neo-btn-block" onclick="Neo.closeDrawer('demoDrawerSm'); Neo.toast('Filters applied', 'success')">Apply Filters</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="neo-drawer-wrap" id="demoDrawer">
+            <div class="neo-drawer">
+              <div class="neo-drawer-head">
+                <div>
+                  <h3 class="neo-drawer-title">Zone 10245</h3>
+                  <p class="neo-drawer-subtitle">Adsterra · PopAds EG</p>
+                </div>
+                <button class="neo-modal-close" onclick="Neo.closeDrawer('demoDrawer')">✕</button>
+              </div>
+              <div class="neo-drawer-body">
+                <div class="neo-kpi" style="margin-bottom: 16px;">
+                  <div class="neo-kpi-label">Profit</div>
+                  <div class="neo-kpi-value" style="color: var(--neo-success);">+$145.80</div>
+                  <div class="neo-kpi-delta neo-kpi-delta-up">↑ 18% vs prev</div>
+                </div>
+                <div class="neo-grid-cols-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <div class="neo-card neo-card-sm">
+                    <div class="neo-fg-tertiary neo-text-xs neo-uppercase">Bot Rate</div>
+                    <div class="neo-fg-danger neo-font-bold" style="font-size: 20px;">4.2%</div>
+                  </div>
+                  <div class="neo-card neo-card-sm">
+                    <div class="neo-fg-tertiary neo-text-xs neo-uppercase">Valid %</div>
+                    <div class="neo-fg-success neo-font-bold" style="font-size: 20px;">91.4%</div>
+                  </div>
+                </div>
+              </div>
+              <div class="neo-drawer-foot">
+                <button class="neo-btn neo-btn-danger-ghost" onclick="Neo.closeDrawer('demoDrawer'); Neo.toast('Zone blacklisted', 'success')">Blacklist</button>
+                <button class="neo-btn neo-btn-primary" onclick="Neo.closeDrawer('demoDrawer'); Neo.toast('Details opened', 'info')">Open Details</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="neo-drawer-wrap" id="demoDrawerLg">
+            <div class="neo-drawer neo-drawer-lg">
+              <div class="neo-drawer-head">
+                <div>
+                  <h3 class="neo-drawer-title">Visit #12345</h3>
+                  <p class="neo-drawer-subtitle">Full decision trace</p>
+                </div>
+                <button class="neo-modal-close" onclick="Neo.closeDrawer('demoDrawerLg')">✕</button>
+              </div>
+              <div class="neo-drawer-body">
+                <p style="color: var(--neo-fg-secondary); line-height: 1.7;">
+                  Large drawer for complex content. Shows full decision payload, signals,
+                  behavior analysis, and IP intelligence.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== ALERTS ==================== -->
+        <section class="comp-section" id="alerts">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">🚨 التنبيهات</h2>
+            <p class="comp-section-desc">Inline alerts for 4 severity levels.</p>
+          </div>
+
+          <div class="comp-grid-col" style="max-width: 700px;">
+            <div class="neo-alert neo-alert-info">
+              <span class="neo-alert-icon">ℹ️</span>
+              <div class="neo-alert-body">
+                <div class="neo-alert-title">Info</div>
+                <div>New features are available in the dashboard.</div>
+              </div>
+            </div>
+            <div class="neo-alert neo-alert-success">
+              <span class="neo-alert-icon">✓</span>
+              <div class="neo-alert-body">
+                <div class="neo-alert-title">Success</div>
+                <div>All campaigns synced successfully.</div>
+              </div>
+            </div>
+            <div class="neo-alert neo-alert-warning">
+              <span class="neo-alert-icon">⚠️</span>
+              <div class="neo-alert-body">
+                <div class="neo-alert-title">Warning</div>
+                <div>BID coverage is 78% — some cost data is estimated.</div>
+              </div>
+            </div>
+            <div class="neo-alert neo-alert-danger">
+              <span class="neo-alert-icon">🚨</span>
+              <div class="neo-alert-body">
+                <div class="neo-alert-title">Critical</div>
+                <div>Bot wave detected: 47 bots in the last 5 minutes.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== KPI CARDS ==================== -->
+        <section class="comp-section" id="kpis">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">💎 مؤشرات KPI</h2>
+            <p class="comp-section-desc">KPI cards with deltas, sparklines, and accent colors.</p>
+          </div>
+
+          <div class="comp-kpis">
+            <div class="neo-kpi neo-kpi-accent" style="--neo-kpi-color: var(--neo-accent);">
+              <div class="neo-kpi-label">Total Visits (7d)</div>
+              <div class="neo-kpi-value">12,483</div>
+              <div class="neo-kpi-delta neo-kpi-delta-up">↑ 12% vs prev</div>
+            </div>
+            <div class="neo-kpi neo-kpi-accent" style="--neo-kpi-color: var(--neo-success);">
+              <div class="neo-kpi-label">Valid Visits</div>
+              <div class="neo-kpi-value" style="color: var(--neo-success);">10,935</div>
+              <div class="neo-kpi-delta neo-kpi-delta-up">↑ 2.1%</div>
+            </div>
+            <div class="neo-kpi neo-kpi-accent" style="--neo-kpi-color: var(--neo-danger);">
+              <div class="neo-kpi-label">Rejected</div>
+              <div class="neo-kpi-value" style="color: var(--neo-danger);">1,548</div>
+              <div class="neo-kpi-delta neo-kpi-delta-down">↓ 5.4%</div>
+            </div>
+            <div class="neo-kpi neo-kpi-accent" style="--neo-kpi-color: var(--neo-info);">
+              <div class="neo-kpi-label">Profit</div>
+              <div class="neo-kpi-value" style="color: var(--neo-info);">+$145.80</div>
+              <div class="neo-kpi-delta neo-kpi-delta-up">↑ 18%</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== EMPTY STATES ==================== -->
+        <section class="comp-section" id="empty">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">📭 الحالات الفارغة</h2>
+            <p class="comp-section-desc">Empty states with icon, title, and optional action.</p>
+          </div>
+
+          <div class="neo-grid-cols-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="neo-card neo-card-lg">
+              <div class="neo-empty">
+                <div class="neo-empty-icon">📭</div>
+                <h3 class="neo-empty-title">مفيش حملات بعد</h3>
+                <p class="neo-empty-msg">أضف أول حملة عشان تبدأ تتبع الترافيك والأرباح.</p>
+                <button class="neo-btn neo-btn-primary" onclick="Neo.toast('Opening new campaign...', 'info')">+ أضف حملة</button>
+              </div>
+            </div>
+            <div class="neo-card neo-card-lg">
+              <div class="neo-empty">
+                <div class="neo-empty-icon">✅</div>
+                <h3 class="neo-empty-title">كل حاجة تمام</h3>
+                <p class="neo-empty-msg">مفيش زيارات مشبوهة في آخر 24 ساعة.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SKELETONS ==================== -->
+        <section class="comp-section" id="skeletons">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">💀 Skeletons</h2>
+            <p class="comp-section-desc">Loading placeholders that match final layout.</p>
+          </div>
+
+          <div class="comp-grid-col" style="max-width: 500px;">
+            <div class="neo-skeleton" style="height: 20px; width: 60%;"></div>
+            <div class="neo-skeleton" style="height: 14px; width: 90%;"></div>
+            <div class="neo-skeleton" style="height: 14px; width: 80%;"></div>
+            <div class="neo-skeleton" style="height: 120px; border-radius: var(--neo-r-lg);"></div>
+          </div>
+        </section>
+
+        <!-- ==================== ICONS ==================== -->
+        <section class="comp-section" id="icons">
+          <div class="comp-section-head">
+            <h2 class="comp-section-title">🎯 الأيقونات</h2>
+            <p class="comp-section-desc">The 20 icons used throughout the app (Lucide).</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 16px;">
+            <div style="text-align: center; color: var(--neo-fg-secondary);">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-dashboard"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">dashboard</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-live"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">live</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-radar"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">radar</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-visits"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">visits</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-sessions"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">sessions</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-labeling"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">labeling</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-campaigns"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">campaigns</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-money"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">money</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-analytics"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">analytics</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-dataquality"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">dataquality</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-settings"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">settings</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-shield"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">shield</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-map"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">map</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-refund"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">refund</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-award"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">award</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-activity"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">activity</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-history"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">history</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-palette"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">palette</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-search"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">search</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 24px; height: 24px; margin: 0 auto 6px; color: var(--neo-fg-primary);" id="ic-logout"></div>
+              <div class="neo-text-2xs neo-fg-tertiary">logout</div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    (async function boot() {
+      try {
+        // Fill icon slots (using Neo.ICON before mount)
+        const iconIds = ['dashboard','live','radar','visits','sessions','labeling','campaigns','money','analytics','dataquality','settings','shield','map','refund','award','activity','history','palette','search','logout'];
+        // Note: Neo.ICON is available after the script loads but before mount
+        iconIds.forEach(id => {
+          const el = document.getElementById('ic-' + id);
+          if (el && window.Neo && window.Neo.ICON && window.Neo.ICON[id]) {
+            el.innerHTML = window.Neo.ICON[id];
+          }
+        });
+
+        await Neo.mount({
+          active: 'components',
+          lang: 'ar',
+          breadcrumb: [{ label: 'النظام' }, { label: 'مكتبة المكونات' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        // Demo chart
+        try {
+          const ctx = document.getElementById('demoChart');
+          if (ctx) {
+            new Chart(ctx.getContext('2d'), {
+              type: 'line',
+              data: {
+                labels: ['Day 1','Day 2','Day 3','Day 4','Day 5','Day 6','Day 7','Day 8','Day 9','Day 10','Day 11','Day 12','Day 13','Day 14'],
+                datasets: [
+                  {
+                    label: 'Revenue',
+                    data: [45,52,48,65,72,68,78,85,80,92,88,95,105,112],
+                    borderColor: '#10B981',
+                    backgroundColor: 'rgba(16,185,129,0.10)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                  },
+                  {
+                    label: 'Cost',
+                    data: [30,32,35,38,42,40,45,48,50,55,52,58,62,65],
+                    borderColor: '#F43F5E',
+                    backgroundColor: 'rgba(244,63,94,0.10)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                  legend: {
+                    labels: {
+                      color: '#CBD5E1',
+                      font: { family: 'Inter', size: 11 },
+                      usePointStyle: true,
+                      padding: 16,
+                    },
+                  },
+                  tooltip: {
+                    backgroundColor: '#1A1D26',
+                    borderColor: '#232734',
+                    borderWidth: 1,
+                    titleColor: '#F8FAFC',
+                    bodyColor: '#CBD5E1',
+                    padding: 10,
+                    cornerRadius: 6,
+                  },
+                },
+                scales: {
+                  x: {
+                    ticks: { color: '#7B8496', font: { size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                  },
+                  y: {
+                    ticks: { color: '#7B8496', font: { size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                  },
+                },
+              },
+            });
+          }
+        } catch (e) {
+          console.warn('Demo chart failed:', e);
+        }
+      } catch (e) {
+        console.error('[Components Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${String(e.message || 'خطأ')}</div>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
