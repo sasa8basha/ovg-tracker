@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · الزيارات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .vis-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .vis-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: vis-spin 0.8s linear infinite;
+    }
+    @keyframes vis-spin { to { transform: rotate(360deg); } }
+
+    .vis-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .vis-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .vis-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* Filters */
+    .vis-filters {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-3) var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-4);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr) auto;
+      gap: var(--neo-sp-2);
+      align-items: end;
+    }
+    @media (max-width: 1024px) { .vis-filters { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .vis-filters { grid-template-columns: 1fr; } }
+
+    .vis-filter-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .vis-filter-label {
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Bulk bar */
+    .vis-bulk-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--neo-bg-elevated);
+      border: 1px solid var(--neo-accent-border);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-3);
+      display: none;
+      align-items: center;
+      gap: var(--neo-sp-3);
+      box-shadow: var(--neo-shadow-md);
+    }
+    .vis-bulk-bar.active { display: flex; }
+    .vis-bulk-count {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-accent-hover);
+      padding: 3px 10px;
+      background: var(--neo-accent-subtle);
+      border-radius: var(--neo-r-sm);
+    }
+
+    /* Table row styling */
+    .vis-row { cursor: pointer; transition: background var(--neo-dur-fast); }
+    .vis-row:hover td { background: var(--neo-bg-elevated); }
+    .vis-row.selected td { background: var(--neo-accent-subtle); }
+
+    /* Mobile: card view */
+    @media (max-width: 768px) {
+      .vis-table-wrap { display: none; }
+      .vis-cards-wrap { display: block !important; }
+    }
+    .vis-cards-wrap { display: none; }
+
+    .vis-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-2);
+      cursor: pointer;
+      transition: border-color var(--neo-dur-fast);
+    }
+    .vis-card:hover { border-color: var(--neo-border-strong); }
+    .vis-card.selected { border-color: var(--neo-accent); background: var(--neo-accent-subtle); }
+
+    /* Drawer preview */
+    .vis-preview-kv {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--neo-border-subtle);
+      font-size: var(--neo-fs-sm);
+    }
+    .vis-preview-kv:last-child { border-bottom: none; }
+    .vis-preview-kv .k { color: var(--neo-fg-tertiary); }
+    .vis-preview-kv .v { color: var(--neo-fg-primary); font-family: var(--neo-font-mono); font-weight: 600; }
+
+    /* Saved filter badge */
+    .vis-filter-saved {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--neo-fs-xs);
+      padding: 2px 8px;
+      border-radius: var(--neo-r-sm);
+      background: var(--neo-success-bg);
+      color: var(--neo-success);
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="vis-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل الزيارات…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="vis-header">
+        <div>
+          <h1 class="vis-header-title">الزيارات</h1>
+          <div class="vis-header-sub" id="visSubtitle">—</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="visRefreshBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+            تحديث
+          </button>
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="visExportBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            تصدير
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="vis-filters">
+        <div class="vis-filter-field">
+          <label class="vis-filter-label">الحملة</label>
+          <select id="visCampaign" class="neo-select neo-input-sm">
+            <option value="">كل الحملات</option>
+          </select>
+        </div>
+        <div class="vis-filter-field">
+          <label class="vis-filter-label">الحكم</label>
+          <select id="visVerdict" class="neo-select neo-input-sm">
+            <option value="">الكل</option>
+            <option value="valid">✓ Valid</option>
+            <option value="invalid">✕ Invalid</option>
+            <option value="suspicious">⚠ Suspicious</option>
+            <option value="unknown">❓ Unknown</option>
+          </select>
+        </div>
+        <div class="vis-filter-field">
+          <label class="vis-filter-label">من تاريخ</label>
+          <input type="date" id="visFrom" class="neo-input neo-input-sm">
+        </div>
+        <div class="vis-filter-field">
+          <label class="vis-filter-label">إلى تاريخ</label>
+          <input type="date" id="visTo" class="neo-input neo-input-sm">
+        </div>
+        <div class="vis-filter-field">
+          <label class="vis-filter-label">Zone</label>
+          <input type="text" id="visZone" class="neo-input neo-input-sm" placeholder="10245">
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="visApplyBtn">تطبيق</button>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="visClearBtn">مسح</button>
+        </div>
+      </div>
+
+      <!-- Bulk bar -->
+      <div class="vis-bulk-bar" id="visBulkBar">
+        <span class="vis-bulk-count" id="visBulkCount">0 محدد</span>
+        <span style="flex:1;"></span>
+        <button class="neo-btn neo-btn-success neo-btn-sm" id="visBulkHuman">✓ إنسان</button>
+        <button class="neo-btn neo-btn-danger neo-btn-sm" id="visBulkBot">✗ بوت</button>
+        <button class="neo-btn neo-btn-ghost neo-btn-sm" id="visBulkClear">إلغاء</button>
+      </div>
+
+      <!-- Table (desktop) -->
+      <div class="vis-table-wrap neo-table-wrap">
+        <table class="neo-table">
+          <thead>
+            <tr>
+              <th class="neo-cell-check"><input type="checkbox" class="neo-table-checkbox" id="visSelectAll"></th>
+              <th>#</th>
+              <th>الوقت</th>
+              <th>IP / الدولة</th>
+              <th>الحملة</th>
+              <th>الزون</th>
+              <th>التكلفة</th>
+              <th>الإيراد</th>
+              <th class="neo-cell-center">Score</th>
+              <th class="neo-cell-center">Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="visTableBody">
+            <tr><td colspan="10" class="neo-table-empty">جاري التحميل…</td></tr>
+          </tbody>
+        </table>
+        <div class="neo-pagination">
+          <div class="neo-pagination-info" id="visPageInfo">—</div>
+          <div class="neo-pagination-controls">
+            <button class="neo-btn neo-btn-ghost neo-btn-sm" id="visPrev">← السابق</button>
+            <span class="neo-pagination-pages" id="visPageNum">1 / 1</span>
+            <button class="neo-btn neo-btn-ghost neo-btn-sm" id="visNext">التالي →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards (mobile) -->
+      <div class="vis-cards-wrap" id="visCardsWrap">
+        <div id="visCardsBody"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:var(--neo-sp-3);gap:8px;">
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="visPrevM">← السابق</button>
+          <span class="neo-mono neo-text-xs neo-fg-tertiary" id="visPageNumM">1 / 1</span>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="visNextM">التالي →</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Drawer -->
+  <div class="neo-drawer-wrap" id="visDrawer">
+    <div class="neo-drawer">
+      <div class="neo-drawer-head">
+        <div style="min-width:0;flex:1;">
+          <h3 class="neo-drawer-title" id="visDrawerTitle">—</h3>
+          <p class="neo-drawer-subtitle" id="visDrawerMeta">—</p>
+        </div>
+        <button class="neo-modal-close" onclick="Neo.closeDrawer('visDrawer')">✕</button>
+      </div>
+      <div class="neo-drawer-body" id="visDrawerBody"></div>
+      <div class="neo-drawer-foot" id="visDrawerFoot"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const VIS = {
+      page: 1,
+      perPage: 25,
+      total: 0,
+      pages: 1,
+      campaigns: [],
+      items: [],
+      selected: new Set(),
+      filters: { campaign_id: '', verdict: '', from: '', to: '', zone: '' },
+    };
+
+    function fmtMoney(n) {
+      const v = Number(n || 0);
+      if (Math.abs(v) < 0.005) return '$0.00';
+      const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+      return sign + '$' + Math.abs(v).toFixed(2);
+    }
+    function fmtMoneyAbs(n) { return '$' + Math.abs(Number(n || 0)).toFixed(4); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+    function esc(s) { return Neo.escape(s); }
+
+    function verdictBadge(v) {
+      if (v === 'valid') return '<span class="neo-badge neo-badge-success">Valid</span>';
+      if (v === 'invalid') return '<span class="neo-badge neo-badge-danger">Invalid</span>';
+      if (v === 'suspicious') return '<span class="neo-badge neo-badge-warning">Suspicious</span>';
+      return '<span class="neo-badge neo-badge-default">Unknown</span>';
+    }
+
+    function scoreColor(s) {
+      if (s >= 80) return 'var(--neo-danger)';
+      if (s >= 40) return 'var(--neo-warning)';
+      return 'var(--neo-success)';
+    }
+
+    // =========================================================
+    // FILTER HELPERS
+    // =========================================================
+    function buildParams(page) {
+      const p = new URLSearchParams();
+      if (VIS.filters.campaign_id) p.set('campaign_id', VIS.filters.campaign_id);
+      if (VIS.filters.verdict) p.set('verdict', VIS.filters.verdict);
+      if (VIS.filters.from) p.set('from_date', VIS.filters.from);
+      if (VIS.filters.to) p.set('to_date', VIS.filters.to);
+      if (VIS.filters.zone) p.set('zone', VIS.filters.zone);
+      p.set('page', page);
+      p.set('per_page', VIS.perPage);
+      return p;
+    }
+
+    // =========================================================
+    // SELECTION
+    // =========================================================
+    function updateBulkBar() {
+      const bar = document.getElementById('visBulkBar');
+      const count = document.getElementById('visBulkCount');
+      if (VIS.selected.size > 0) {
+        bar.classList.add('active');
+        count.textContent = VIS.selected.size + ' محدد';
+      } else {
+        bar.classList.remove('active');
+      }
+    }
+
+    function toggleSelect(id, checked) {
+      if (checked) VIS.selected.add(id);
+      else VIS.selected.delete(id);
+      updateBulkBar();
+
+      // Update row highlight
+      const row = document.querySelector(`[data-visit-id="${id}"]`);
+      if (row) row.classList.toggle('selected', checked);
+    }
+
+    // =========================================================
+    // TABLE RENDER
+    // =========================================================
+    function renderTable() {
+      const tbody = document.getElementById('visTableBody');
+      if (!VIS.items.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="neo-table-empty">مفيش زيارات في الفترة دي</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = VIS.items.map(v => {
+        const camp = VIS.campaigns.find(c => c.id === v.campaign_id);
+        const campName = camp ? camp.name : '—';
+        const isSelected = VIS.selected.has(v.id);
+        const bid = Number(v.bid || 0);
+        const rev = Number(v.revenue || 0);
+        const profit = rev - bid;
+        const profitColor = profit > 0.001 ? 'var(--neo-success)' : profit < -0.001 ? 'var(--neo-danger)' : 'var(--neo-fg-muted)';
+
+        return `
+          <tr class="vis-row ${isSelected ? 'selected' : ''}" data-visit-id="${v.id}">
+            <td class="neo-cell-check">
+              <input type="checkbox" class="neo-table-checkbox vis-check" data-id="${v.id}" ${isSelected ? 'checked' : ''}>
+            </td>
+            <td class="neo-mono">
+              <a href="/visits/${v.id}" target="_blank" style="color: var(--neo-accent-hover); text-decoration: none;">#${v.id}</a>
+            </td>
+            <td class="neo-mono neo-text-xs neo-fg-tertiary">${esc(v.time)}</td>
+            <td>
+              <div class="neo-mono neo-text-xs neo-fg-primary">${esc(v.ip)}</div>
+              <div class="neo-text-2xs neo-fg-tertiary">${esc(v.country_code || v.country || '—')}</div>
+            </td>
+            <td class="neo-text-xs">${esc(campName)}</td>
+            <td><span class="neo-badge neo-badge-default" style="font-family: var(--neo-font-mono);">${esc(v.zone || '—')}</span></td>
+            <td class="neo-cell-num neo-fg-danger neo-text-xs">${fmtMoneyAbs(bid)}</td>
+            <td class="neo-cell-num neo-fg-success neo-text-xs">${fmtMoneyAbs(rev)}</td>
+            <td class="neo-cell-center neo-mono neo-font-bold" style="color: ${scoreColor(v.score)};">${v.score}</td>
+            <td class="neo-cell-center">${verdictBadge(v.verdict)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Bind row clicks (open drawer) + checkboxes
+      tbody.querySelectorAll('.vis-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+          if (e.target.classList.contains('vis-check')) return;
+          openDrawer(Number(row.dataset.visitId));
+        });
+      });
+
+      tbody.querySelectorAll('.vis-check').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          toggleSelect(Number(cb.dataset.id), cb.checked);
+        });
+      });
+    }
+
+    // =========================================================
+    // CARDS RENDER (mobile)
+    // =========================================================
+    function renderCards() {
+      const container = document.getElementById('visCardsBody');
+      if (!VIS.items.length) {
+        container.innerHTML = '<div class="neo-empty"><div class="neo-empty-icon">📭</div><div class="neo-empty-msg">مفيش زيارات</div></div>';
+        return;
+      }
+
+      container.innerHTML = VIS.items.map(v => {
+        const camp = VIS.campaigns.find(c => c.id === v.campaign_id);
+        const campName = camp ? camp.name : '—';
+        return `
+          <div class="vis-card" data-visit-id="${v.id}">
+            <div class="neo-flex neo-justify-between neo-mb-2">
+              <div>
+                <div class="neo-mono neo-font-bold neo-fg-primary" style="font-size: 13px;">#${v.id}</div>
+                <div class="neo-text-2xs neo-fg-tertiary">${esc(v.time)}</div>
+              </div>
+              ${verdictBadge(v.verdict)}
+            </div>
+            <div class="neo-flex neo-justify-between neo-text-xs neo-mono neo-fg-secondary neo-mb-1">
+              <span>${esc(v.ip)}</span>
+              <span>${esc(v.country_code || '')}</span>
+            </div>
+            <div class="neo-text-2xs neo-fg-tertiary">${esc(campName)} · ${esc(v.zone || '—')}</div>
+            <div class="neo-flex neo-justify-between neo-mt-2 neo-text-xs neo-mono">
+              <span style="color: var(--neo-danger);">$${Number(v.bid).toFixed(4)}</span>
+              <span style="color: var(--neo-success);">$${Number(v.revenue).toFixed(4)}</span>
+              <span style="color: ${scoreColor(v.score)}; font-weight: 700;">Score ${v.score}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.querySelectorAll('.vis-card').forEach(card => {
+        card.addEventListener('click', () => openDrawer(Number(card.dataset.visitId)));
+      });
+    }
+
+    // =========================================================
+    // PAGINATION
+    // =========================================================
+    function updatePagination() {
+      const from = VIS.total > 0 ? (VIS.page - 1) * VIS.perPage + 1 : 0;
+      const to = Math.min(VIS.page * VIS.perPage, VIS.total);
+
+      document.getElementById('visPageInfo').innerHTML =
+        `عرض <b style="color:var(--neo-fg-primary);">${fmtInt(from)}–${fmtInt(to)}</b> من <b style="color:var(--neo-fg-primary);">${fmtInt(VIS.total)}</b>`;
+      document.getElementById('visPageNum').textContent = `${VIS.page} / ${VIS.pages || 1}`;
+      document.getElementById('visPageNumM').textContent = `${VIS.page} / ${VIS.pages || 1}`;
+
+      document.getElementById('visPrev').disabled = VIS.page <= 1;
+      document.getElementById('visNext').disabled = VIS.page >= VIS.pages;
+      document.getElementById('visPrevM').disabled = VIS.page <= 1;
+      document.getElementById('visNextM').disabled = VIS.page >= VIS.pages;
+    }
+
+    // =========================================================
+    // DRAWER
+    // =========================================================
+    function openDrawer(visitId) {
+      const v = VIS.items.find(x => x.id === visitId);
+      if (!v) return;
+
+      const camp = VIS.campaigns.find(c => c.id === v.campaign_id);
+      const campName = camp ? camp.name : '—';
+
+      document.getElementById('visDrawerTitle').textContent = 'زيارة #' + v.id;
+      document.getElementById('visDrawerMeta').textContent = v.time + ' · ' + (v.country || '—');
+
+      const bid = Number(v.bid || 0);
+      const rev = Number(v.revenue || 0);
+      const profit = rev - bid;
+
+      document.getElementById('visDrawerBody').innerHTML = `
+        <div class="neo-mb-4">
+          ${verdictBadge(v.verdict)}
+          <span class="neo-badge neo-badge-default neo-ml-2" style="margin-right: 6px;">Score: ${v.score}</span>
+        </div>
+
+        <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mb-2">📋 تفاصيل</div>
+        <div class="vis-preview-kv"><span class="k">IP</span><span class="v">${esc(v.ip)}</span></div>
+        <div class="vis-preview-kv"><span class="k">Country</span><span class="v">${esc(v.country || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">Campaign</span><span class="v">${esc(campName)}</span></div>
+        <div class="vis-preview-kv"><span class="k">Zone</span><span class="v">${esc(v.zone || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">Browser</span><span class="v">${esc(v.browser || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">Device</span><span class="v">${esc(v.device || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">Time on Page</span><span class="v">${v.time_on_page}s</span></div>
+        <div class="vis-preview-kv"><span class="k">Clicks</span><span class="v">${v.clicks}</span></div>
+        <div class="vis-preview-kv"><span class="k">Scrolls</span><span class="v">${v.scrolls}</span></div>
+
+        <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mt-4 neo-mb-2">💰 P&L</div>
+        <div class="vis-preview-kv"><span class="k">BID</span><span class="v" style="color: var(--neo-danger);">${fmtMoneyAbs(bid)}</span></div>
+        <div class="vis-preview-kv"><span class="k">Revenue</span><span class="v" style="color: var(--neo-success);">${fmtMoneyAbs(rev)}</span></div>
+        <div class="vis-preview-kv"><span class="k">Profit</span><span class="v" style="color: ${profit >= 0 ? 'var(--neo-success)' : 'var(--neo-danger)'}; font-weight: 700;">${fmtMoney(profit)}</span></div>
+
+        ${v.ground_truth ? `
+          <div class="neo-alert neo-alert-info neo-mt-4">
+            <span class="neo-alert-icon">🏷️</span>
+            <div class="neo-alert-body">
+              <div class="neo-alert-title">Ground Truth: ${esc(v.ground_truth.toUpperCase())}</div>
+            </div>
+          </div>
+        ` : ''}
+      `;
+
+      document.getElementById('visDrawerFoot').innerHTML = `
+        <a href="/visits/${v.id}" class="neo-btn neo-btn-primary neo-btn-sm" style="text-decoration: none;">🔍 التفاصيل الكاملة</a>
+        <button class="neo-btn neo-btn-ghost neo-btn-sm" onclick="Neo.closeDrawer('visDrawer')">إغلاق</button>
+      `;
+
+      Neo.openDrawer('visDrawer');
+    }
+
+    // =========================================================
+    // LOADER
+    // =========================================================
+    async function loadVisits(page) {
+      if (page) VIS.page = page;
+      try {
+        const params = buildParams(VIS.page);
+        const data = await Neo.api('/api/visits?' + params.toString());
+
+        VIS.items = data.items || [];
+        VIS.total = data.total || 0;
+        VIS.pages = data.pages || 1;
+
+        document.getElementById('visSubtitle').textContent =
+          `${fmtInt(VIS.total)} زيارة · صفحة ${VIS.page} من ${VIS.pages}`;
+
+        renderTable();
+        renderCards();
+        updatePagination();
+
+      } catch (e) {
+        console.error('[Visits] load failed:', e);
+        Neo.toast('فشل التحميل: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // LOAD CAMPAIGNS (for filter)
+    // =========================================================
+    async function loadCampaigns() {
+      try {
+        VIS.campaigns = await Neo.api('/api/campaigns');
+        const sel = document.getElementById('visCampaign');
+        VIS.campaigns.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('[Visits] campaigns load failed:', e);
+      }
+    }
+
+    // =========================================================
+    // BIND
+    // =========================================================
+    function bindControls() {
+      // Apply
+      document.getElementById('visApplyBtn').addEventListener('click', () => {
+        VIS.filters.campaign_id = document.getElementById('visCampaign').value;
+        VIS.filters.verdict = document.getElementById('visVerdict').value;
+        VIS.filters.from = document.getElementById('visFrom').value;
+        VIS.filters.to = document.getElementById('visTo').value;
+        VIS.filters.zone = document.getElementById('visZone').value;
+        VIS.selected.clear();
+        updateBulkBar();
+        loadVisits(1);
+      });
+
+      // Clear
+      document.getElementById('visClearBtn').addEventListener('click', () => {
+        document.getElementById('visCampaign').value = '';
+        document.getElementById('visVerdict').value = '';
+        document.getElementById('visFrom').value = '';
+        document.getElementById('visTo').value = '';
+        document.getElementById('visZone').value = '';
+        VIS.filters = { campaign_id: '', verdict: '', from: '', to: '', zone: '' };
+        VIS.selected.clear();
+        updateBulkBar();
+        loadVisits(1);
+      });
+
+      // Pagination
+      document.getElementById('visPrev').addEventListener('click', () => {
+        if (VIS.page > 1) loadVisits(VIS.page - 1);
+      });
+      document.getElementById('visNext').addEventListener('click', () => {
+        if (VIS.page < VIS.pages) loadVisits(VIS.page + 1);
+      });
+      document.getElementById('visPrevM').addEventListener('click', () => {
+        if (VIS.page > 1) loadVisits(VIS.page - 1);
+      });
+      document.getElementById('visNextM').addEventListener('click', () => {
+        if (VIS.page < VIS.pages) loadVisits(VIS.page + 1);
+      });
+
+      // Refresh
+      document.getElementById('visRefreshBtn').addEventListener('click', () => loadVisits());
+
+      // Select all
+      document.getElementById('visSelectAll').addEventListener('change', (e) => {
+        if (e.target.checked) {
+          VIS.items.forEach(v => VIS.selected.add(v.id));
+        } else {
+          VIS.selected.clear();
+        }
+        renderTable();
+        updateBulkBar();
+      });
+
+      // Bulk actions
+      document.getElementById('visBulkHuman').addEventListener('click', () => bulkLabel('human'));
+      document.getElementById('visBulkBot').addEventListener('click', () => bulkLabel('bot'));
+      document.getElementById('visBulkClear').addEventListener('click', () => {
+        VIS.selected.clear();
+        renderTable();
+        updateBulkBar();
+      });
+
+      // Export
+      document.getElementById('visExportBtn').addEventListener('click', exportCsv);
+    }
+
+    // =========================================================
+    // BULK LABEL
+    // =========================================================
+    async function bulkLabel(label) {
+      if (VIS.selected.size === 0) return;
+      const ids = Array.from(VIS.selected);
+
+      try {
+        const res = await Neo.api('/api/labeling/visits/bulk-label', {
+          method: 'POST',
+          body: JSON.stringify({ visit_ids: ids, label: label }),
+        });
+
+        Neo.toast(`✓ ${res.updated} زيارة اتصنفت`, 'success');
+        VIS.selected.clear();
+        updateBulkBar();
+        await loadVisits();
+
+      } catch (e) {
+        Neo.toast('فشل: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // EXPORT CSV
+    // =========================================================
+    function exportCsv() {
+      if (!VIS.items.length) { Neo.toast('مفيش بيانات للتصدير', 'warning'); return; }
+
+      const header = ['ID', 'Time', 'IP', 'Country', 'Zone', 'Campaign', 'Verdict', 'Score', 'BID', 'Revenue', 'Clicks', 'Scrolls'];
+      const rows = VIS.items.map(v => {
+        const camp = VIS.campaigns.find(c => c.id === v.campaign_id);
+        return [
+          v.id, v.time, v.ip, v.country || '', v.zone || '',
+          camp ? camp.name : '',
+          v.verdict || '', v.score,
+          Number(v.bid || 0).toFixed(6),
+          Number(v.revenue || 0).toFixed(6),
+          v.clicks, v.scrolls,
+        ];
+      });
+
+      const csv = [header, ...rows]
+        .map(row => row.map(x => `"${String(x).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ovg_visits_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      Neo.toast('تم التصدير', 'success');
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'visits',
+          lang: 'ar',
+          breadcrumb: [{ label: 'الزيارات' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindControls();
+        await loadCampaigns();
+
+        // Prefill from URL
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('verdict')) {
+          document.getElementById('visVerdict').value = params.get('verdict');
+          VIS.filters.verdict = params.get('verdict');
+        }
+        if (params.get('zone')) {
+          document.getElementById('visZone').value = params.get('zone');
+          VIS.filters.zone = params.get('zone');
+        }
+
+        await loadVisits(1);
+
+      } catch (e) {
+        console.error('[Visits Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
