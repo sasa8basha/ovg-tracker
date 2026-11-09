@@ -1,5 +1,5 @@
 """
-main.py — OVG Tracker entry point (v11.0 — Production)
+main.py — OVG Tracker entry point (v12.0 — 100% Neo Production)
 """
 import asyncio
 from fastapi import FastAPI, Request
@@ -38,7 +38,7 @@ Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="11.0", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker — Neo", version="12.0", docs_url="/docs" if DEBUG else None)
 
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -69,14 +69,7 @@ async def cache_control_middleware(request: Request, call_next):
 async def tracker_cors_middleware(request: Request, call_next):
     if request.url.path.startswith(("/api/track", "/api/collect", "/api/interstitial")):
         if request.method == "OPTIONS":
-            return Response(
-                status_code=200,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                },
-            )
+            return Response(status_code=200, headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "*"})
         response = await call_next(request)
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
@@ -89,19 +82,21 @@ async def startup_event():
     asyncio.create_task(stale_session_finalizer_loop())
     asyncio.create_task(reputation_loader_loop())
     asyncio.create_task(intelligence_worker_loop())
-    print("=" * 60)
-    print(f"  OVG Tracker v11.0 — PRODUCTION — ENV={ENV}  DEBUG={DEBUG}")
-    print("  Background workers:")
-    print("    ✓ Adsterra Sync (every 5 min)")
-    print("    ✓ Stale Finalizer (every 60s)")
-    print("    ✓ Reputation Loader (immediate + every 24h)")
-    print("    ✓ IP Intel Worker (every 30s)")
-    print("  Neo V2 pages (10):")
-    print("    /v2/dashboard  /v2/reports  /v2/visits  /v2/campaigns")
-    print("    /v2/live  /v2/radar  /v2/ip-lists  /v2/sessions")
-    print("    /v2/campaigns/{id}  /v2/components")
-    print("  Old URLs redirect 301 to /v2/*")
-    print("=" * 60)
+    print("=" * 62)
+    print(f"  OVG Tracker v12.0 — 100% NEO — ENV={ENV}  DEBUG={DEBUG}")
+    print("  Background Workers: 4 running")
+    print("  ──────────────────────────────────────────────────────────")
+    print("  Neo V2 Pages (21):")
+    print("    /v2/dashboard       /v2/reports        /v2/visits")
+    print("    /v2/visits/{id}     /v2/campaigns      /v2/campaigns/{id}")
+    print("    /v2/live            /v2/radar          /v2/ip-lists")
+    print("    /v2/sessions        /v2/sessions/{id}  /v2/labeling")
+    print("    /v2/data-quality    /v2/zone-analytics /v2/audit-log")
+    print("    /v2/system-health   /v2/tracker        /v2/popads-report")
+    print("    /v2/adsterra-report /v2/reports        /v2/components")
+    print("  ──────────────────────────────────────────────────────────")
+    print("  Old URLs 301-redirect to /v2/*")
+    print("=" * 62)
 
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
