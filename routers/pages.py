@@ -187,9 +187,6 @@ def live_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(read_template("live.html"))
 
 
-# =========================================================
-# Phase 2 — Reveal the Buried
-# =========================================================
 @router.get("/audit-log", response_class=HTMLResponse)
 def audit_log_page(request: Request, db: Session = Depends(get_db)):
     if not _optional_user(request, db):
@@ -204,6 +201,16 @@ def system_health_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(read_template("system_health.html"))
 
 
+# =========================================================
+# Phase 4 — Design System Preview (Neo)
+# =========================================================
+@router.get("/v2/components", response_class=HTMLResponse)
+def components_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/components.html"))
+
+
 @router.get("/404", response_class=HTMLResponse)
 def page_404():
     html = "<html><head><title>404 Not Found</title></head><body style='background:#fff;color:#000;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;'><h1>404 Not Found</h1></body></html>"
@@ -212,4 +219,4 @@ def page_404():
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "9.7"}
+    return {"status": "ok", "version": "10.0-neo"}
