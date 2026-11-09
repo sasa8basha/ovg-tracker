@@ -1,98 +1,483 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" data-theme="dark">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OVG · تسجيل الدخول</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
   <style>
-    body{font-family:'Cairo',sans-serif;background:#0F172A;color:#F1F5F9;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
-    .card{background:#1E293B;border:1px solid #334155;border-radius:24px;padding:32px;width:100%;max-width:440px}
-    .input{width:100%;padding:12px 16px;border:1.5px solid #334155;border-radius:12px;font-size:15px;background:#0F172A;color:#F1F5F9;margin-top:6px;box-sizing:border-box;font-family:'Cairo',sans-serif}
-    .input:focus{outline:none;border-color:#6366F1;box-shadow:0 0 0 4px rgba(99,102,241,.15)}
-    .btn{background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;padding:13px;border-radius:12px;font-weight:700;width:100%;border:none;cursor:pointer;font-size:15px;font-family:'Cairo',sans-serif}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    .tab{padding:10px;border-radius:10px;font-weight:700;font-size:14px;flex:1;background:transparent;color:#94A3B8;border:none;cursor:pointer;font-family:'Cairo',sans-serif}
-    .tab.active{background:rgba(99,102,241,.2);color:#6366F1}
-    label{font-size:13px;color:#CBD5E1;font-weight:600}
-    .error{background:rgba(244,63,94,.1);color:#F43F5E;padding:10px;border-radius:10px;font-size:13px;text-align:center;border:1px solid rgba(244,63,94,.2)}
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--neo-bg-canvas);
+      font-family: 'Inter', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+      color: var(--neo-fg-secondary);
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--neo-sp-4);
+      box-sizing: border-box;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Background decoration */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -30%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      left: -20%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(34,211,238,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-xl);
+      padding: var(--neo-sp-8) var(--neo-sp-6);
+      box-shadow: var(--neo-shadow-xl);
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--neo-accent), var(--neo-info), var(--neo-accent));
+      opacity: 0.8;
+    }
+
+    .login-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-6);
+      text-align: center;
+    }
+
+    .login-logo {
+      width: 72px;
+      height: 72px;
+      border-radius: var(--neo-r-lg);
+      background: linear-gradient(135deg, var(--neo-accent), var(--neo-info));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      box-shadow: var(--neo-accent-glow);
+      animation: login-pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes login-pulse {
+      0%, 100% { box-shadow: 0 0 24px rgba(99,102,241,0.35); }
+      50% { box-shadow: 0 0 40px rgba(99,102,241,0.55); }
+    }
+
+    .login-title {
+      font-size: var(--neo-fs-2xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0;
+      line-height: 1.1;
+    }
+
+    .login-subtitle {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      margin: 0;
+    }
+
+    /* Tabs */
+    .login-tabs {
+      display: flex;
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-md);
+      padding: 4px;
+      margin-bottom: var(--neo-sp-5);
+    }
+
+    .login-tab {
+      flex: 1;
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+      border-radius: var(--neo-r-sm);
+      background: transparent;
+      border: none;
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-bold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+
+    .login-tab.active {
+      background: var(--neo-accent-subtle);
+      color: var(--neo-accent-hover);
+    }
+
+    /* Form */
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--neo-sp-3);
+    }
+
+    .login-form .neo-field {
+      margin: 0;
+    }
+
+    .login-error {
+      background: var(--neo-danger-bg);
+      border: 1px solid var(--neo-danger-border);
+      color: var(--neo-danger-fg);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+      border-radius: var(--neo-r-sm);
+      font-size: var(--neo-fs-xs);
+      display: none;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .login-error.visible {
+      display: block;
+      animation: login-shake 300ms ease-out;
+    }
+
+    @keyframes login-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    .login-submit {
+      height: 44px;
+      background: linear-gradient(135deg, var(--neo-accent), var(--neo-accent-hover));
+      color: white;
+      border: none;
+      border-radius: var(--neo-r-md);
+      font-family: inherit;
+      font-size: var(--neo-fs-md);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--neo-sp-2);
+      margin-top: var(--neo-sp-2);
+      box-shadow: var(--neo-accent-glow);
+    }
+
+    .login-submit:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 32px rgba(99,102,241,0.5);
+    }
+
+    .login-submit:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .login-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .login-submit.loading::before {
+      content: '';
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      animation: login-spin 600ms linear infinite;
+    }
+
+    @keyframes login-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: var(--neo-sp-4);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+    }
+
+    .login-footer a {
+      color: var(--neo-accent-hover);
+      text-decoration: none;
+      font-weight: var(--neo-fw-bold);
+      transition: color var(--neo-dur-fast);
+    }
+
+    .login-footer a:hover {
+      color: var(--neo-accent);
+    }
+
+    .login-version {
+      text-align: center;
+      margin-top: var(--neo-sp-4);
+      font-size: 10px;
+      color: var(--neo-fg-muted);
+      font-family: var(--neo-font-mono);
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 500px) {
+      .login-card {
+        padding: var(--neo-sp-6) var(--neo-sp-4);
+      }
+      .login-logo {
+        width: 60px;
+        height: 60px;
+        font-size: 30px;
+      }
+      .login-title {
+        font-size: var(--neo-fs-xl);
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div style="text-align:center;margin-bottom:24px">
-      <div style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:36px">🛡️</div>
-      <h1 style="font-size:24px;font-weight:800;margin:0">OVG Tracker</h1>
-      <p style="color:#94A3B8;font-size:13px;margin:6px 0 0">منصة تتبع الترافيك ومنع البوتات</p>
-    </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:20px;background:rgba(0,0,0,.2);padding:4px;border-radius:12px">
-      <button class="tab active" id="tab-login" onclick="switchTab('login')">تسجيل دخول</button>
-      <button class="tab" id="tab-signup" onclick="switchTab('signup')">إنشاء حساب</button>
-    </div>
+  <div class="login-container">
+    <div class="login-card">
 
-    <form id="authForm" style="display:flex;flex-direction:column;gap:14px">
-      <div>
-        <label>اسم المستخدم</label>
-        <input name="username" class="input" placeholder="ahmed أو بريدك الإلكتروني" required>
+      <!-- Brand -->
+      <div class="login-brand">
+        <div class="login-logo">🛡️</div>
+        <h1 class="login-title">OVG Tracker</h1>
+        <p class="login-subtitle">منصة تتبع الترافيك ومنع البوتات</p>
       </div>
-      <div id="emailWrap" style="display:none">
-        <label>البريد الإلكتروني</label>
-        <input name="email" type="email" class="input" placeholder="you@example.com">
+
+      <!-- Tabs -->
+      <div class="login-tabs">
+        <button class="login-tab active" id="tabLogin" type="button" onclick="LOGIN.switchTab('login')">تسجيل دخول</button>
+        <button class="login-tab" id="tabSignup" type="button" onclick="LOGIN.switchTab('signup')">إنشاء حساب</button>
       </div>
-      <div>
-        <label>كلمة المرور</label>
-        <input name="password" type="password" class="input" placeholder="••••••••" required minlength="6">
+
+      <!-- Form -->
+      <form class="login-form" id="authForm" onsubmit="LOGIN.submit(event)">
+
+        <div class="neo-field">
+          <label class="neo-field-label" for="inpUsername">اسم المستخدم</label>
+          <input
+            type="text"
+            id="inpUsername"
+            name="username"
+            class="neo-input"
+            placeholder="username أو بريدك الإلكتروني"
+            required
+            autocomplete="username"
+            maxlength="100">
+        </div>
+
+        <div class="neo-field" id="emailField" style="display:none;">
+          <label class="neo-field-label neo-field-label-required" for="inpEmail">البريد الإلكتروني</label>
+          <input
+            type="email"
+            id="inpEmail"
+            name="email"
+            class="neo-input"
+            placeholder="you@example.com"
+            autocomplete="email"
+            maxlength="254">
+        </div>
+
+        <div class="neo-field">
+          <label class="neo-field-label" for="inpPassword">كلمة المرور</label>
+          <input
+            type="password"
+            id="inpPassword"
+            name="password"
+            class="neo-input"
+            placeholder="••••••••"
+            required
+            autocomplete="current-password"
+            minlength="6"
+            maxlength="128">
+        </div>
+
+        <div class="neo-field" id="confirmField" style="display:none;">
+          <label class="neo-field-label neo-field-label-required" for="inpConfirm">تأكيد كلمة المرور</label>
+          <input
+            type="password"
+            id="inpConfirm"
+            name="confirm"
+            class="neo-input"
+            placeholder="••••••••"
+            autocomplete="new-password"
+            maxlength="128">
+        </div>
+
+        <div class="login-error" id="loginError"></div>
+
+        <button type="submit" class="login-submit" id="submitBtn">
+          <span id="submitText">تسجيل الدخول</span>
+        </button>
+
+      </form>
+
+      <!-- Footer -->
+      <div class="login-footer">
+        <a href="/forgot-password">نسيت كلمة المرور؟</a>
       </div>
-      <div id="confirmWrap" style="display:none">
-        <label>تأكيد كلمة المرور</label>
-        <input name="confirm" type="password" class="input" placeholder="••••••••">
-      </div>
-      <p id="error" class="error" style="display:none"></p>
-      <button type="submit" id="submitBtn" class="btn">تسجيل الدخول</button>
-      <a href="/forgot-password" style="text-align:center;color:#818CF8;font-size:13px;text-decoration:none;margin-top:4px">نسيت كلمة المرور؟</a>
-    </form>
+
+      <div class="login-version">OVG TRACKER v12.0</div>
+
+    </div>
   </div>
 
   <script>
-    let MODE = 'login';
-    function switchTab(m) {
-      MODE = m;
-      document.getElementById('tab-login').classList.toggle('active', m === 'login');
-      document.getElementById('tab-signup').classList.toggle('active', m === 'signup');
-      document.getElementById('emailWrap').style.display = m === 'signup' ? 'block' : 'none';
-      document.getElementById('confirmWrap').style.display = m === 'signup' ? 'block' : 'none';
-      document.getElementById('submitBtn').textContent = m === 'signup' ? 'إنشاء حساب' : 'تسجيل الدخول';
-      document.getElementById('error').style.display = 'none';
-    }
-    document.getElementById('authForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    const LOGIN = {
+      mode: 'login',
+      loading: false,
+    };
+
+    LOGIN.switchTab = function(mode) {
+      LOGIN.mode = mode;
+      const isSignup = mode === 'signup';
+
+      document.getElementById('tabLogin').classList.toggle('active', !isSignup);
+      document.getElementById('tabSignup').classList.toggle('active', isSignup);
+
+      document.getElementById('emailField').style.display = isSignup ? '' : 'none';
+      document.getElementById('confirmField').style.display = isSignup ? '' : 'none';
+      document.getElementById('submitText').textContent = isSignup ? 'إنشاء حساب' : 'تسجيل الدخول';
+
+      // Update autocomplete
+      document.getElementById('inpPassword').setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
+
+      // Clear error
+      LOGIN.showError('');
+    };
+
+    LOGIN.showError = function(msg) {
+      const el = document.getElementById('loginError');
+      if (!msg) {
+        el.classList.remove('visible');
+        el.textContent = '';
+        return;
+      }
+      el.textContent = msg;
+      el.classList.add('visible');
+    };
+
+    LOGIN.setLoading = function(loading) {
+      LOGIN.loading = loading;
       const btn = document.getElementById('submitBtn');
-      const err = document.getElementById('error');
-      btn.disabled = true; err.style.display = 'none';
-      const orig = btn.textContent; btn.textContent = 'جاري...';
-      const fd = new FormData(e.target);
-      const body = {
-        username: (fd.get('username')||'').trim(),
-        password: fd.get('password'),
-        email: (fd.get('email')||'').trim(),
-      };
-      if (MODE === 'signup' && body.password !== fd.get('confirm')) {
-        err.textContent = 'كلمتا المرور غير متطابقتين'; err.style.display = 'block';
-        btn.disabled = false; btn.textContent = orig; return;
+      btn.disabled = loading;
+      btn.classList.toggle('loading', loading);
+      document.getElementById('submitText').textContent = loading
+        ? 'جاري...'
+        : (LOGIN.mode === 'signup' ? 'إنشاء حساب' : 'تسجيل الدخول');
+    };
+
+    LOGIN.submit = async function(e) {
+      e.preventDefault();
+      if (LOGIN.loading) return;
+
+      LOGIN.showError('');
+
+      const username = (document.getElementById('inpUsername').value || '').trim();
+      const password = document.getElementById('inpPassword').value || '';
+      const email = (document.getElementById('inpEmail').value || '').trim();
+      const confirm = document.getElementById('inpConfirm').value || '';
+
+      // Validation
+      if (!username) { LOGIN.showError('اسم المستخدم مطلوب'); return; }
+      if (!password || password.length < 6) { LOGIN.showError('كلمة المرور لازم 6 حروف على الأقل'); return; }
+
+      if (LOGIN.mode === 'signup') {
+        if (!email || !email.includes('@')) { LOGIN.showError('بريد إلكتروني صحيح مطلوب'); return; }
+        if (password !== confirm) { LOGIN.showError('كلمتا المرور غير متطابقتين'); return; }
       }
-      const url = MODE === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+
+      LOGIN.setLoading(true);
+
       try {
-        const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-        const d = await r.json().catch(()=>({}));
-        if (r.ok) { location.href = '/dashboard'; return; }
-        err.textContent = d.detail || 'فشل العملية'; err.style.display = 'block';
-      } catch(e) {
-        err.textContent = 'خطأ في الاتصال بالسيرفر'; err.style.display = 'block';
-      } finally {
-        btn.disabled = false; btn.textContent = orig;
+        const url = LOGIN.mode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+        const body = { username, password };
+        if (LOGIN.mode === 'signup') body.email = email;
+
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          credentials: 'same-origin',
+        });
+
+        const data = await r.json().catch(() => ({}));
+
+        if (r.ok) {
+          // Success — redirect to dashboard
+          window.location.href = '/v2/dashboard';
+          return;
+        }
+
+        // Error
+        let errorMsg = data.detail || 'فشل العملية';
+        if (typeof errorMsg === 'object' && Array.isArray(errorMsg)) {
+          errorMsg = errorMsg.map(x => x.msg || x.detail || '').join(', ') || 'بيانات غير صالحة';
+        }
+        LOGIN.showError(errorMsg);
+        LOGIN.setLoading(false);
+      } catch (err) {
+        LOGIN.showError('خطأ في الاتصال: ' + err.message);
+        LOGIN.setLoading(false);
       }
-    });
+    };
+
+    // Auto-fill from URL if redirected with error
+    (function init() {
+      const params = new URLSearchParams(location.search);
+      const err = params.get('error');
+      if (err) LOGIN.showError(decodeURIComponent(err));
+
+      // Focus username on load
+      setTimeout(() => {
+        const el = document.getElementById('inpUsername');
+        if (el) el.focus();
+      }, 100);
+    })();
   </script>
 </body>
-        </html>
+</html>

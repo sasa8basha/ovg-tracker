@@ -1,217 +1,694 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" data-theme="dark">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OVG · الإعدادات</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
   <style>
-    body{font-family:'Cairo',sans-serif;background:#0F172A;color:#F1F5F9;padding:24px}
-    .glass{background:rgba(30,41,59,.7);border:1px solid rgba(255,255,255,.05);border-radius:16px;padding:24px;margin-bottom:20px;max-width:640px;margin-left:auto;margin-right:auto}
-    .input{width:100%;padding:12px 16px;border:1.5px solid #334155;border-radius:12px;font-size:15px;background:#0F172A;color:#F1F5F9;box-sizing:border-box;font-family:'Cairo',sans-serif}
-    .input:focus{outline:none;border-color:#6366F1;box-shadow:0 0 0 4px rgba(99,102,241,.15)}
-    label{font-size:13px;color:#CBD5E1;font-weight:600;display:block;margin-bottom:6px}
-    .btn{background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;padding:11px 22px;border-radius:10px;font-weight:700;border:none;cursor:pointer;font-size:14px;font-family:'Cairo',sans-serif}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    .btn-danger{background:#F43F5E}
-    .btn-secondary{background:#334155}
-    h2{font-size:16px;font-weight:800;margin:0 0 16px;color:#F1F5F9}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
-    .badge-ok{background:rgba(16,185,129,.15);color:#10B981}
-    .badge-warn{background:rgba(245,158,11,.15);color:#F59E0B}
-    .msg{padding:10px;border-radius:10px;font-size:13px;text-align:center;margin-top:10px;display:none}
-    .msg-ok{background:rgba(16,185,129,.1);color:#10B981;border:1px solid rgba(16,185,129,.3)}
-    .msg-err{background:rgba(244,63,94,.1);color:#F43F5E;border:1px solid rgba(244,63,94,.2)}
-    .back-link{color:#818CF8;text-decoration:none;font-size:14px}
-    .hint{color:#94A3B8;font-size:11px;margin-top:4px}
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--neo-bg-canvas);
+      font-family: 'Inter', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+      color: var(--neo-fg-secondary);
+    }
+
+    .settings-page {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: var(--neo-sp-6) var(--neo-sp-4);
+    }
+
+    /* Header */
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+
+    .settings-header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-3);
+    }
+
+    .settings-back {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--neo-r-sm);
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--neo-fg-tertiary);
+      text-decoration: none;
+      font-size: 16px;
+      transition: all var(--neo-dur-fast);
+    }
+
+    .settings-back:hover {
+      background: var(--neo-bg-elevated);
+      color: var(--neo-fg-primary);
+      border-color: var(--neo-border-strong);
+    }
+
+    .settings-title {
+      font-size: var(--neo-fs-2xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    .settings-subtitle {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      margin: 4px 0 0 0;
+    }
+
+    /* Section card */
+    .settings-section {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-5);
+      margin-bottom: var(--neo-sp-3);
+    }
+
+    .settings-section.danger {
+      background: rgba(239,68,68,0.03);
+      border-color: var(--neo-danger-border);
+    }
+
+    .settings-section-head {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+    }
+
+    .settings-section-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--neo-r-md);
+      background: var(--neo-accent-subtle);
+      color: var(--neo-accent-hover);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .settings-section.danger .settings-section-icon {
+      background: var(--neo-danger-bg);
+      color: var(--neo-danger);
+    }
+
+    .settings-section-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .settings-section-title {
+      font-size: var(--neo-fs-md);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin: 0 0 4px 0;
+    }
+
+    .settings-section-desc {
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    /* Form rows */
+    .settings-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-3);
+    }
+
+    @media (max-width: 600px) {
+      .settings-form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .settings-form-row {
+      margin-bottom: var(--neo-sp-3);
+    }
+
+    .settings-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+      margin-top: var(--neo-sp-3);
+    }
+
+    .settings-msg {
+      font-size: var(--neo-fs-xs);
+      min-height: 18px;
+      margin-top: var(--neo-sp-2);
+      line-height: 1.5;
+    }
+
+    .settings-msg.error { color: var(--neo-danger-fg); }
+    .settings-msg.success { color: var(--neo-success-fg); }
+
+    /* Email verify badge */
+    .verify-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+
+    .verify-badge.ok {
+      background: var(--neo-success-bg);
+      color: var(--neo-success);
+    }
+
+    .verify-badge.warn {
+      background: var(--neo-warning-bg);
+      color: var(--neo-warning);
+    }
+
+    /* Info box */
+    .settings-info-box {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+      line-height: 1.7;
+      margin-top: var(--neo-sp-3);
+    }
+
+    /* Danger zone */
+    .settings-danger-desc {
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-danger-fg);
+      line-height: 1.6;
+      margin-bottom: var(--neo-sp-3);
+    }
+
+    /* Loading state */
+    .settings-loading {
+      text-align: center;
+      padding: var(--neo-sp-8);
+      color: var(--neo-fg-tertiary);
+      font-size: var(--neo-fs-sm);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      animation: settings-spin 600ms linear infinite;
+      margin-bottom: var(--neo-sp-2);
+    }
+
+    @keyframes settings-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* CPM inputs with prefix */
+    .cpm-input-wrap {
+      position: relative;
+    }
+
+    .cpm-input-prefix {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--neo-fg-tertiary);
+      font-size: var(--neo-fs-sm);
+      pointer-events: none;
+    }
+
+    .cpm-input-wrap .neo-input {
+      padding-left: 28px;
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+    }
   </style>
 </head>
 <body>
-  <div style="max-width:640px;margin:0 auto 20px">
-    <a href="/dashboard" class="back-link">← العودة للداشبورد</a>
-    <h1 style="font-size:26px;font-weight:800;margin:12px 0 4px">الإعدادات</h1>
-    <p style="color:#94A3B8;font-size:13px;margin:0">إدارة حسابك وأمانه</p>
-  </div>
 
-  <!-- CPM Settings (Phase 3A) -->
-  <div class="glass">
-    <h2>💰 إعدادات CPM (الربح والخسارة)</h2>
-    <p style="color:#94A3B8;font-size:13px;margin:0 0 16px">
-      السعر اللي بتشتري بيه الزيارة والسعر اللي بتاخده من شبكة الإعلانات. هيتحسب عليهم الربح الصافي لكل زون في "التقارير الذكية".
-    </p>
-    <div style="margin-bottom:12px">
-      <label>سعر الشراء (Buy CPM) — $ لكل 1000 زيارة</label>
-      <input id="inpCpmBuy" type="number" step="0.01" min="0" max="100" class="input">
-      <p class="hint">مثال: 1.0 لو بتشتري من PopAds بـ $1 لكل 1000 زيارة</p>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>سعر البيع (Sell CPM) — $ لكل 1000 impression</label>
-      <input id="inpCpmSell" type="number" step="0.01" min="0" max="100" class="input">
-      <p class="hint">مثال: 1.5 لو Adsterra بتديك $1.5 لكل 1000 impression</p>
-    </div>
-    <button class="btn" onclick="saveCpmSettings()">حفظ إعدادات CPM</button>
-    <p id="cpmMsg" class="msg"></p>
-  </div>
+  <div class="settings-page">
 
-  <!-- Profile -->
-  <div class="glass">
-    <h2>📋 المعلومات الشخصية</h2>
-    <div style="margin-bottom:12px">
-      <label>اسم المستخدم</label>
-      <input id="inpUsername" class="input">
+    <div class="settings-header">
+      <div class="settings-header-left">
+        <a href="/v2/dashboard" class="settings-back" aria-label="رجوع">→</a>
+        <div>
+          <h1 class="settings-title">الإعدادات</h1>
+          <p class="settings-subtitle">إدارة حسابك وأمانه</p>
+        </div>
+      </div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>البريد الإلكتروني <span id="verifyBadge"></span></label>
-      <input id="inpEmail" type="email" class="input">
-    </div>
-    <button class="btn" onclick="saveProfile()">حفظ التعديلات</button>
-    <button class="btn btn-secondary" id="resendBtn" onclick="resendVerify()" style="display:none;margin-right:8px">إعادة إرسال رابط التفعيل</button>
-    <p id="profileMsg" class="msg"></p>
-  </div>
 
-  <!-- Change Password -->
-  <div class="glass">
-    <h2>🔒 تغيير كلمة المرور</h2>
-    <div style="margin-bottom:12px">
-      <label>كلمة المرور الحالية</label>
-      <input id="inpCurPw" type="password" class="input">
+    <div id="settingsLoading" class="settings-loading">
+      <div class="spinner"></div>
+      <div>جاري التحميل…</div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>كلمة المرور الجديدة</label>
-      <input id="inpNewPw" type="password" class="input">
-    </div>
-    <button class="btn" onclick="changePassword()">تحديث كلمة المرور</button>
-    <p id="pwMsg" class="msg"></p>
-  </div>
 
-  <!-- Sessions -->
-  <div class="glass">
-    <h2>🖥️ الجلسات</h2>
-    <p style="color:#94A3B8;font-size:13px;margin:0 0 12px">تسجيل الخروج من كل الأجهزة التانية (هيتم إبقاء الجهاز الحالي).</p>
-    <button class="btn btn-secondary" onclick="logoutAll()">تسجيل الخروج من باقي الأجهزة</button>
-    <p id="sessMsg" class="msg"></p>
-  </div>
+    <div id="settingsContent" style="display:none;">
 
-  <!-- Delete Account -->
-  <div class="glass" style="border-color:rgba(244,63,94,.3)">
-    <h2 style="color:#F43F5E">⚠️ حذف الحساب</h2>
-    <p style="color:#94A3B8;font-size:13px;margin:0 0 12px">حذف كل شيء نهائيًا: المواقع، الزيارات، والإعدادات. لا يمكن التراجع.</p>
-    <div style="margin-bottom:12px">
-      <label>كلمة المرور</label>
-      <input id="inpDelPw" type="password" class="input">
+      <!-- ============ 1. CPM Settings ============ -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <div class="settings-section-icon">💰</div>
+          <div class="settings-section-info">
+            <h2 class="settings-section-title">إعدادات CPM (الربح والخسارة)</h2>
+            <p class="settings-section-desc">السعر اللي بتشتري بيه الزيارة والسعر اللي بتاخده من شبكة الإعلانات. يُستخدم في حساب الربح الصافي لكل زون في التقارير الذكية.</p>
+          </div>
+        </div>
+
+        <div class="settings-form-grid">
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpCpmBuy">سعر الشراء (Buy CPM)</label>
+            <div class="cpm-input-wrap">
+              <span class="cpm-input-prefix">$</span>
+              <input type="number" id="inpCpmBuy" class="neo-input" step="0.01" min="0" max="100" placeholder="1.00">
+            </div>
+            <span class="neo-field-hint">$ لكل 1000 زيارة</span>
+          </div>
+
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpCpmSell">سعر البيع (Sell CPM)</label>
+            <div class="cpm-input-wrap">
+              <span class="cpm-input-prefix">$</span>
+              <input type="number" id="inpCpmSell" class="neo-input" step="0.01" min="0" max="100" placeholder="1.50">
+            </div>
+            <span class="neo-field-hint">$ لكل 1000 impression</span>
+          </div>
+        </div>
+
+        <div class="settings-info-box">
+          💡 <b>مثال:</b> لو بتشتري من PopAds بـ $1 لكل 1000 زيارة، وحطيت <code>Buy CPM = 1.00</code>. ولو Adsterra بتديك $1.5 لكل 1000 impression، حط <code>Sell CPM = 1.50</code>.
+        </div>
+
+        <div class="settings-actions">
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="btnSaveCpm">💾 حفظ إعدادات CPM</button>
+          <div class="settings-msg" id="cpmMsg"></div>
+        </div>
+      </div>
+
+      <!-- ============ 2. Profile ============ -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <div class="settings-section-icon">👤</div>
+          <div class="settings-section-info">
+            <h2 class="settings-section-title">المعلومات الشخصية</h2>
+            <p class="settings-section-desc">تحديث اسم المستخدم والبريد الإلكتروني</p>
+          </div>
+        </div>
+
+        <div class="settings-form-row">
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpUsername">اسم المستخدم</label>
+            <input type="text" id="inpUsername" class="neo-input" maxlength="32" placeholder="username">
+          </div>
+        </div>
+
+        <div class="settings-form-row">
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpEmail">
+              البريد الإلكتروني
+              <span id="verifyBadge"></span>
+            </label>
+            <input type="email" id="inpEmail" class="neo-input" maxlength="254" placeholder="you@example.com">
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="btnSaveProfile">💾 حفظ التعديلات</button>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="btnResendVerify" style="display:none;">📧 إعادة إرسال رابط التفعيل</button>
+          <div class="settings-msg" id="profileMsg"></div>
+        </div>
+      </div>
+
+      <!-- ============ 3. Change Password ============ -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <div class="settings-section-icon">🔒</div>
+          <div class="settings-section-info">
+            <h2 class="settings-section-title">تغيير كلمة المرور</h2>
+            <p class="settings-section-desc">يُنصح بتغيير كلمة المرور كل فترة للأمان</p>
+          </div>
+        </div>
+
+        <div class="settings-form-row">
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpCurPw">كلمة المرور الحالية</label>
+            <input type="password" id="inpCurPw" class="neo-input" autocomplete="current-password" maxlength="128">
+          </div>
+        </div>
+
+        <div class="settings-form-row">
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpNewPw">كلمة المرور الجديدة</label>
+            <input type="password" id="inpNewPw" class="neo-input" autocomplete="new-password" minlength="8" maxlength="128">
+            <span class="neo-field-hint">8 حروف على الأقل، وتحتوي على حرفين مختلفين</span>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="btnChangePw">🔒 تحديث كلمة المرور</button>
+          <div class="settings-msg" id="pwMsg"></div>
+        </div>
+      </div>
+
+      <!-- ============ 4. Sessions ============ -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <div class="settings-section-icon">🖥️</div>
+          <div class="settings-section-info">
+            <h2 class="settings-section-title">الجلسات</h2>
+            <p class="settings-section-desc">تسجيل الخروج من كل الأجهزة التانية (هيتم إبقاء الجهاز الحالي)</p>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="btnLogoutAll">🚪 تسجيل الخروج من باقي الأجهزة</button>
+          <div class="settings-msg" id="sessMsg"></div>
+        </div>
+      </div>
+
+      <!-- ============ 5. Delete Account ============ -->
+      <div class="settings-section danger">
+        <div class="settings-section-head">
+          <div class="settings-section-icon">⚠️</div>
+          <div class="settings-section-info">
+            <h2 class="settings-section-title" style="color: var(--neo-danger);">حذف الحساب</h2>
+            <p class="settings-section-desc">حذف نهائي — المواقع، الزيارات، الإعدادات. لا يمكن التراجع.</p>
+          </div>
+        </div>
+
+        <div class="settings-danger-desc">
+          ⚠️ <b>تحذير:</b> هتحذف كل حاجة نهائياً. لو متأكد، ادخل كلمة المرور واكتب اسم المستخدم للتأكيد.
+        </div>
+
+        <div class="settings-form-row">
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpDelPw">كلمة المرور</label>
+            <input type="password" id="inpDelPw" class="neo-input" autocomplete="current-password" maxlength="128">
+          </div>
+        </div>
+
+        <div class="settings-form-row">
+          <div class="neo-field">
+            <label class="neo-field-label" for="inpDelUser">اكتب اسم المستخدم للتأكيد</label>
+            <input type="text" id="inpDelUser" class="neo-input" placeholder="اسم المستخدم بالظبط" maxlength="32">
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button class="neo-btn neo-btn-danger neo-btn-sm" id="btnDeleteAccount">🗑️ حذف الحساب نهائياً</button>
+          <div class="settings-msg" id="delMsg"></div>
+        </div>
+      </div>
+
     </div>
-    <div style="margin-bottom:12px">
-      <label>اكتب اسم المستخدم للتأكيد</label>
-      <input id="inpDelUser" class="input">
-    </div>
-    <button class="btn btn-danger" onclick="deleteAccount()">حذف الحساب نهائيًا</button>
-    <p id="delMsg" class="msg"></p>
   </div>
 
   <script>
-    function show(el, ok, text) {
-      el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
-      el.textContent = text;
-      el.style.display = 'block';
+    const SET = {
+      currentUsername: '',
+      currentEmail: '',
+    };
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function showMsg(elId, type, text) {
+      const el = document.getElementById(elId);
+      el.className = 'settings-msg ' + type;
+      el.textContent = text || '';
+      if (text) {
+        setTimeout(() => { if (el.textContent === text) { el.textContent = ''; el.className = 'settings-msg'; } }, 5000);
+      }
+    }
+
+    function setLoading(btnId, loading, defaultText) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      const orig = btn.dataset.orig || btn.textContent;
+      btn.dataset.orig = orig;
+      btn.textContent = loading ? '⏳...' : orig;
     }
 
     async function loadSettings() {
-      const r = await fetch('/api/settings');
-      if (!r.ok) { location.href = '/'; return; }
-      const d = await r.json();
-      document.getElementById('inpUsername').value = d.username || '';
-      document.getElementById('inpEmail').value = d.email || '';
-      document.getElementById('inpCpmBuy').value = d.cpm_buy ?? 1.0;
-      document.getElementById('inpCpmSell').value = d.cpm_sell ?? 1.5;
-      const b = document.getElementById('verifyBadge');
-      if (!d.email) {
-        b.innerHTML = '<span class="badge badge-warn">لا يوجد بريد</span>';
-        document.getElementById('resendBtn').style.display = 'none';
-      } else if (d.email_verified) {
-        b.innerHTML = '<span class="badge badge-ok">✓ مفعّل</span>';
-        document.getElementById('resendBtn').style.display = 'none';
-      } else {
-        b.innerHTML = '<span class="badge badge-warn">غير مفعّل</span>';
-        document.getElementById('resendBtn').style.display = 'inline-block';
+      try {
+        const r = await fetch('/api/settings', { credentials: 'same-origin' });
+        if (!r.ok) {
+          if (r.status === 401) { location.href = '/'; return; }
+          throw new Error('HTTP ' + r.status);
+        }
+        const d = await r.json();
+
+        SET.currentUsername = d.username || '';
+        SET.currentEmail = d.email || '';
+
+        document.getElementById('inpUsername').value = d.username || '';
+        document.getElementById('inpEmail').value = d.email || '';
+        document.getElementById('inpCpmBuy').value = d.cpm_buy ?? 1.0;
+        document.getElementById('inpCpmSell').value = d.cpm_sell ?? 1.5;
+
+        // Verify badge
+        const badge = document.getElementById('verifyBadge');
+        const resendBtn = document.getElementById('btnResendVerify');
+
+        if (!d.email) {
+          badge.innerHTML = '<span class="verify-badge warn">لا يوجد بريد</span>';
+          resendBtn.style.display = 'none';
+        } else if (d.email_verified) {
+          badge.innerHTML = '<span class="verify-badge ok">✓ مفعّل</span>';
+          resendBtn.style.display = 'none';
+        } else {
+          badge.innerHTML = '<span class="verify-badge warn">غير مفعّل</span>';
+          resendBtn.style.display = '';
+        }
+
+        document.getElementById('settingsLoading').style.display = 'none';
+        document.getElementById('settingsContent').style.display = '';
+      } catch (e) {
+        document.getElementById('settingsLoading').innerHTML = `<div style="color: var(--neo-danger);">فشل التحميل: ${esc(e.message)}</div>`;
       }
     }
 
-    async function saveCpmSettings() {
+    // ============ CPM ============
+    document.getElementById('btnSaveCpm').addEventListener('click', async function() {
       const buy = parseFloat(document.getElementById('inpCpmBuy').value);
       const sell = parseFloat(document.getElementById('inpCpmSell').value);
-      const msg = document.getElementById('cpmMsg');
-      if (isNaN(buy) || buy < 0 || buy > 100) { show(msg, false, 'سعر الشراء لازم يكون رقم بين 0 و 100'); return; }
-      if (isNaN(sell) || sell < 0 || sell > 100) { show(msg, false, 'سعر البيع لازم يكون رقم بين 0 و 100'); return; }
-      const r = await fetch('/api/settings/cpm', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ cpm_buy: buy, cpm_sell: sell })
-      });
-      const d = await r.json().catch(()=>({}));
-      if (r.ok) show(msg, true, 'تم حفظ إعدادات CPM ✅');
-      else show(msg, false, d.detail || 'فشل الحفظ');
-    }
 
-    async function saveProfile() {
+      if (isNaN(buy) || buy < 0 || buy > 100) {
+        showMsg('cpmMsg', 'error', 'سعر الشراء لازم يكون رقم بين 0 و 100');
+        return;
+      }
+      if (isNaN(sell) || sell < 0 || sell > 100) {
+        showMsg('cpmMsg', 'error', 'سعر البيع لازم يكون رقم بين 0 و 100');
+        return;
+      }
+
+      setLoading('btnSaveCpm', true);
+
+      try {
+        const r = await fetch('/api/settings/cpm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cpm_buy: buy, cpm_sell: sell }),
+          credentials: 'same-origin',
+        });
+        const d = await r.json().catch(() => ({}));
+
+        if (r.ok) {
+          showMsg('cpmMsg', 'success', '✓ تم حفظ إعدادات CPM');
+        } else {
+          showMsg('cpmMsg', 'error', d.detail || 'فشل الحفظ');
+        }
+      } catch (e) {
+        showMsg('cpmMsg', 'error', 'خطأ: ' + e.message);
+      } finally {
+        setLoading('btnSaveCpm', false);
+      }
+    });
+
+    // ============ Profile ============
+    document.getElementById('btnSaveProfile').addEventListener('click', async function() {
       const username = document.getElementById('inpUsername').value.trim();
       const email = document.getElementById('inpEmail').value.trim();
-      const msg = document.getElementById('profileMsg');
-      const r = await fetch('/api/settings/profile', {
-        method: 'PATCH', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ username, email })
-      });
-      const d = await r.json().catch(()=>({}));
-      if (r.ok) {
-        show(msg, true, 'تم حفظ التعديلات ✅');
-        loadSettings();
-      } else {
-        show(msg, false, d.detail || 'فشل الحفظ');
+
+      if (!username) { showMsg('profileMsg', 'error', 'اسم المستخدم مطلوب'); return; }
+
+      setLoading('btnSaveProfile', true);
+
+      try {
+        const r = await fetch('/api/settings/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email }),
+          credentials: 'same-origin',
+        });
+        const d = await r.json().catch(() => ({}));
+
+        if (r.ok) {
+          showMsg('profileMsg', 'success', '✓ تم حفظ التعديلات');
+          setTimeout(() => loadSettings(), 800);
+        } else {
+          showMsg('profileMsg', 'error', d.detail || 'فشل الحفظ');
+        }
+      } catch (e) {
+        showMsg('profileMsg', 'error', 'خطأ: ' + e.message);
+      } finally {
+        setLoading('btnSaveProfile', false);
       }
-    }
+    });
 
-    async function resendVerify() {
-      const msg = document.getElementById('profileMsg');
-      const r = await fetch('/api/auth/resend-verification', { method: 'POST' });
-      const d = await r.json().catch(()=>({}));
-      if (r.ok) show(msg, true, d.message || 'تم الإرسال');
-      else show(msg, false, d.detail || 'فشل الإرسال');
-    }
+    // ============ Resend Verify ============
+    document.getElementById('btnResendVerify').addEventListener('click', async function() {
+      setLoading('btnResendVerify', true);
 
-    async function changePassword() {
-      const current_password = document.getElementById('inpCurPw').value;
-      const new_password = document.getElementById('inpNewPw').value;
-      const msg = document.getElementById('pwMsg');
-      const r = await fetch('/api/settings/change-password', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ current_password, new_password })
-      });
-      const d = await r.json().catch(()=>({}));
-      if (r.ok) { show(msg, true, d.message); document.getElementById('inpCurPw').value = ''; document.getElementById('inpNewPw').value = ''; }
-      else show(msg, false, d.detail || 'فشل التحديث');
-    }
+      try {
+        const r = await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        const d = await r.json().catch(() => ({}));
 
-    async function logoutAll() {
-      const msg = document.getElementById('sessMsg');
-      const r = await fetch('/api/settings/logout-all', { method: 'POST' });
-      const d = await r.json().catch(()=>({}));
-      if (r.ok) show(msg, true, d.message || 'تم تسجيل الخروج من باقي الأجهزة');
-      else show(msg, false, d.detail || 'فشل');
-    }
+        if (r.ok) {
+          showMsg('profileMsg', 'success', d.message || 'تم إرسال رابط التفعيل');
+        } else {
+          showMsg('profileMsg', 'error', d.detail || 'فشل الإرسال');
+        }
+      } catch (e) {
+        showMsg('profileMsg', 'error', 'خطأ: ' + e.message);
+      } finally {
+        setLoading('btnResendVerify', false);
+      }
+    });
 
-    async function deleteAccount() {
-      if (!confirm('هل أنت متأكد تمامًا؟ كل البيانات هتتحذف نهائيًا!')) return;
-      const password = document.getElementById('inpDelPw').value;
+    // ============ Change Password ============
+    document.getElementById('btnChangePw').addEventListener('click', async function() {
+      const current = document.getElementById('inpCurPw').value;
+      const newPw = document.getElementById('inpNewPw').value;
+
+      if (!current) { showMsg('pwMsg', 'error', 'كلمة المرور الحالية مطلوبة'); return; }
+      if (!newPw || newPw.length < 8) { showMsg('pwMsg', 'error', 'كلمة المرور الجديدة لازم 8 حروف على الأقل'); return; }
+
+      setLoading('btnChangePw', true);
+
+      try {
+        const r = await fetch('/api/settings/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current_password: current, new_password: newPw }),
+          credentials: 'same-origin',
+        });
+        const d = await r.json().catch(() => ({}));
+
+        if (r.ok) {
+          showMsg('pwMsg', 'success', d.message || '✓ تم تحديث كلمة المرور');
+          document.getElementById('inpCurPw').value = '';
+          document.getElementById('inpNewPw').value = '';
+        } else {
+          showMsg('pwMsg', 'error', d.detail || 'فشل التحديث');
+        }
+      } catch (e) {
+        showMsg('pwMsg', 'error', 'خطأ: ' + e.message);
+      } finally {
+        setLoading('btnChangePw', false);
+      }
+    });
+
+    // ============ Logout All ============
+    document.getElementById('btnLogoutAll').addEventListener('click', async function() {
+      if (!confirm('هتسجل خروج من كل الأجهزة التانية. متأكد؟')) return;
+
+      setLoading('btnLogoutAll', true);
+
+      try {
+        const r = await fetch('/api/settings/logout-all', {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        const d = await r.json().catch(() => ({}));
+
+        if (r.ok) {
+          showMsg('sessMsg', 'success', '✓ ' + (d.message || 'تم تسجيل الخروج من باقي الأجهزة'));
+        } else {
+          showMsg('sessMsg', 'error', d.detail || 'فشل');
+        }
+      } catch (e) {
+        showMsg('sessMsg', 'error', 'خطأ: ' + e.message);
+      } finally {
+        setLoading('btnLogoutAll', false);
+      }
+    });
+
+    // ============ Delete Account ============
+    document.getElementById('btnDeleteAccount').addEventListener('click', async function() {
+      const pw = document.getElementById('inpDelPw').value;
       const confirmName = document.getElementById('inpDelUser').value.trim();
-      const msg = document.getElementById('delMsg');
-      const r = await fetch('/api/settings/account', {
-        method: 'DELETE', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ password, confirm: confirmName })
-      });
-      const d = await r.json().catch(()=>({}));
-      if (r.ok) { location.href = '/'; }
-      else show(msg, false, d.detail || 'فشل الحذف');
-    }
 
+      if (!pw) { showMsg('delMsg', 'error', 'كلمة المرور مطلوبة'); return; }
+      if (confirmName !== SET.currentUsername) {
+        showMsg('delMsg', 'error', 'اسم المستخدم غير مطابق');
+        return;
+      }
+      if (!confirm('⚠️ هتحذف الحساب وكل بياناتك نهائياً. متأكد 100%؟')) return;
+      if (!confirm('تأكيد أخير: هل أنت متأكد؟ هذا لا يمكن التراجع عنه.')) return;
+
+      setLoading('btnDeleteAccount', true);
+
+      try {
+        const r = await fetch('/api/settings/account', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw, confirm: confirmName }),
+          credentials: 'same-origin',
+        });
+        const d = await r.json().catch(() => ({}));
+
+        if (r.ok) {
+          alert('تم حذف الحساب. سيتم تحويلك...');
+          location.href = '/';
+        } else {
+          showMsg('delMsg', 'error', d.detail || 'فشل الحذف');
+          setLoading('btnDeleteAccount', false);
+        }
+      } catch (e) {
+        showMsg('delMsg', 'error', 'خطأ: ' + e.message);
+        setLoading('btnDeleteAccount', false);
+      }
+    });
+
+    // Load on start
     loadSettings();
   </script>
 </body>
-  </html>
+</html>
