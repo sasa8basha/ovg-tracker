@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · IP Lists</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090D; }
+    body { font-family: 'Inter', 'IBM Plex Sans Arabic', system-ui, sans-serif; color: #CBD5E1; overflow: hidden; }
+    #shAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: #08090D; }
+    .skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #08090D; color: #7B8496; z-index: 9998; }
+    .skel .spinner { width: 32px; height: 32px; border: 3px solid #232734; border-top-color: #7C5CFF; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ip-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .ip-title { font-size: 22px; font-weight: 900; color: #F8FAFC; margin: 0 0 4px 0; }
+    .ip-sub { font-size: 12px; color: #7B8496; }
+
+    .ip-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .ip-kpi { background: #0F1117; border: 1px solid #232734; border-radius: 10px; padding: 12px; }
+    .ip-kpi-label { font-size: 9px; color: #4A5263; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .ip-kpi-val { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 900; color: #F8FAFC; }
+    .ip-kpi-val.green { color: #10B981; }
+    .ip-kpi-val.rose { color: #F43F5E; }
+    .ip-kpi-val.amber { color: #F59E0B; }
+
+    .ip-filters {
+      background: #0F1117; border: 1px solid #232734; border-radius: 12px;
+      padding: 12px; margin-bottom: 16px; display: grid;
+      grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: end;
+    }
+    .ip-input { width: 100%; height: 32px; padding: 0 10px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 12px; outline: none; box-sizing: border-box; }
+    .ip-input:focus { border-color: #7C5CFF; }
+    .ip-label { display: block; font-size: 10px; font-weight: 700; color: #4A5263; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+
+    .ip-tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid #232734; }
+    .ip-tab { padding: 10px 18px; background: transparent; border: none; border-bottom: 2px solid transparent; color: #7B8496; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; transition: all 120ms; }
+    .ip-tab.active { color: #F8FAFC; border-bottom-color: #7C5CFF; }
+    .ip-tab:hover { color: #CBD5E1; }
+
+    .ip-panel { display: none; }
+    .ip-panel.active { display: block; }
+
+    .ip-table-wrap { background: #0F1117; border: 1px solid #232734; border-radius: 12px; overflow: hidden; }
+    .ip-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .ip-table th { padding: 10px 8px; text-align: right; font-size: 10px; color: #4A5263; text-transform: uppercase; font-weight: 700; background: #0A0C12; border-bottom: 1px solid #1A1D29; white-space: nowrap; }
+    .ip-table td { padding: 8px; border-bottom: 1px solid #1A1D29; }
+    .ip-table tr:last-child td { border-bottom: none; }
+    .ip-table tr:hover td { background: #161822; }
+    .ip-mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .ip-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .ip-badge.residential { background: rgba(16,185,129,0.15); color: #10B981; }
+    .ip-badge.datacenter { background: rgba(244,63,94,0.15); color: #F43F5E; }
+    .ip-badge.vpn { background: rgba(244,63,94,0.15); color: #F43F5E; }
+    .ip-badge.proxy { background: rgba(249,115,22,0.15); color: #F97316; }
+    .ip-badge.tor { background: rgba(168,85,247,0.15); color: #A855F7; }
+    .ip-badge.suspicious { background: rgba(245,158,11,0.15); color: #F59E0B; }
+    .ip-badge.unknown { background: rgba(100,116,139,0.15); color: #94A3B8; }
+
+    .ip-empty { padding: 60px 20px; text-align: center; color: #7B8496; }
+    .ip-empty-icon { font-size: 48px; opacity: 0.4; display: block; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="shAppRoot" style="display:none;">
+    <main id="shContent">
+      <div class="ip-header">
+        <div>
+          <h1 class="ip-title">🌐 قوائم IP</h1>
+          <p class="ip-sub">White List للـ residential النضيف · Black List للـ VPN/Proxy/Datacenter</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="sh-btn sh-btn-ghost" id="refreshBtn">🔄 تحديث</button>
+        </div>
+      </div>
+
+      <div class="ip-kpis" id="ipKpis">
+        <div class="ip-kpi"><div class="ip-kpi-label">إجمالي IPs</div><div class="ip-kpi-val" id="kpiTotal">0</div></div>
+        <div class="ip-kpi"><div class="ip-kpi-label">Residential</div><div class="ip-kpi-val green" id="kpiResidential">0</div></div>
+        <div class="ip-kpi"><div class="ip-kpi-label">Datacenter</div><div class="ip-kpi-val rose" id="kpiDatacenter">0</div></div>
+        <div class="ip-kpi"><div class="ip-kpi-label">VPN</div><div class="ip-kpi-val rose" id="kpiVpn">0</div></div>
+        <div class="ip-kpi"><div class="ip-kpi-label">Proxy</div><div class="ip-kpi-val amber" id="kpiProxy">0</div></div>
+        <div class="ip-kpi"><div class="ip-kpi-label">Tor</div><div class="ip-kpi-val amber" id="kpiTor">0</div></div>
+      </div>
+
+      <div class="ip-filters">
+        <div>
+          <label class="ip-label">الحملة</label>
+          <select id="campaignFilter" class="ip-input"><option value="">كل الحملات</option></select>
+        </div>
+        <div>
+          <label class="ip-label">بحث (IP / Country)</label>
+          <input type="text" id="searchInput" class="ip-input" placeholder="فلترة سريعة...">
+        </div>
+        <button class="sh-btn sh-btn-primary" id="applyBtn" style="height:32px;">تطبيق</button>
+        <button class="sh-btn sh-btn-ghost" id="clearBtn" style="height:32px;">مسح</button>
+      </div>
+
+      <div class="ip-tabs">
+        <button class="ip-tab active" data-tab="whitelist">✅ White List</button>
+        <button class="ip-tab" data-tab="blacklist">🚫 Black List</button>
+      </div>
+
+      <div class="ip-panel active" id="panelWhitelist">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-size:12px;color:#7B8496;" id="wlCount">— IP</span>
+          <button class="sh-btn sh-btn-primary" id="exportWlBtn" style="background:#10B981;">⬇ تصدير CSV (رفعه في PopAds)</button>
+        </div>
+        <div class="ip-table-wrap">
+          <table class="ip-table">
+            <thead><tr><th>IP</th><th>الدولة</th><th>ISP</th><th>ASN</th><th>Risk</th></tr></thead>
+            <tbody id="wlBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="ip-panel" id="panelBlacklist">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-size:12px;color:#7B8496;" id="blCount">— IP</span>
+          <button class="sh-btn sh-btn-primary" id="exportBlBtn" style="background:#F43F5E;">⬇ تصدير CSV (حظره في PopAds)</button>
+        </div>
+        <div class="ip-table-wrap">
+          <table class="ip-table">
+            <thead><tr><th>IP</th><th>التصنيف</th><th>الدولة</th><th>ISP</th><th>Risk</th><th>الأسباب</th></tr></thead>
+            <tbody id="blBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/shell.js"></script>
+  <script>
+    const IPI = { site: null, campaignId: '', search: '', whitelist: [], blacklist: [] };
+
+    async function loadCampaigns() {
+      try {
+        const list = await Shell.api('/api/campaigns');
+        const sel = document.getElementById('campaignFilter');
+        sel.innerHTML = '<option value="">كل الحملات</option>' + list.map(c => `<option value="${c.id}">${Shell.esc(c.name)}</option>`).join('');
+      } catch (e) {}
+    }
+
+    async function loadStats() {
+      try {
+        const q = IPI.campaignId ? `?campaign_id=${IPI.campaignId}` : '';
+        const d = await Shell.api('/api/ip-intel/stats' + q);
+        document.getElementById('kpiTotal').textContent = d.total || 0;
+        document.getElementById('kpiResidential').textContent = d.residential || 0;
+        document.getElementById('kpiDatacenter').textContent = d.datacenter || 0;
+        document.getElementById('kpiVpn').textContent = d.vpn || 0;
+        document.getElementById('kpiProxy').textContent = d.proxy || 0;
+        document.getElementById('kpiTor').textContent = d.tor || 0;
+      } catch (e) {}
+    }
+
+    function filterRows(rows) {
+      if (!IPI.search) return rows;
+      const s = IPI.search.toLowerCase();
+      return rows.filter(r =>
+        (r.ip || '').toLowerCase().includes(s) ||
+        (r.country || '').toLowerCase().includes(s) ||
+        (r.isp || '').toLowerCase().includes(s) ||
+        (r.asn || '').toLowerCase().includes(s)
+      );
+    }
+
+    async function loadWhitelist() {
+      try {
+        const q = IPI.campaignId ? `?campaign_id=${IPI.campaignId}` : '';
+        const d = await Shell.api('/api/ip-intel/whitelist' + q);
+        IPI.whitelist = d.items || [];
+        const filtered = filterRows(IPI.whitelist);
+        document.getElementById('wlCount').textContent = `${filtered.length} IP`;
+        const body = document.getElementById('wlBody');
+        if (!filtered.length) {
+          body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#7B8496;">مفيش IPs نضيفة لسه. استنى الـ worker يخلص تحليل.</td></tr>';
+          return;
+        }
+        body.innerHTML = filtered.map(r => `
+          <tr>
+            <td class="ip-mono">${Shell.esc(r.ip)}</td>
+            <td>${Shell.esc(r.country || '—')}</td>
+            <td style="font-size:11px;">${Shell.esc((r.isp || '').substring(0, 40))}</td>
+            <td class="ip-mono">${Shell.esc(r.asn || '—')}</td>
+            <td><span style="font-family:'JetBrains Mono';color:${r.risk_score > 10 ? '#F59E0B' : '#10B981'};font-weight:800;">${r.risk_score}</span></td>
+          </tr>`).join('');
+      } catch (e) {
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:#F43F5E;">${Shell.esc(e.message)}</td></tr>`;
+      }
+    }
+
+    async function loadBlacklist() {
+      try {
+        const q = IPI.campaignId ? `?campaign_id=${IPI.campaignId}` : '';
+        const d = await Shell.api('/api/ip-intel/blacklist' + q);
+        IPI.blacklist = d.items || [];
+        const filtered = filterRows(IPI.blacklist);
+        document.getElementById('blCount').textContent = `${filtered.length} IP`;
+        const body = document.getElementById('blBody');
+        if (!filtered.length) {
+          body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#7B8496;">مفيش IPs مشبوهة. ممتاز!</td></tr>';
+          return;
+        }
+        body.innerHTML = filtered.map(r => {
+          const reasons = (r.reasons || []).map(x => x.reason).slice(0, 2).join(' · ');
+          return `<tr>
+            <td class="ip-mono">${Shell.esc(r.ip)}</td>
+            <td><span class="ip-badge ${Shell.esc(r.classification || 'unknown')}">${Shell.esc(r.classification || 'unknown')}</span></td>
+            <td>${Shell.esc(r.country || '—')}</td>
+            <td style="font-size:11px;">${Shell.esc((r.isp || '').substring(0, 35))}</td>
+            <td><span style="font-family:'JetBrains Mono';color:#F43F5E;font-weight:800;">${r.risk_score}</span></td>
+            <td style="font-size:10px;color:#7B8496;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${Shell.esc(reasons)}">${Shell.esc(reasons || '—')}</td>
+          </tr>`;
+        }).join('');
+      } catch (e) {
+        document.getElementById('blBody').innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:#F43F5E;">${Shell.esc(e.message)}</td></tr>`;
+      }
+    }
+
+    async function exportList(kind) {
+      const q = IPI.campaignId ? `?campaign_id=${IPI.campaignId}` : '';
+      const url = `/api/ip-intel/export/${kind}${q}`;
+      try {
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        let fn = `ovg_${kind}.csv`;
+        const disp = res.headers.get('Content-Disposition');
+        if (disp) {
+          const m = disp.match(/filename="?([^";]+)"?/);
+          if (m) fn = m[1];
+        }
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        a.download = fn;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+        Shell.toast(`تم تصدير ${kind} ✅`, 'success');
+      } catch (e) {
+        Shell.toast('فشل التصدير: ' + e.message, 'error');
+      }
+    }
+
+    function setupTabs() {
+      document.querySelectorAll('.ip-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.ip-tab').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.ip-panel').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById('panel' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).classList.add('active');
+        });
+      });
+    }
+
+    function setupFilters() {
+      document.getElementById('campaignFilter').addEventListener('change', (e) => {
+        IPI.campaignId = e.target.value;
+        loadStats(); loadWhitelist(); loadBlacklist();
+      });
+      document.getElementById('searchInput').addEventListener('input', (e) => {
+        IPI.search = e.target.value;
+        loadWhitelist(); loadBlacklist();
+      });
+      document.getElementById('applyBtn').addEventListener('click', () => {
+        loadStats(); loadWhitelist(); loadBlacklist();
+      });
+      document.getElementById('clearBtn').addEventListener('click', () => {
+        IPI.search = '';
+        IPI.campaignId = '';
+        document.getElementById('campaignFilter').value = '';
+        document.getElementById('searchInput').value = '';
+        loadStats(); loadWhitelist(); loadBlacklist();
+      });
+      document.getElementById('refreshBtn').addEventListener('click', () => {
+        loadStats(); loadWhitelist(); loadBlacklist();
+      });
+      document.getElementById('exportWlBtn').addEventListener('click', () => exportList('whitelist'));
+      document.getElementById('exportBlBtn').addEventListener('click', () => exportList('blacklist'));
+    }
+
+    (async function boot() {
+      try {
+        await Shell.mount({ active: 'ip-lists', lang: 'ar', breadcrumb: [{ label: 'قوائم IP' }] });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('shAppRoot').style.display = '';
+
+        setupTabs();
+        setupFilters();
+        await loadCampaigns();
+        await Promise.all([loadStats(), loadWhitelist(), loadBlacklist()]);
+      } catch (e) {
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color:#F43F5E;">${Shell.esc(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

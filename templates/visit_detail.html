@@ -17,6 +17,8 @@
     .score-bg { stroke: rgba(255,255,255,0.05); }
     .score-progress { stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1.5s ease-out; }
     .cat-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .risk-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 6px; }
+    .risk-bar > div { height: 100%; border-radius: 3px; transition: width 600ms ease-out; }
   </style>
 </head>
 <body class="min-h-screen p-6">
@@ -36,7 +38,6 @@
       </div>
     </div>
 
-    <!-- Ground Truth Card -->
     <div class="glass-card p-5 mb-6">
       <div class="flex flex-wrap items-center gap-4">
         <div class="flex-1 min-w-[200px]">
@@ -50,6 +51,8 @@
         </div>
       </div>
     </div>
+
+    <div id="mismatchBanner" class="hidden mb-6"></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -72,7 +75,7 @@
         <div class="glass-card p-6">
           <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💰</span> الأرباح المالية</h3>
           <div class="grid grid-cols-3 gap-3">
-            <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">التكلفة (BID)</div><div id="vBid" class="text-sm font-bold text-rose-400 font-mono">$0.00</div></div>
+            <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">BID</div><div id="vBid" class="text-sm font-bold text-rose-400 font-mono">$0.00</div></div>
             <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الإيراد</div><div id="vRevenue" class="text-sm font-bold text-emerald-400 font-mono">$0.00</div></div>
             <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الربح</div><div id="vProfit" class="text-sm font-bold font-mono">$0.00</div></div>
           </div>
@@ -90,7 +93,34 @@
 
       <div class="lg:col-span-2 space-y-6">
 
-        <!-- 🔴 PopAds Full Macros Section -->
+        <!-- IP Intelligence (NEW) -->
+        <div class="glass-card p-6" id="ipIntelCard">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>🌐</span> IP Intelligence
+            </h3>
+            <span id="vClassification" class="px-3 py-1 rounded-full text-[10px] font-bold"></span>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+            <div><div class="text-xs text-slate-500 mb-1">IP</div><div id="vIpIntelIp" class="font-mono text-white font-bold break-all text-xs"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">Country</div><div id="vIpIntelCountry" class="text-slate-200"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">ISP</div><div id="vIpIntelIsp" class="text-slate-200 text-xs break-all"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vIpIntelAsn" class="font-mono text-slate-200 text-xs"></div></div>
+          </div>
+
+          <div class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs text-slate-400 font-bold">Risk Score</span>
+              <span id="vIpRiskScore" class="font-mono text-sm font-bold">0</span>
+            </div>
+            <div class="risk-bar"><div id="vIpRiskBar" style="width:0%;background:#10B981;"></div></div>
+          </div>
+
+          <div id="vIpReasons" class="mt-3"></div>
+        </div>
+
+        <!-- PopAds Macros -->
         <div class="glass-card p-6">
           <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
@@ -113,8 +143,10 @@
           <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🌐</span> الشبكة والاتصال</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div><div class="text-xs text-slate-500 mb-1">IP Address</div><div id="vIp" class="font-mono text-white font-bold bg-white/5 px-2 py-1 rounded break-all"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">Country</div><div id="vCountry" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">ISP</div><div id="vIsp" class="text-slate-200"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">Country (من إحنا)</div><div id="vCountry" class="text-slate-200"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">Country (PopAds)</div><div id="vCountryPopads" class="text-slate-200"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">ISP (من إحنا)</div><div id="vIsp" class="text-slate-200 text-xs break-all"></div></div>
+            <div><div class="text-xs text-slate-500 mb-1">ISP (PopAds)</div><div id="vIspPopads" class="text-slate-200 text-xs break-all"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vAsn" class="text-slate-200"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">نوع الاتصال</div><div id="vConnType" class="text-slate-200"></div></div>
             <div><div class="text-xs text-slate-500 mb-1">VPN/Proxy</div><div id="vVpn"></div></div>
@@ -172,12 +204,22 @@
       lang: 'Language',
     };
 
+    const CLASS_STYLES = {
+      residential: { bg: 'rgba(16,185,129,0.15)', color: '#10B981', label: '✅ Residential (نضيف)' },
+      datacenter:  { bg: 'rgba(244,63,94,0.15)',  color: '#F43F5E', label: '🏢 Datacenter (مشبوه)' },
+      vpn:         { bg: 'rgba(244,63,94,0.15)',  color: '#F43F5E', label: '🚫 VPN' },
+      proxy:       { bg: 'rgba(249,115,22,0.15)', color: '#F97316', label: '🔀 Proxy' },
+      tor:         { bg: 'rgba(168,85,247,0.15)', color: '#A855F7', label: '🧅 Tor' },
+      suspicious:  { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: '⚠️ Suspicious' },
+      unknown:     { bg: 'rgba(100,116,139,0.15)',color: '#94A3B8', label: '❓ Unknown' },
+    };
+
     function renderPopadsMacros(known, raw) {
       const container = document.getElementById('popadsKnown');
       const keys = Object.keys(known || {});
 
       if (keys.length === 0) {
-        container.innerHTML = '<div class="col-span-3 text-slate-500 text-sm text-center py-6 bg-white/5 rounded-lg">مفيش ماكروز PopAds في الزيارة دي — ممكن تكون من مصدر تاني أو URL مفيهوش ماكروز.</div>';
+        container.innerHTML = '<div class="col-span-3 text-slate-500 text-sm text-center py-6 bg-white/5 rounded-lg">مفيش ماكروز PopAds في الزيارة دي.</div>';
       } else {
         container.innerHTML = keys.map(function(k) {
           const val = known[k];
@@ -220,6 +262,85 @@
         rawEl.classList.toggle('hidden', !isOpen);
         btn.textContent = isOpen ? '🔒 إخفاء Raw JSON' : '🔍 إظهار Raw JSON';
       };
+    }
+
+    function renderIpIntel(intel) {
+      if (!intel) return;
+      const cls = intel.classification || 'unknown';
+      const style = CLASS_STYLES[cls] || CLASS_STYLES.unknown;
+
+      const clsEl = document.getElementById('vClassification');
+      clsEl.textContent = style.label;
+      clsEl.style.background = style.bg;
+      clsEl.style.color = style.color;
+
+      document.getElementById('vIpIntelIp').textContent = intel.ip || '—';
+      document.getElementById('vIpIntelCountry').textContent = intel.country || '—';
+      document.getElementById('vIpIntelIsp').textContent = intel.isp || '—';
+      document.getElementById('vIpIntelAsn').textContent = intel.asn || '—';
+
+      const risk = Number(intel.risk_score || 0);
+      document.getElementById('vIpRiskScore').textContent = risk;
+      const riskColor = risk >= 80 ? '#F43F5E' : risk >= 60 ? '#F97316' : risk >= 40 ? '#F59E0B' : '#10B981';
+      const bar = document.getElementById('vIpRiskBar');
+      bar.style.width = risk + '%';
+      bar.style.background = riskColor;
+      document.getElementById('vIpRiskScore').style.color = riskColor;
+
+      const reasonsEl = document.getElementById('vIpReasons');
+      const reasons = intel.reasons || [];
+      if (reasons.length === 0) {
+        reasonsEl.innerHTML = '<div class="text-[11px] text-slate-500 text-center py-2">لا توجد أسباب مشبوهة — IP نضيف ✅</div>';
+      } else {
+        reasonsEl.innerHTML = '<div class="text-[10px] text-slate-500 font-bold mb-2">الأسباب:</div>' +
+          reasons.map(r => {
+            const sevColor = r.severity === 'high' ? '#F43F5E' : r.severity === 'medium' ? '#F59E0B' : '#94A3B8';
+            return `<div class="flex items-center gap-2 text-[11px] mb-1">
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${sevColor};"></span>
+              <span style="color:#CBD5E1;">${esc(r.reason || '')}</span>
+              <span style="color:#4A5263;font-size:9px;font-family:monospace;">(${esc(r.source || '')})</span>
+            </div>`;
+          }).join('');
+      }
+    }
+
+    function renderMismatches(mismatches) {
+      const banner = document.getElementById('mismatchBanner');
+      if (!mismatches || mismatches.length === 0) {
+        banner.classList.add('hidden');
+        return;
+      }
+      const hasHigh = mismatches.some(m => m.severity === 'high');
+      const bg = hasHigh ? 'rgba(244,63,94,0.08)' : 'rgba(245,158,11,0.08)';
+      const border = hasHigh ? 'rgba(244,63,94,0.35)' : 'rgba(245,158,11,0.35)';
+      const color = hasHigh ? '#FDA4AF' : '#FCD34D';
+
+      banner.style.background = bg;
+      banner.style.border = '1px solid ' + border;
+      banner.style.borderRadius = '12px';
+      banner.style.padding = '14px 18px';
+      banner.style.color = color;
+      banner.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <span style="font-size:22px;">${hasHigh ? '🚨' : '⚠️'}</span>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:13px;color:#F8FAFC;margin-bottom:6px;">
+              ${hasHigh ? 'تناقضات في البيانات' : 'ملاحظات على البيانات'}
+            </div>
+            ${mismatches.map(m => `
+              <div style="font-size:11px;margin-top:4px;line-height:1.6;">
+                <b style="color:#F8FAFC;">${esc(m.field.toUpperCase())}:</b>
+                إحنا: <span style="font-family:monospace;">${esc(m.ours)}</span> ·
+                PopAds: <span style="font-family:monospace;">${esc(m.popads)}</span>
+              </div>
+            `).join('')}
+            <div style="font-size:10px;margin-top:8px;opacity:0.8;">
+              ⚠️ الفرق ده ممكن يكون طبيعي (تحديث GeoIP مختلف)، أو دليل على إن الترافيك ده مش من المكان اللي PopAds بتقول عليه.
+            </div>
+          </div>
+        </div>
+      `;
+      banner.classList.remove('hidden');
     }
 
     function renderGroundTruth(gt, at, by) {
@@ -296,7 +417,9 @@
       document.getElementById('vScore').textContent = d.score;
       document.getElementById('vIp').textContent = d.ip;
       document.getElementById('vCountry').textContent = d.country;
+      document.getElementById('vCountryPopads').textContent = (d.popads_known && d.popads_known.country) || '—';
       document.getElementById('vIsp').textContent = d.isp;
+      document.getElementById('vIspPopads').textContent = (d.popads_known && (d.popads_known.ispname || d.popads_known.isp)) || '—';
       document.getElementById('vAsn').textContent = d.asn;
       document.getElementById('vConnType').textContent = d.connection_type;
       document.getElementById('vTimezone').textContent = d.timezone;
@@ -311,10 +434,10 @@
       document.getElementById('vClicks').textContent = d.clicks;
       document.getElementById('vScrolls').textContent = d.scrolls;
 
-      // 🔴 PopAds macros
       renderPopadsMacros(d.popads_known || {}, d.popads_data || {});
+      renderIpIntel(d.ip_intel);
+      renderMismatches(d.mismatches);
 
-      // 🔴 Financials
       const bid = Number(d.bid || 0);
       const rev = Number(d.revenue || 0);
       const profit = rev - bid;
