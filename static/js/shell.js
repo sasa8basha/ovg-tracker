@@ -9,7 +9,7 @@
     mounted: false, cmdOpen: false, cmdItems: [], cmdSelected: 0, cmdQuery: '',
     baseTitle: document.title, attentionTimer: null, pulseTimer: null,
     quickActionsEl: null, quickActionsTarget: null,
-    pulse: null,  // Phase 1 — last pulse payload
+    pulse: null,
   };
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -69,6 +69,13 @@
     pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
     scale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
     eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    // Phase 2 — new icons
+    shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
+    refund: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+    award: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
+    activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+    history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
   };
 
   const NAV = {
@@ -81,14 +88,24 @@
         { id: 'labeling',  label: 'المراجعة',     icon: 'labeling',  href: '/labeling', badge: 'labeling' },
         { id: 'sessions',  label: 'Sessions',     icon: 'sessions',  href: '/sessions' },
       ]},
+      { group: 'التحليل المتقدم', items: [
+        { id: 'ip-lists',  label: 'قوائم IP',         icon: 'shield',  href: '/ip-lists' },
+        { id: 'reports',   label: 'الخريطة والتقارير', icon: 'map',     href: '/reports' },
+      ]},
       { group: 'الحملات', items: [
         { id: 'campaigns', label: 'كل الحملات',     icon: 'campaigns', href: '/campaigns' },
         { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/smart-reports' },
         { id: 'analytics', label: 'Zone Analytics',  icon: 'analytics', href: '/zone-analytics' },
       ]},
+      { group: 'التقارير والإثباتات', items: [
+        { id: 'popads-report',   label: 'استرداد PopAds',  icon: 'refund', href: '/popads-report' },
+        { id: 'adsterra-report', label: 'شهادة Adsterra',   icon: 'award',  href: '/adsterra-report' },
+      ]},
       { group: 'النظام', items: [
-        { id: 'dataquality', label: 'جودة البيانات', icon: 'dataquality', href: '/data-quality' },
-        { id: 'settings',    label: 'الإعدادات',     icon: 'settings',    href: '/settings' },
+        { id: 'system-health', label: 'حالة النظام',   icon: 'activity',  href: '/system-health' },
+        { id: 'audit-log',     label: 'سجل الإجراءات', icon: 'history',   href: '/audit-log' },
+        { id: 'dataquality',   label: 'جودة البيانات', icon: 'dataquality', href: '/data-quality' },
+        { id: 'settings',      label: 'الإعدادات',     icon: 'settings',    href: '/settings' },
       ]},
     ],
     en: [
@@ -100,14 +117,24 @@
         { id: 'labeling',  label: 'Labeling',  icon: 'labeling',  href: '/labeling', badge: 'labeling' },
         { id: 'sessions',  label: 'Sessions',  icon: 'sessions',  href: '/sessions' },
       ]},
+      { group: 'Deep Analysis', items: [
+        { id: 'ip-lists',  label: 'IP Lists',      icon: 'shield',  href: '/ip-lists' },
+        { id: 'reports',   label: 'Map & Reports', icon: 'map',     href: '/reports' },
+      ]},
       { group: 'Campaigns', items: [
         { id: 'campaigns', label: 'All Campaigns',  icon: 'campaigns', href: '/campaigns' },
         { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/smart-reports' },
         { id: 'analytics', label: 'Zone Analytics', icon: 'analytics', href: '/zone-analytics' },
       ]},
+      { group: 'Reports & Proofs', items: [
+        { id: 'popads-report',   label: 'PopAds Refund',   icon: 'refund', href: '/popads-report' },
+        { id: 'adsterra-report', label: 'Adsterra Proof',  icon: 'award',  href: '/adsterra-report' },
+      ]},
       { group: 'System', items: [
-        { id: 'dataquality', label: 'Data Quality', icon: 'dataquality', href: '/data-quality' },
-        { id: 'settings',    label: 'Settings',     icon: 'settings',    href: '/settings' },
+        { id: 'system-health', label: 'System Health', icon: 'activity',  href: '/system-health' },
+        { id: 'audit-log',     label: 'Audit Log',     icon: 'history',   href: '/audit-log' },
+        { id: 'dataquality',   label: 'Data Quality',  icon: 'dataquality', href: '/data-quality' },
+        { id: 'settings',      label: 'Settings',      icon: 'settings',    href: '/settings' },
       ]},
     ],
   };
@@ -220,9 +247,6 @@
     el.innerHTML = items.map((it, i) => { const isLast = i === items.length - 1; const crumb = it.href ? `<a href="${esc(it.href)}" class="crumb" style="color:inherit;text-decoration:none;">${esc(it.label)}</a>` : `<span class="crumb ${isLast ? 'active' : ''}">${esc(it.label)}</span>`; return (i > 0 ? '<span class="sep">/</span>' : '') + crumb; }).join('');
   }
 
-  // =========================================================
-  // Phase 1 — Money Pulse via /api/stats/pulse (1 call, not 4)
-  // =========================================================
   async function refreshMoneyPulse() {
     try {
       const pulse = await api('/api/stats/pulse');
@@ -235,7 +259,6 @@
       const source = today.source || 'unknown';
       const integrity = (today.integrity && today.integrity.integrity) || 'unknown';
 
-      // Trend: % change vs yesterday
       let trendPct = 0;
       let trendDir = 'flat';
       if (Math.abs(yestProfit) > 0.01) {
@@ -250,7 +273,6 @@
         const cls = todayProfit > 0.01 ? 'pos' : todayProfit < -0.01 ? 'neg' : 'zero';
         el.className = `sh-money-pulse ${cls}`;
 
-        // Indicator when profit is estimated, not exact
         const estimated = (source === 'cpm' || source === 'unknown' || integrity !== 'exact');
         const indicator = estimated ? ' *' : '';
 
@@ -259,17 +281,10 @@
 
         const trendEl = el.querySelector('.sh-mp-trend');
         if (trendEl) {
-          if (trendDir === 'flat') {
-            trendEl.textContent = '—';
-            trendEl.className = 'sh-mp-trend flat';
-          } else {
-            const arrow = trendDir === 'up' ? '↑' : '↓';
-            trendEl.textContent = `${arrow}${Math.abs(trendPct).toFixed(0)}%`;
-            trendEl.className = `sh-mp-trend ${trendDir}`;
-          }
+          if (trendDir === 'flat') { trendEl.textContent = '—'; trendEl.className = 'sh-mp-trend flat'; }
+          else { const arrow = trendDir === 'up' ? '↑' : '↓'; trendEl.textContent = `${arrow}${Math.abs(trendPct).toFixed(0)}%`; trendEl.className = `sh-mp-trend ${trendDir}`; }
         }
 
-        // Tooltip: explain the source of the number
         let title = `الربح اليوم: ${fmtMoney(todayProfit)}`;
         if (source === 'cpm') title += ' — تقدير بالـ CPM';
         else if (source === 'exact_partial') title += ' — محسوب من BID جزئي';
@@ -284,15 +299,9 @@
       const profitEl = document.getElementById('shStatusProfit');
       if (profitEl) {
         profitEl.textContent = fmtMoney(todayProfit);
-        profitEl.style.color = todayProfit > 0
-          ? 'var(--sh-green)'
-          : todayProfit < 0
-            ? 'var(--sh-rose)'
-            : 'var(--sh-ink-lo)';
+        profitEl.style.color = todayProfit > 0 ? 'var(--sh-green)' : todayProfit < 0 ? 'var(--sh-rose)' : 'var(--sh-ink-lo)';
       }
-    } catch (err) {
-      // Silent — pulse is cosmetic
-    }
+    } catch (err) {}
   }
 
   async function refreshAttentionCount() {
@@ -381,7 +390,7 @@
     mount, toast, openCmd, closeCmd, api, setBreadcrumb,
     refreshMoneyPulse, refreshAttentionCount, applyTheme,
     esc, fmtNum, fmtMoney, fmtPct,
-    localDateStr,   // ← Phase 1: previously internal, now public
+    localDateStr,
     ICON,
     state: S,
   };
