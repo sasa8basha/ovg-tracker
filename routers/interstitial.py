@@ -1,5 +1,5 @@
 """
-routers/interstitial.py — Interstitial Precheck + Anubis PoW (Direct Links) v5.0
+routers/interstitial.py — Interstitial precheck for Direct Links.
 """
 import hashlib
 import secrets
@@ -20,25 +20,17 @@ from schemas import (
     ChallengeVerifyPayload,
 )
 from utils import (
-    get_client_ip,
-    handshake_limiter,
-    challenge_limiter,
-    challenge_verify_limiter,
-    safe_origin,
-    stats_cache,
-    TTLCache,
+    get_client_ip, handshake_limiter, challenge_limiter, challenge_verify_limiter,
+    safe_origin, stats_cache, TTLCache,
 )
 from collector.precheck import quick_precheck
 from collector.interstitial_template import INTERSTITIAL_HTML
 from collector.header_analyzer import analyze_headers
-from helpers import extract_zone_id_from_url
+from helpers import extract_zone_id_from_url, extract_macros
 
 router = APIRouter()
 
 
-# =========================================================
-# ANUBIS POW CONFIG
-# =========================================================
 PASS_COOKIE_NAME = "ovg_pass"
 PASS_COOKIE_TTL_SECONDS = 7 * 86400
 CHALLENGE_CACHE_TTL = 600
@@ -63,7 +55,7 @@ def _pow_target(difficulty: int) -> str:
     return "0" * int(difficulty)
 
 
-def _verify_pow(random_data: str, nonce: int, difficulty: int) -> tuple:
+def _verify_pow(random_data: str, nonce: int, difficulty: int):
     payload = f"{random_data}{int(nonce)}"
     h = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return h.startswith(_pow_target(difficulty)), h
@@ -83,76 +75,6 @@ def _read_pass_token(token: str):
     if not token:
         return None
     return _pass_token_cache.get(token)
-
-
-MACRO_ALIASES = {
-    "bid": ("bid",),
-    "impression_id": ("impressionid", "impid", "impression_id"),
-    "website_id": ("websiteid", "website_id"),
-    "category_id": ("categoryid", "category_id"),
-    "category_name": ("categoryname", "category_name"),
-    "isp_id": ("ispid", "isp_id"),
-    "isp_name": ("ispname", "isp_name", "isp"),
-    "country": ("country",),
-    "quality": ("quality",),
-    "screen_res": ("screenresolution", "screen_resolution"),
-    "os_name": ("osname", "os_name"),
-    "browser_name": ("browsername", "browser_name"),
-    "form_factor": ("formfactorname", "form_factor"),
-    "device_name": ("devicename", "device_name"),
-    "campaign_id": ("campaignid", "campaign_id"),
-    "campaign_name": ("campaignname", "campaign_name"),
-    "os_id": ("osid", "os_id"),
-    "browser_id": ("browserid", "browser_id"),
-    "form_factor_id": ("formfactorid", "form_factor_id"),
-    "device_id": ("deviceid", "device_id"),
-    "adblock": ("adblock",),
-    "ip": ("ip",),
-    "ipv6": ("ipv6",),
-    "ipv6or4": ("ipv6or4",),
-    "xforwardedfor": ("xforwardedfor",),
-    "useragent": ("useragent", "ua"),
-    "lang": ("lang",),
-}
-
-
-def _extract_macros(tp: dict) -> dict:
-    if not isinstance(tp, dict):
-        return {"raw": {}, "known": {}, "bid": 0.0, "impression_id": None,
-                "website_id": None, "quality": None, "adblock": False, "country": None}
-    lowered = {str(k).strip().lower(): v for k, v in tp.items() if v is not None and str(v) != ""}
-    known = {}
-    for canonical, aliases in MACRO_ALIASES.items():
-        for alias in aliases:
-            if alias in lowered:
-                known[canonical] = lowered[alias]
-                break
-
-    def _to_float(v):
-        try:
-            return float(v)
-        except (ValueError, TypeError):
-            return 0.0
-
-    def _to_int(v):
-        try:
-            return int(float(v))
-        except (ValueError, TypeError):
-            return None
-
-    def _to_bool(v):
-        return str(v).strip() in ("1", "true", "True", "yes", "YES")
-
-    return {
-        "raw": tp,
-        "known": known,
-        "bid": _to_float(known.get("bid")),
-        "impression_id": str(known.get("impression_id") or "")[:100] or None,
-        "website_id": str(known.get("website_id") or "")[:100] or None,
-        "quality": _to_int(known.get("quality")),
-        "adblock": _to_bool(known.get("adblock", "0")),
-        "country": str(known.get("country") or "")[:10] or None,
-    }
 
 
 def _extract_zone(payload_url: str, tracking_params: dict, campaign) -> tuple:
@@ -217,13 +139,18 @@ async def serve_interstitial(campaign_key: str, request: Request, db: Session = 
     pass_token = request.cookies.get(PASS_COOKIE_NAME)
     entry = _read_pass_token(pass_token) if pass_token else None
     if entry and entry.get("campaign_key") == campaign_key:
-        return Response(status_code=302, headers={"Location": c.destination_url})
+        # Skip challenge, redirect with sub_id
+        sep = "&" if "?" in c.destination_url else "?"
+        param = c.adsterra_tracking_param or "sub_id"
+        target = f"{c.destination_url}{sep}{param}={entry['session_id']}"
+        return Response(status_code=302, headers={"Location": target})
 
     origin = safe_origin(request)
     html = (
         INTERSTITIAL_HTML
         .replace("__CAMPAIGN_KEY__", c.campaign_key)
         .replace("__DEST_URL__", c.destination_url)
+        .replace("__TRACKING_PARAM__", c.adsterra_tracking_param or "sub_id")
         .replace("__PRECHECK_URL__", f"{origin}/api/interstitial/precheck")
         .replace("__CHALLENGE_URL__", f"{origin}/api/interstitial/challenge")
         .replace("__VERIFY_URL__", f"{origin}/api/interstitial/verify")
@@ -247,8 +174,7 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
         return {"action": "block", "url": None, "score": 100, "reasons": ["CAMPAIGN_INACTIVE"]}
 
     result = quick_precheck(
-        nav=payload.nav or {},
-        fp=payload.fp or {},
+        nav=payload.nav or {}, fp=payload.fp or {},
         threshold=int(c.bot_block_threshold or 100),
     )
     headers_dict = {str(k).lower(): str(v) for k, v in request.headers.items()}
@@ -269,27 +195,24 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
     velocity_score = 0
     velocity_reasons = []
     if cross["ip_visits_10m"] >= 20:
-        velocity_score += 40
-        velocity_reasons.append(f"IP_VELOCITY_EXTREME({cross['ip_visits_10m']})")
+        velocity_score += 40; velocity_reasons.append(f"IP_VELOCITY_EXTREME({cross['ip_visits_10m']})")
     elif cross["ip_visits_10m"] >= 10:
-        velocity_score += 25
-        velocity_reasons.append(f"IP_VELOCITY_HIGH({cross['ip_visits_10m']})")
+        velocity_score += 25; velocity_reasons.append(f"IP_VELOCITY_HIGH({cross['ip_visits_10m']})")
     elif cross["ip_visits_10m"] >= 5:
-        velocity_score += 10
-        velocity_reasons.append(f"IP_VELOCITY_MED({cross['ip_visits_10m']})")
+        velocity_score += 10; velocity_reasons.append(f"IP_VELOCITY_MED({cross['ip_visits_10m']})")
     if cross["fp_visits_10m"] >= 30:
-        velocity_score += 45
-        velocity_reasons.append(f"FP_REUSE_EXTREME({cross['fp_visits_10m']})")
+        velocity_score += 45; velocity_reasons.append(f"FP_REUSE_EXTREME({cross['fp_visits_10m']})")
     elif cross["fp_visits_10m"] >= 15:
-        velocity_score += 30
-        velocity_reasons.append(f"FP_REUSE_HIGH({cross['fp_visits_10m']})")
+        velocity_score += 30; velocity_reasons.append(f"FP_REUSE_HIGH({cross['fp_visits_10m']})")
     elif cross["fp_visits_10m"] >= 7:
-        velocity_score += 15
-        velocity_reasons.append(f"FP_REUSE_MED({cross['fp_visits_10m']})")
+        velocity_score += 15; velocity_reasons.append(f"FP_REUSE_MED({cross['fp_visits_10m']})")
 
     total_score = min(150, int(result["score"]) + int(extra_score) + int(velocity_score))
     threshold = int(c.bot_block_threshold or 100)
     zone_id, zone_source = _extract_zone(payload.url or "", payload.tracking_params or {}, c)
+
+    macros = extract_macros(payload.tracking_params or {})
+    country_macro = macros.get("country")
 
     is_hard_block = result["action"] == "block" or total_score >= threshold
 
@@ -315,9 +238,7 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
         reason = "interstitial_precheck_clean"
         filter_reason = None
 
-    macros = _extract_macros(payload.tracking_params or {})
     existing_session = db.query(SessionModel).filter(SessionModel.session_id == payload.session_id).first()
-
     if not existing_session:
         click_id = payload.session_id
         evidence_list = [{
@@ -334,45 +255,25 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
             evidence_list.append({"code": code, "severity": "high", "score": 40, "detail": "cross_visit"})
 
         visit = VisitModel(
-            campaign_id=c.id,
-            session_id=payload.session_id,
-            click_id=click_id,
-            timestamp=datetime.utcnow(),
-            ip=client_ip,
-            user_agent=ua,
-            zone_id=zone_id,
+            campaign_id=c.id, session_id=payload.session_id, click_id=click_id,
+            timestamp=datetime.utcnow(), ip=client_ip, user_agent=ua, zone_id=zone_id,
             bid=macros.get("bid", 0.0),
             popads_impression_id=macros.get("impression_id"),
             popads_website_id=macros.get("website_id"),
             popads_quality=macros.get("quality"),
             popads_adblock=macros.get("adblock", False),
             popads_data=macros.get("raw"),
-            score=total_score,
-            verdict=verdict,
-            confidence=confidence,
-            bot_probability=bot_probability,
-            mode="direct",
-            reason=reason,
-            evidence=evidence_list,
-            filter_reason=filter_reason,
-            country=macros.get("country") or "Unknown",
-            data_quality="partial",
-            counting_type="direct_link",
+            score=total_score, verdict=verdict, confidence=confidence, bot_probability=bot_probability,
+            mode="direct", reason=reason, evidence=evidence_list, filter_reason=filter_reason,
+            country=country_macro or "Unknown",
+            data_quality="partial", counting_type="direct_link",
             canvas_hash=(canvas_raw[:15] + "...") if canvas_raw else "Unknown",
         )
         db.add(visit)
         session = SessionModel(
-            session_id=payload.session_id,
-            campaign_id=c.id,
-            user_id=c.user_id,
-            ip=client_ip,
-            user_agent=ua[:500],
-            started_at=datetime.utcnow(),
-            data_quality="partial",
-            verdict=verdict,
-            score=total_score,
-            confidence=confidence,
-            bot_probability=bot_probability,
+            session_id=payload.session_id, campaign_id=c.id, user_id=c.user_id, ip=client_ip,
+            user_agent=ua[:500], started_at=datetime.utcnow(), data_quality="partial", verdict=verdict,
+            score=total_score, confidence=confidence, bot_probability=bot_probability,
             meta={
                 "direct_link": True,
                 "precheck_score": int(result["score"]),
@@ -396,33 +297,32 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
             stats_cache.invalidate(f"stats:user:{c.user_id}:all")
             stats_cache.invalidate(f"stats:campaign:{c.id}")
 
+    # Build redirect URL with correct sub_id param
+    sep = "&" if "?" in c.destination_url else "?"
+    param = c.adsterra_tracking_param or "sub_id"
+    redirect_url = f"{c.destination_url}{sep}{param}={payload.session_id}"
+
     if action == "block":
         return {
-            "action": "block",
-            "url": None,
-            "score": total_score,
+            "action": "block", "url": None, "score": total_score,
             "reasons": (result["reasons"] or []) + extra_reasons + velocity_reasons,
         }
 
     if action == "challenge":
         return {
-            "action": "challenge",
-            "url": c.destination_url,
-            "score": total_score,
-            "session_id": payload.session_id,
-            "campaign_key": c.campaign_key,
+            "action": "challenge", "url": redirect_url, "score": total_score,
+            "session_id": payload.session_id, "campaign_key": c.campaign_key,
             "difficulty": _difficulty_for_score(total_score),
             "reasons": (result["reasons"] or []) + extra_reasons + velocity_reasons,
         }
 
-    return {"action": "redirect", "url": c.destination_url, "score": total_score, "reasons": []}
+    return {"action": "redirect", "url": redirect_url, "score": total_score, "reasons": []}
 
 
 @router.post("/api/interstitial/challenge")
 async def issue_challenge(payload: ChallengeRequestPayload, request: Request, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED:
         raise HTTPException(404, "Not Found")
-
     client_ip = get_client_ip(request)
     challenge_limiter.check(f"chl:{client_ip}")
 
@@ -434,9 +334,7 @@ async def issue_challenge(payload: ChallengeRequestPayload, request: Request, db
     if not session:
         raise HTTPException(400, "Session not found")
 
-    score = int(session.score or 0)
-    difficulty = _difficulty_for_score(score)
-
+    difficulty = _difficulty_for_score(int(session.score or 0))
     random_data = secrets.token_hex(CHALLENGE_PREFIX_LEN // 2)
     expires_at = int(time.time()) + CHALLENGE_CACHE_TTL
 
@@ -448,12 +346,8 @@ async def issue_challenge(payload: ChallengeRequestPayload, request: Request, db
     })
 
     return {
-        "ok": True,
-        "session_id": payload.session_id,
-        "algorithm": "sha256",
-        "difficulty": difficulty,
-        "random_data": random_data,
-        "expires_at": expires_at,
+        "ok": True, "session_id": payload.session_id, "algorithm": "sha256",
+        "difficulty": difficulty, "random_data": random_data, "expires_at": expires_at,
     }
 
 
@@ -461,22 +355,17 @@ async def issue_challenge(payload: ChallengeRequestPayload, request: Request, db
 async def verify_challenge(payload: ChallengeVerifyPayload, request: Request, response: Response, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED:
         raise HTTPException(404, "Not Found")
-
     client_ip = get_client_ip(request)
     challenge_verify_limiter.check(f"vfy:{client_ip}")
 
     entry = _challenge_cache.get(payload.session_id)
     if not entry:
         return JSONResponse({"ok": False, "reason": "challenge_expired"}, status_code=400)
-
     if int(entry.get("expires_at", 0)) < int(time.time()):
         _challenge_cache.invalidate(payload.session_id)
         return JSONResponse({"ok": False, "reason": "challenge_expired"}, status_code=400)
 
-    random_data = entry["random_data"]
-    difficulty = int(entry["difficulty"])
-    ok, expected_hash = _verify_pow(random_data, payload.nonce, difficulty)
-
+    ok, expected_hash = _verify_pow(entry["random_data"], payload.nonce, int(entry["difficulty"]))
     if not ok or expected_hash != payload.hash.lower():
         return JSONResponse({"ok": False, "reason": "invalid_solution"}, status_code=400)
 
@@ -484,13 +373,8 @@ async def verify_challenge(payload: ChallengeVerifyPayload, request: Request, re
     pass_token = _make_pass_token(payload.session_id, entry["campaign_key"])
 
     response.set_cookie(
-        key=PASS_COOKIE_NAME,
-        value=pass_token,
-        max_age=PASS_COOKIE_TTL_SECONDS,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        path="/",
+        key=PASS_COOKIE_NAME, value=pass_token, max_age=PASS_COOKIE_TTL_SECONDS,
+        httponly=True, secure=True, samesite="lax", path="/",
     )
 
     try:
@@ -499,11 +383,11 @@ async def verify_challenge(payload: ChallengeVerifyPayload, request: Request, re
             meta = dict(session.meta or {})
             meta["challenge_passed_at"] = datetime.utcnow().isoformat()
             meta["challenge_elapsed_ms"] = int(payload.elapsed_ms)
-            meta["challenge_difficulty"] = difficulty
+            meta["challenge_difficulty"] = int(entry["difficulty"])
             session.meta = meta
             db.commit()
     except Exception as e:
         print(f"[CHALLENGE] session update failed: {e}")
         db.rollback()
 
-    return {"ok": True, "redirect_url": None}
+    return {"ok": True}
