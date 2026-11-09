@@ -232,6 +232,48 @@ def visits_v2_page(request: Request, db: Session = Depends(get_db)):
     return HTMLResponse(read_template("v2/visits.html"))
 
 
+@router.get("/v2/campaigns", response_class=HTMLResponse)
+def campaigns_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/campaigns.html"))
+
+
+@router.get("/v2/campaigns/{campaign_id}", response_class=HTMLResponse)
+def campaign_detail_v2_page(request: Request, campaign_id: int, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/campaign_detail.html"))
+
+
+@router.get("/v2/live", response_class=HTMLResponse)
+def live_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/live.html"))
+
+
+@router.get("/v2/radar", response_class=HTMLResponse)
+def radar_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/radar.html"))
+
+
+@router.get("/v2/ip-lists", response_class=HTMLResponse)
+def ip_lists_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/ip-lists.html"))
+
+
+@router.get("/v2/sessions", response_class=HTMLResponse)
+def sessions_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db):
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/sessions.html"))
+
+
 @router.get("/404", response_class=HTMLResponse)
 def page_404():
     html = "<html><head><title>404 Not Found</title></head><body style='background:#fff;color:#000;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;'><h1>404 Not Found</h1></body></html>"
@@ -240,4 +282,4 @@ def page_404():
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "10.2-neo"}
+    return {"status": "ok", "version": "10.5-neo"}
