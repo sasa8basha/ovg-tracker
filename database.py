@@ -29,11 +29,13 @@ _MIGRATIONS = {
 }
 
 _INDEXES = [
-    ("ix_visits_bot_prob_ts",    "visits",   "bot_probability, timestamp"),
-    ("ix_visits_confidence_ts",  "visits",   "confidence, timestamp"),
-    ("ix_visits_mode",           "visits",   "mode"),
-    ("ix_visits_reason",         "visits",   "reason"),
-    ("ix_sessions_pending",      "sessions", "visit_id, started_at"),
+    ("ix_visits_bot_prob_ts",    "visits",         "bot_probability, timestamp"),
+    ("ix_visits_confidence_ts",  "visits",         "confidence, timestamp"),
+    ("ix_visits_mode",           "visits",         "mode"),
+    ("ix_visits_reason",         "visits",         "reason"),
+    ("ix_sessions_pending",      "sessions",       "visit_id, started_at"),
+    ("ix_ip_intel_class",        "ip_intelligence", "classification"),
+    ("ix_ip_intel_risk",         "ip_intelligence", "risk_score"),
 ]
 
 
@@ -42,6 +44,7 @@ def apply_safe_migrations():
     tables = set(insp.get_table_names())
     if not tables:
         return
+
     with engine.connect() as conn:
         for table, cols in _MIGRATIONS.items():
             if table not in tables:
@@ -56,6 +59,7 @@ def apply_safe_migrations():
                     print(f"✅ Migration: added {table}.{col_name} ({col_type})")
                 except Exception as e:
                     print(f"⚠️ Migration failed {table}.{col_name}: {e}")
+
         for idx_name, table, cols in _INDEXES:
             if table not in tables:
                 continue
@@ -86,7 +90,11 @@ def seed_traffic_sources():
                 ).first()
                 if not existing:
                     conn.execute(
-                        text("INSERT INTO traffic_sources (slug, name, default_cpm, notes, is_builtin) VALUES (:slug, :name, :cpm, '', 1)"),
+                        text(
+                            "INSERT INTO traffic_sources "
+                            "(slug, name, default_cpm, notes, is_builtin) "
+                            "VALUES (:slug, :name, :cpm, '', 1)"
+                        ),
                         {"slug": slug, "name": name, "cpm": cpm},
                     )
             conn.commit()
@@ -114,7 +122,11 @@ def seed_destinations():
                 ).first()
                 if not existing:
                     conn.execute(
-                        text("INSERT INTO destinations (slug, name, postback_supported, notes, is_builtin) VALUES (:slug, :name, :postback, '', 1)"),
+                        text(
+                            "INSERT INTO destinations "
+                            "(slug, name, postback_supported, notes, is_builtin) "
+                            "VALUES (:slug, :name, :postback, '', 1)"
+                        ),
                         {"slug": slug, "name": name, "postback": postback},
                     )
             conn.commit()
@@ -132,10 +144,14 @@ def backfill_legacy_data_quality():
         if "data_quality" not in cols:
             return
         with engine.connect() as conn:
-            n = conn.execute(text("SELECT COUNT(*) FROM visits WHERE data_quality IS NULL")).scalar() or 0
+            n = conn.execute(
+                text("SELECT COUNT(*) FROM visits WHERE data_quality IS NULL")
+            ).scalar() or 0
             if n == 0:
                 return
-            conn.execute(text("UPDATE visits SET data_quality = 'legacy' WHERE data_quality IS NULL"))
+            conn.execute(
+                text("UPDATE visits SET data_quality = 'legacy' WHERE data_quality IS NULL")
+            )
             conn.commit()
             print(f"✅ Backfill: {n} legacy visits tagged")
     except Exception as e:
@@ -151,10 +167,14 @@ def backfill_counting_type():
         if "counting_type" not in cols:
             return
         with engine.connect() as conn:
-            n = conn.execute(text("SELECT COUNT(*) FROM visits WHERE counting_type IS NULL")).scalar() or 0
+            n = conn.execute(
+                text("SELECT COUNT(*) FROM visits WHERE counting_type IS NULL")
+            ).scalar() or 0
             if n == 0:
                 return
-            conn.execute(text("UPDATE visits SET counting_type = 'standalone' WHERE counting_type IS NULL"))
+            conn.execute(
+                text("UPDATE visits SET counting_type = 'standalone' WHERE counting_type IS NULL")
+            )
             conn.commit()
             print(f"✅ Backfill: {n} visits tagged as standalone")
     except Exception as e:
@@ -169,9 +189,11 @@ def backfill_engine_fields():
         cols = [c["name"] for c in insp.get_columns("visits")]
         if "confidence" not in cols or "bot_probability" not in cols:
             return
+
         with engine.connect() as conn:
             n = conn.execute(text(
-                "SELECT COUNT(*) FROM visits WHERE confidence IS NULL AND verdict IS NOT NULL"
+                "SELECT COUNT(*) FROM visits "
+                "WHERE confidence IS NULL AND verdict IS NOT NULL"
             )).scalar() or 0
             if n > 0:
                 conn.execute(text(

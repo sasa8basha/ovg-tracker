@@ -54,10 +54,8 @@ class CampaignModel(Base):
     destination_zone_id = Column(String(100), default="")
     landing_url = Column(String(1000), default="")
     sell_cpm = Column(Float, default=0.0, nullable=False)
-
     adsterra_api_key = Column(String(255), nullable=True)
     adsterra_tracking_param = Column(String(50), default="sub_id")
-
     campaign_key = Column(String(32), unique=True, index=True, nullable=False)
     redirect_delay_ms = Column(Integer, default=500, nullable=False)
     bot_block_threshold = Column(Integer, default=100, nullable=False)
@@ -281,3 +279,29 @@ class DecisionAuditModel(Base):
     inputs_json = Column(JSON, nullable=True)
     actor = Column(String(100), default="system")
     __table_args__ = (Index("ix_audit_type_time", "decision_type", "timestamp"), Index("ix_audit_target", "target_id"))
+
+
+class IPIntelligence(Base):
+    __tablename__ = "ip_intelligence"
+    id = Column(Integer, primary_key=True, index=True)
+    ip_address = Column(String(45), unique=True, index=True, nullable=False)
+    asn = Column(String(50), nullable=True, index=True)
+    asn_description = Column(String(200), nullable=True)
+    country = Column(String(2), nullable=True, index=True)
+    isp = Column(String(200), nullable=True)
+    classification = Column(String(20), nullable=True, index=True)
+    risk_score = Column(Integer, default=0, index=True)
+    reasons = Column(JSON, nullable=True)
+    last_checked = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
+    tcp_rtt_ms = Column(Float, nullable=True)
+    ws_echo_ms = Column(Float, nullable=True)
+    rtt_gap_ms = Column(Float, nullable=True)
+
+
+class IPReputationCache(Base):
+    __tablename__ = "ip_reputation_cache"
+    id = Column(Integer, primary_key=True, index=True)
+    source_name = Column(String(100), unique=True, index=True, nullable=False)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    record_count = Column(Integer, default=0)
+    data = Column(JSON, nullable=True)

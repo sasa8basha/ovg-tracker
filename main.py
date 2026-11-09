@@ -11,6 +11,8 @@ from config import ALLOWED_ORIGINS, ENV, DEBUG
 from database import engine, Base, run_data_seeding_and_backfills, apply_safe_migrations
 from auth import bootstrap_admin
 from adsterra_sync import sync_adsterra_loop
+from ip_reputation_loader import reputation_loader_loop
+from ip_intelligence import intelligence_worker_loop
 from routers.collector_v3 import stale_session_finalizer_loop
 
 from routers import (
@@ -23,6 +25,7 @@ from routers import (
     traffic_sources as traffic_sources_router, destinations as destinations_router,
     collector_v3 as collector_v3_router, interstitial as interstitial_router,
     sessions as sessions_router, adsterra as adsterra_router,
+    ip_intel as ip_intel_router,
 )
 
 apply_safe_migrations()
@@ -30,12 +33,13 @@ Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="9.4", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="9.5", docs_url="/docs" if DEBUG else None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS, allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
@@ -45,11 +49,14 @@ app.add_middleware(
 async def tracker_cors_middleware(request: Request, call_next):
     if request.url.path.startswith(("/api/track", "/api/collect", "/api/interstitial")):
         if request.method == "OPTIONS":
-            return Response(status_code=200, headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            })
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                },
+            )
         response = await call_next(request)
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
@@ -60,11 +67,14 @@ async def tracker_cors_middleware(request: Request, call_next):
 async def startup_event():
     asyncio.create_task(sync_adsterra_loop())
     asyncio.create_task(stale_session_finalizer_loop())
+    asyncio.create_task(reputation_loader_loop())
+    asyncio.create_task(intelligence_worker_loop())
     print("=" * 60)
-    print(f"  OVG Tracker v9.4 — ENV={ENV}  DEBUG={DEBUG}")
-    print("  Adsterra API: /api/adsterra/{campaign_id}/...")
-    print("  Adsterra Background Sync: running (every 5 mins)")
-    print("  Stale Session Finalizer: running (every 60 sec)")
+    print(f"  OVG Tracker v9.5 — ENV={ENV}  DEBUG={DEBUG}")
+    print("  Adsterra Sync:       running (every 5 min)")
+    print("  Stale Finalizer:     running (every 60s)")
+    print("  Reputation Loader:   running (immediate + every 24h)")
+    print("  IP Intel Worker:     running (every 30s)")
     print("=" * 60)
 
 
@@ -86,4 +96,5 @@ app.include_router(radar_router.router, prefix="/api", tags=["radar"])
 app.include_router(zone_actions_router.router, prefix="/api", tags=["zone-actions"])
 app.include_router(live_router.router, prefix="/api", tags=["live"])
 app.include_router(sessions_router.router, prefix="/api/sessions", tags=["sessions"])
+app.include_router(ip_intel_router.router, prefix="/api/ip-intel", tags=["ip-intel"])
 app.include_router(pages_router.router, tags=["pages"])
