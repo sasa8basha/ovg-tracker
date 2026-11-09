@@ -1,5 +1,5 @@
 """
-main.py — OVG Tracker entry point (v10.0-neo)
+main.py — OVG Tracker entry point (v10.2-neo)
 """
 import asyncio
 from fastapi import FastAPI, Request
@@ -33,13 +33,15 @@ from routers import (
 from routers import pulse as pulse_router
 # Phase 2 — System Health dashboard
 from routers import system_health as system_health_router
+# Phase 5 — Dashboard V2 (single-call overview)
+from routers import dashboard as dashboard_router
 
 apply_safe_migrations()
 Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="10.0-neo", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="10.2-neo", docs_url="/docs" if DEBUG else None)
 
 # GZip
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -93,12 +95,12 @@ async def startup_event():
     asyncio.create_task(reputation_loader_loop())
     asyncio.create_task(intelligence_worker_loop())
     print("=" * 60)
-    print(f"  OVG Tracker v10.0-neo — ENV={ENV}  DEBUG={DEBUG}")
+    print(f"  OVG Tracker v10.2-neo — ENV={ENV}  DEBUG={DEBUG}")
     print("  Adsterra Sync:       running (every 5 min)")
     print("  Stale Finalizer:     running (every 60s)")
     print("  Reputation Loader:   running (immediate + every 24h)")
     print("  IP Intel Worker:     running (every 30s)")
-    print("  Design System:       Neo v1.0 (available at /v2/components)")
+    print("  Neo Pages:           /v2/components · /v2/dashboard · /v2/reports · /v2/visits")
     print("=" * 60)
 
 
@@ -114,6 +116,7 @@ app.include_router(tracker_router.router, prefix="/api", tags=["tracker"])
 app.include_router(stats_router.router, prefix="/api", tags=["stats"])
 app.include_router(pulse_router.router, prefix="/api", tags=["pulse"])
 app.include_router(system_health_router.router, prefix="/api", tags=["system-health"])
+app.include_router(dashboard_router.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(reports_router.router, prefix="/api", tags=["reports"])
 app.include_router(labeling_router.router, prefix="/api", tags=["labeling"])
 app.include_router(data_quality_router.router, prefix="/api", tags=["data-quality"])
