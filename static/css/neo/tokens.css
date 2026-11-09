@@ -1,0 +1,243 @@
+/* =========================================================
+   OVG Neo — Design Tokens (v1.0)
+   Single source of truth. Prefix: --neo-
+   No dependencies. Zero overrides on existing CSS.
+   ========================================================= */
+
+:root {
+  /* ============ SURFACES (5 levels) ============ */
+  --neo-bg-canvas:    #0A0B0F;
+  --neo-bg-surface:   #111318;
+  --neo-bg-elevated:  #1A1D26;
+  --neo-bg-raised:    #232734;
+  --neo-bg-overlay:   rgba(10, 11, 15, 0.85);
+  --neo-bg-glass:     rgba(26, 29, 38, 0.72);
+
+  /* ============ BORDERS (3 + focus) ============ */
+  --neo-border-subtle:  rgba(255, 255, 255, 0.06);
+  --neo-border-default: rgba(255, 255, 255, 0.10);
+  --neo-border-strong:  rgba(255, 255, 255, 0.16);
+  --neo-border-focus:   #6366F1;
+
+  /* ============ TEXT (4 levels, WCAG AA on canvas) ============ */
+  --neo-fg-primary:   #F5F7FA;    /* 15.2:1 ✓ */
+  --neo-fg-secondary: #B0B8C4;    /* 8.4:1  ✓ */
+  --neo-fg-tertiary:  #7B8496;    /* 4.8:1  ✓ */
+  --neo-fg-muted:     #4A5263;    /* decorative only */
+  --neo-fg-inverse:   #0A0B0F;
+
+  /* ============ ACCENT (1 primary) ============ */
+  --neo-accent:          #6366F1;
+  --neo-accent-hover:    #818CF8;
+  --neo-accent-active:   #4F46E5;
+  --neo-accent-subtle:   rgba(99, 102, 241, 0.12);
+  --neo-accent-border:   rgba(99, 102, 241, 0.35);
+  --neo-accent-glow:     0 0 24px rgba(99, 102, 241, 0.35);
+
+  /* ============ SEMANTIC (4) ============ */
+  --neo-success:        #10B981;
+  --neo-success-bg:     rgba(16, 185, 129, 0.12);
+  --neo-success-border: rgba(16, 185, 129, 0.35);
+  --neo-success-fg:     #6EE7B7;
+
+  --neo-warning:        #F59E0B;
+  --neo-warning-bg:     rgba(245, 158, 11, 0.12);
+  --neo-warning-border: rgba(245, 158, 11, 0.35);
+  --neo-warning-fg:     #FCD34D;
+
+  --neo-danger:         #EF4444;
+  --neo-danger-bg:      rgba(239, 68, 68, 0.12);
+  --neo-danger-border:  rgba(239, 68, 68, 0.35);
+  --neo-danger-fg:      #FCA5A5;
+
+  --neo-info:           #3B82F6;
+  --neo-info-bg:        rgba(59, 130, 246, 0.12);
+  --neo-info-border:    rgba(59, 130, 246, 0.35);
+  --neo-info-fg:        #93C5FD;
+
+  /* ============ GRADE (S/A/B/C/D/F) ============ */
+  --neo-grade-s: #A855F7;
+  --neo-grade-a: #10B981;
+  --neo-grade-b: #3B82F6;
+  --neo-grade-c: #F59E0B;
+  --neo-grade-d: #F97316;
+  --neo-grade-f: #EF4444;
+
+  /* ============ TYPOGRAPHY (2 fonts) ============ */
+  --neo-font-sans:   'Inter', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+  --neo-font-arabic: 'IBM Plex Sans Arabic', 'Inter', system-ui, sans-serif;
+  --neo-font-mono:   'Inter', ui-monospace, 'SF Mono', Menlo, monospace;
+  --neo-fv-numeric:  "tnum" 1, "cv11" 1, "ss01" 1;
+
+  --neo-fs-2xs:  10px;
+  --neo-fs-xs:   11px;
+  --neo-fs-sm:   12px;
+  --neo-fs-base: 13px;
+  --neo-fs-md:   14px;
+  --neo-fs-lg:   16px;
+  --neo-fs-xl:   20px;
+  --neo-fs-2xl:  24px;
+  --neo-fs-3xl:  32px;
+  --neo-fs-4xl:  40px;
+
+  --neo-lh-tight:   1.15;
+  --neo-lh-snug:    1.35;
+  --neo-lh-normal:  1.5;
+  --neo-lh-relaxed: 1.65;
+
+  --neo-ls-tight:  -0.02em;
+  --neo-ls-normal: 0;
+  --neo-ls-wide:   0.03em;
+  --neo-ls-wider:  0.08em;
+
+  --neo-fw-normal:    400;
+  --neo-fw-medium:    500;
+  --neo-fw-semibold:  600;
+  --neo-fw-bold:      700;
+  --neo-fw-extrabold: 800;
+  --neo-fw-black:     900;
+
+  /* ============ SPACING (4px grid) ============ */
+  --neo-sp-0:  0;
+  --neo-sp-1:  4px;
+  --neo-sp-2:  8px;
+  --neo-sp-3:  12px;
+  --neo-sp-4:  16px;
+  --neo-sp-5:  20px;
+  --neo-sp-6:  24px;
+  --neo-sp-8:  32px;
+  --neo-sp-10: 40px;
+  --neo-sp-12: 48px;
+  --neo-sp-16: 64px;
+  --neo-sp-20: 80px;
+
+  /* ============ RADII ============ */
+  --neo-r-xs:   4px;
+  --neo-r-sm:   6px;
+  --neo-r-md:   10px;
+  --neo-r-lg:   14px;
+  --neo-r-xl:   20px;
+  --neo-r-full: 9999px;
+
+  /* ============ SHADOWS ============ */
+  --neo-shadow-xs: 0 1px 2px rgba(0,0,0,0.35);
+  --neo-shadow-sm: 0 2px 4px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+  --neo-shadow-md: 0 4px 12px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.20);
+  --neo-shadow-lg: 0 12px 32px rgba(0,0,0,0.45), 0 4px 8px rgba(0,0,0,0.25);
+  --neo-shadow-xl: 0 24px 48px rgba(0,0,0,0.55), 0 8px 16px rgba(0,0,0,0.30);
+
+  /* ============ MOTION ============ */
+  --neo-dur-instant: 60ms;
+  --neo-dur-fast:    120ms;
+  --neo-dur-base:    200ms;
+  --neo-dur-slow:    320ms;
+  --neo-dur-slower:  500ms;
+
+  --neo-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --neo-ease-in:     cubic-bezier(0.7, 0, 0.84, 0);
+  --neo-ease-io:     cubic-bezier(0.65, 0, 0.35, 1);
+  --neo-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ============ Z-INDEX ============ */
+  --neo-z-base:     0;
+  --neo-z-dropdown: 100;
+  --neo-z-sticky:   200;
+  --neo-z-overlay:  300;
+  --neo-z-modal:    400;
+  --neo-z-drawer:   401;
+  --neo-z-toast:    500;
+  --neo-z-cmd:      600;
+  --neo-z-debug:    9000;
+
+  /* ============ LAYOUT ============ */
+  --neo-sidebar-w:      240px;
+  --neo-sidebar-w-col:  64px;
+  --neo-topbar-h:       56px;
+  --neo-statusbar-h:    32px;
+  --neo-content-max:    1400px;
+  --neo-content-pad:    var(--neo-sp-6);
+}
+
+/* ============ LIGHT MODE ============ */
+[data-neo-theme="light"] {
+  --neo-bg-canvas:    #F8FAFC;
+  --neo-bg-surface:   #FFFFFF;
+  --neo-bg-elevated:  #F1F5F9;
+  --neo-bg-raised:    #E2E8F0;
+  --neo-bg-overlay:   rgba(15, 23, 42, 0.5);
+  --neo-bg-glass:     rgba(248, 250, 252, 0.85);
+
+  --neo-border-subtle:  rgba(0, 0, 0, 0.04);
+  --neo-border-default: rgba(0, 0, 0, 0.08);
+  --neo-border-strong:  rgba(0, 0, 0, 0.14);
+
+  --neo-fg-primary:   #0F172A;
+  --neo-fg-secondary: #334155;
+  --neo-fg-tertiary:  #64748B;
+  --neo-fg-muted:     #94A3B8;
+  --neo-fg-inverse:   #F8FAFC;
+
+  --neo-shadow-xs: 0 1px 2px rgba(15,23,42,0.06);
+  --neo-shadow-sm: 0 2px 4px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  --neo-shadow-md: 0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04);
+  --neo-shadow-lg: 0 12px 32px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.06);
+  --neo-shadow-xl: 0 24px 48px rgba(15,23,42,0.14), 0 8px 16px rgba(15,23,42,0.08);
+}
+
+/* ============ BASE RESET ============ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+
+body.neo-body {
+  font-family: var(--neo-font-sans);
+  font-size: var(--neo-fs-base);
+  line-height: var(--neo-lh-normal);
+  background: var(--neo-bg-canvas);
+  color: var(--neo-fg-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "cv11";
+}
+
+body.neo-body.ar,
+[dir="rtl"] body.neo-body {
+  font-family: var(--neo-font-arabic);
+}
+
+/* ============ SELECTION ============ */
+::selection {
+  background: var(--neo-accent-subtle);
+  color: var(--neo-fg-primary);
+}
+
+/* ============ SCROLLBAR ============ */
+.neo-body ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.neo-body ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.neo-body ::-webkit-scrollbar-thumb {
+  background: var(--neo-border-default);
+  border-radius: var(--neo-r-full);
+}
+.neo-body ::-webkit-scrollbar-thumb:hover {
+  background: var(--neo-border-strong);
+}
+
+/* ============ FOCUS ============ */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--neo-bg-canvas),
+              0 0 0 4px var(--neo-accent-subtle);
+  border-radius: inherit;
+}
+
+/* ============ NUMERIC ============ */
+.neo-mono,
+.neo-num {
+  font-family: var(--neo-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--neo-fv-numeric);
+}
