@@ -1,5 +1,5 @@
 """
-main.py — OVG Tracker entry point (v10.5-neo)
+main.py — OVG Tracker entry point (v11.0 — Production)
 """
 import asyncio
 from fastapi import FastAPI, Request
@@ -29,11 +29,8 @@ from routers import (
     ip_intel as ip_intel_router,
 )
 
-# Phase 1 — single-call Money Pulse
 from routers import pulse as pulse_router
-# Phase 2 — System Health dashboard
 from routers import system_health as system_health_router
-# Phase 5 — Dashboard V2 (single-call overview)
 from routers import dashboard as dashboard_router
 
 apply_safe_migrations()
@@ -41,11 +38,9 @@ Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="10.5-neo", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="11.0", docs_url="/docs" if DEBUG else None)
 
-# GZip
 app.add_middleware(GZipMiddleware, minimum_size=500)
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -95,15 +90,17 @@ async def startup_event():
     asyncio.create_task(reputation_loader_loop())
     asyncio.create_task(intelligence_worker_loop())
     print("=" * 60)
-    print(f"  OVG Tracker v10.5-neo — ENV={ENV}  DEBUG={DEBUG}")
-    print("  Adsterra Sync:       running (every 5 min)")
-    print("  Stale Finalizer:     running (every 60s)")
-    print("  Reputation Loader:   running (immediate + every 24h)")
-    print("  IP Intel Worker:     running (every 30s)")
-    print("  Neo Pages (10):      /v2/components  /v2/dashboard  /v2/reports")
-    print("                       /v2/visits      /v2/campaigns  /v2/campaigns/{id}")
-    print("                       /v2/live        /v2/radar      /v2/ip-lists")
-    print("                       /v2/sessions")
+    print(f"  OVG Tracker v11.0 — PRODUCTION — ENV={ENV}  DEBUG={DEBUG}")
+    print("  Background workers:")
+    print("    ✓ Adsterra Sync (every 5 min)")
+    print("    ✓ Stale Finalizer (every 60s)")
+    print("    ✓ Reputation Loader (immediate + every 24h)")
+    print("    ✓ IP Intel Worker (every 30s)")
+    print("  Neo V2 pages (10):")
+    print("    /v2/dashboard  /v2/reports  /v2/visits  /v2/campaigns")
+    print("    /v2/live  /v2/radar  /v2/ip-lists  /v2/sessions")
+    print("    /v2/campaigns/{id}  /v2/components")
+    print("  Old URLs redirect 301 to /v2/*")
     print("=" * 60)
 
 
