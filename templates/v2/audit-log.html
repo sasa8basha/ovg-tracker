@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · سجل الإجراءات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .al-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .al-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: al-spin 0.8s linear infinite;
+    }
+    @keyframes al-spin { to { transform: rotate(360deg); } }
+
+    .al-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .al-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .al-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* Tabs */
+    .al-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-default);
+    }
+    .al-tab {
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+    .al-tab:hover { color: var(--neo-fg-secondary); }
+    .al-tab.active { color: var(--neo-fg-primary); border-bottom-color: var(--neo-accent); }
+    .al-tab-count {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--neo-bg-elevated);
+      color: var(--neo-fg-muted);
+    }
+    .al-tab.active .al-tab-count {
+      background: var(--neo-accent-subtle);
+      color: var(--neo-accent-hover);
+    }
+
+    /* Filters */
+    .al-filters {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-3);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr auto;
+      gap: var(--neo-sp-2);
+      align-items: end;
+    }
+    @media (max-width: 900px) { .al-filters { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 500px) { .al-filters { grid-template-columns: 1fr; } }
+
+    .al-filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .al-filter-label {
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Panel */
+    .al-panel { display: none; }
+    .al-panel.active { display: block; }
+
+    /* Row */
+    .al-row {
+      display: grid;
+      grid-template-columns: 120px 100px 1fr 150px 100px;
+      gap: var(--neo-sp-3);
+      padding: var(--neo-sp-3) var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-subtle);
+      align-items: center;
+      transition: background var(--neo-dur-fast);
+    }
+    .al-row:hover { background: var(--neo-bg-elevated); }
+    .al-row:last-child { border-bottom: none; }
+    @media (max-width: 900px) {
+      .al-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: var(--neo-sp-3);
+      }
+    }
+
+    .al-header-row {
+      display: grid;
+      grid-template-columns: 120px 100px 1fr 150px 100px;
+      gap: var(--neo-sp-3);
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      background: var(--neo-bg-canvas);
+      border-bottom: 1px solid var(--neo-border-default);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    @media (max-width: 900px) { .al-header-row { display: none; } }
+
+    .al-action-badge {
+      display: inline-flex;
+      padding: 3px 10px;
+      border-radius: var(--neo-r-sm);
+      font-size: 10px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      font-family: var(--neo-font-mono);
+      white-space: nowrap;
+    }
+    .al-action-badge.blacklist { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .al-action-badge.pause { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .al-action-badge.scale { background: var(--neo-success-bg); color: var(--neo-success); }
+    .al-action-badge.resume { background: var(--neo-info-bg); color: var(--neo-info-fg); }
+
+    .al-zone {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      padding: 2px 6px;
+      background: var(--neo-bg-canvas);
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .al-reason {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .al-meta {
+      font-size: 10px;
+      color: var(--neo-fg-muted);
+      font-family: var(--neo-font-mono);
+      margin-top: 2px;
+    }
+
+    .al-time {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+    }
+
+    .al-undo-btn {
+      padding: 4px 10px;
+      background: var(--neo-warning-bg);
+      color: var(--neo-warning);
+      border: 1px solid var(--neo-warning-border);
+      border-radius: var(--neo-r-sm);
+      font-family: inherit;
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .al-undo-btn:hover { background: var(--neo-warning); color: white; }
+    .al-undo-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .al-reverted {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: var(--neo-r-xs);
+      background: var(--neo-bg-elevated);
+      color: var(--neo-fg-muted);
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      font-family: var(--neo-font-mono);
+    }
+
+    .al-empty {
+      padding: var(--neo-sp-12) var(--neo-sp-6);
+      text-align: center;
+      color: var(--neo-fg-tertiary);
+    }
+    .al-empty-icon {
+      font-size: 48px;
+      opacity: 0.4;
+      display: block;
+      margin-bottom: var(--neo-sp-2);
+    }
+    .al-empty-title {
+      font-size: var(--neo-fs-md);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+      margin-bottom: var(--neo-sp-1);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="al-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل سجل الإجراءات…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="al-header">
+        <div>
+          <h1 class="al-header-title">📜 سجل الإجراءات</h1>
+          <div class="al-header-sub">كل إجراء اتاخد على الزونات — مين، امتى، وليه</div>
+        </div>
+        <button class="neo-btn neo-btn-secondary neo-btn-sm" id="alRefreshBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+          تحديث
+        </button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="al-tabs">
+        <button class="al-tab active" data-tab="active">
+          🟢 نشطة <span class="al-tab-count" id="alTabActiveCount">0</span>
+        </button>
+        <button class="al-tab" data-tab="recent">
+          🕐 الأخيرة <span class="al-tab-count" id="alTabRecentCount">0</span>
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="al-filters">
+        <div class="al-filter-field">
+          <label class="al-filter-label">نوع الإجراء</label>
+          <select id="alFilterAction" class="neo-select neo-input-sm">
+            <option value="">كل الأنواع</option>
+            <option value="blacklist">🚫 حظر</option>
+            <option value="pause">⏸ إيقاف</option>
+            <option value="scale">📈 تكبير</option>
+            <option value="resume">▶ استئناف</option>
+          </select>
+        </div>
+        <div class="al-filter-field">
+          <label class="al-filter-label">Zone</label>
+          <input type="text" id="alFilterZone" class="neo-input neo-input-sm" placeholder="فلترة بالـ zone">
+        </div>
+        <div class="al-filter-field">
+          <label class="al-filter-label">بحث</label>
+          <input type="text" id="alFilterSearch" class="neo-input neo-input-sm" placeholder="فلترة السبب...">
+        </div>
+        <button class="neo-btn neo-btn-ghost neo-btn-sm" id="alClearFilters">مسح</button>
+      </div>
+
+      <!-- Active panel -->
+      <div class="al-panel active" data-panel="active">
+        <div class="neo-table-wrap">
+          <div class="al-header-row">
+            <div>الإجراء</div>
+            <div>الزون</div>
+            <div>السبب</div>
+            <div>الوقت</div>
+            <div>إجراء</div>
+          </div>
+          <div id="alActiveBody"></div>
+        </div>
+      </div>
+
+      <!-- Recent panel -->
+      <div class="al-panel" data-panel="recent">
+        <div class="neo-table-wrap">
+          <div class="al-header-row">
+            <div>الإجراء</div>
+            <div>الزون</div>
+            <div>السبب</div>
+            <div>الوقت</div>
+            <div>إجراء</div>
+          </div>
+          <div id="alRecentBody"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const AL = {
+      tab: 'active',
+      activeItems: [],
+      recentItems: [],
+      filters: { action: '', zone: '', search: '' },
+      activeCount: 0,
+      recentCount: 0,
+    };
+
+    function esc(s) { return Neo.escape(s); }
+
+    const ACTION_LABELS = {
+      blacklist: '🚫 حظر',
+      pause: '⏸ إيقاف',
+      scale: '📈 تكبير',
+      resume: '▶ استئناف',
+    };
+
+    function actionBadge(action) {
+      const label = ACTION_LABELS[action] || action;
+      const cls = ['blacklist','pause','scale','resume'].includes(action) ? action : 'resume';
+      return `<span class="al-action-badge ${cls}">${esc(label)}</span>`;
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        const now = new Date();
+        const diff = now - d;
+        const mins = Math.floor(diff / 60000);
+        const hours = Math.floor(mins / 60);
+        const days = Math.floor(hours / 24);
+
+        if (mins < 1) return 'الآن';
+        if (mins < 60) return `${mins} د`;
+        if (hours < 24) return `${hours} س`;
+        if (days < 7) return `${days} ي`;
+
+        return d.toLocaleDateString('en-GB', { month: 'short', day: '2-digit' });
+      } catch (e) { return '—'; }
+    }
+
+    // =========================================================
+    // FILTER
+    // =========================================================
+    function applyFilters(items) {
+      let out = items;
+      if (AL.filters.action) out = out.filter(i => i.action === AL.filters.action);
+      if (AL.filters.zone) {
+        const q = AL.filters.zone.toLowerCase();
+        out = out.filter(i => (i.zone_id || '').toLowerCase().includes(q));
+      }
+      if (AL.filters.search) {
+        const q = AL.filters.search.toLowerCase();
+        out = out.filter(i =>
+          (i.reason || '').toLowerCase().includes(q) ||
+          (i.zone_id || '').toLowerCase().includes(q) ||
+          (i.action || '').toLowerCase().includes(q)
+        );
+      }
+      return out;
+    }
+
+    // =========================================================
+    // RENDER
+    // =========================================================
+    function renderList(containerId, items, isActive) {
+      const container = document.getElementById(containerId);
+      const filtered = applyFilters(items);
+
+      if (!filtered.length) {
+        container.innerHTML = `
+          <div class="al-empty">
+            <span class="al-empty-icon">📭</span>
+            <div class="al-empty-title">مفيش إجراءات</div>
+            <div style="font-size: 12px;">لسه مفيش zone actions مسجلة${isActive ? ' نشطة' : ''}.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(r => {
+        const meta = r.metadata || {};
+        let metaText = '';
+        if (r.action === 'scale' && meta.percent) metaText = `+${meta.percent}%`;
+        if (r.action === 'pause' && meta.hours) metaText = `${meta.hours}h`;
+
+        let actionBtn = '';
+        if (isActive && r.id) {
+          actionBtn = `<button class="al-undo-btn" data-id="${r.id}" data-zone="${esc(r.zone_id)}">↩️ تراجع</button>`;
+        } else if (r.reverted_at) {
+          actionBtn = '<span class="al-reverted">تم التراجع</span>';
+        }
+
+        return `
+          <div class="al-row">
+            <div>${actionBadge(r.action)}</div>
+            <div><span class="al-zone">${esc(r.zone_id)}</span></div>
+            <div>
+              <div class="al-reason" title="${esc(r.reason || '')}">${esc(r.reason || '—')}</div>
+              ${metaText ? `<div class="al-meta">${esc(metaText)}</div>` : ''}
+            </div>
+            <div class="al-time">${formatTime(r.timestamp)}</div>
+            <div>${actionBtn}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Bind undo
+      container.querySelectorAll('.al-undo-btn').forEach(btn => {
+        btn.addEventListener('click', () => undoAction(btn.dataset.id, btn.dataset.zone, btn));
+      });
+    }
+
+    // =========================================================
+    // UNDO
+    // =========================================================
+    async function undoAction(actionId, zoneId, btn) {
+      if (!confirm(`تراجع عن الإجراء على ${zoneId}؟`)) return;
+      btn.disabled = true;
+      btn.textContent = '⏳...';
+
+      try {
+        await Neo.api(`/api/zones/${encodeURIComponent(zoneId)}/action/${actionId}`, { method: 'DELETE' });
+        Neo.toast('تم التراجع ✅', 'success');
+        await loadAll();
+      } catch (e) {
+        Neo.toast('فشل التراجع: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '↩️ تراجع';
+      }
+    }
+
+    // =========================================================
+    // LOAD
+    // =========================================================
+    async function loadAll() {
+      try {
+        const [activeRes, recentRes] = await Promise.all([
+          Neo.api('/api/zones/actions/active'),
+          Neo.api('/api/zones/actions/recent?limit=200'),
+        ]);
+
+        AL.activeItems = (activeRes.zones || []).map(z => ({
+          id: null,
+          zone_id: z.zone_id,
+          action: z.action,
+          reason: z.reason,
+          metadata: z.metadata,
+          timestamp: z.timestamp,
+          reverted_at: null,
+        }));
+
+        // For active items, fetch IDs from recent to enable undo
+        const recentMap = {};
+        (recentRes.actions || []).forEach(a => {
+          const key = `${a.zone_id}|${a.action}|${a.timestamp}`;
+          recentMap[key] = a;
+        });
+
+        AL.activeItems = AL.activeItems.map(z => {
+          const key = `${z.zone_id}|${z.action}|${z.timestamp}`;
+          const match = recentMap[key];
+          return match ? { ...z, id: match.id } : z;
+        });
+
+        AL.recentItems = recentRes.actions || [];
+        AL.activeCount = AL.activeItems.length;
+        AL.recentCount = AL.recentItems.length;
+
+        document.getElementById('alTabActiveCount').textContent = AL.activeCount;
+        document.getElementById('alTabRecentCount').textContent = AL.recentCount;
+
+        renderList('alActiveBody', AL.activeItems, true);
+        renderList('alRecentBody', AL.recentItems, false);
+
+      } catch (e) {
+        console.error('[AL] load failed:', e);
+        Neo.toast('فشل التحميل: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // TABS
+    // =========================================================
+    function switchTab(tab) {
+      AL.tab = tab;
+      document.querySelectorAll('.al-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.querySelectorAll('.al-panel').forEach(p => {
+        p.classList.toggle('active', p.dataset.panel === tab);
+      });
+    }
+
+    // =========================================================
+    // BIND
+    // =========================================================
+    function bindControls() {
+      document.querySelectorAll('.al-tab').forEach(t => {
+        t.addEventListener('click', () => switchTab(t.dataset.tab));
+      });
+
+      document.getElementById('alFilterAction').addEventListener('change', (e) => {
+        AL.filters.action = e.target.value;
+        renderList('alActiveBody', AL.activeItems, true);
+        renderList('alRecentBody', AL.recentItems, false);
+      });
+
+      document.getElementById('alFilterZone').addEventListener('input', (e) => {
+        AL.filters.zone = e.target.value;
+        renderList('alActiveBody', AL.activeItems, true);
+        renderList('alRecentBody', AL.recentItems, false);
+      });
+
+      document.getElementById('alFilterSearch').addEventListener('input', (e) => {
+        AL.filters.search = e.target.value;
+        renderList('alActiveBody', AL.activeItems, true);
+        renderList('alRecentBody', AL.recentItems, false);
+      });
+
+      document.getElementById('alClearFilters').addEventListener('click', () => {
+        AL.filters = { action: '', zone: '', search: '' };
+        document.getElementById('alFilterAction').value = '';
+        document.getElementById('alFilterZone').value = '';
+        document.getElementById('alFilterSearch').value = '';
+        renderList('alActiveBody', AL.activeItems, true);
+        renderList('alRecentBody', AL.recentItems, false);
+      });
+
+      document.getElementById('alRefreshBtn').addEventListener('click', loadAll);
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'audit-log',
+          lang: 'ar',
+          breadcrumb: [{ label: 'سجل الإجراءات' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindControls();
+        await loadAll();
+
+      } catch (e) {
+        console.error('[AL Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

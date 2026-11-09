@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · كود التتبع</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .tr-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: var(--neo-bg-canvas); color: var(--neo-fg-tertiary); font-size: 13px; z-index: 9998; }
+    .tr-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid var(--neo-border-default); border-top-color: var(--neo-accent); border-radius: 50%; animation: tr-spin 0.8s linear infinite; }
+    @keyframes tr-spin { to { transform: rotate(360deg); } }
+
+    .tr-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5); flex-wrap: wrap; }
+    .tr-header-title { font-size: var(--neo-fs-3xl); font-weight: var(--neo-fw-black); color: var(--neo-fg-primary); letter-spacing: -0.02em; margin: 0 0 4px 0; line-height: 1.1; }
+    .tr-header-sub { font-size: var(--neo-fs-sm); color: var(--neo-fg-tertiary); }
+
+    .tr-selector { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-md); padding: var(--neo-sp-3); margin-bottom: var(--neo-sp-4); }
+    .tr-selector-label { font-size: 10px; font-weight: var(--neo-fw-bold); color: var(--neo-fg-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+
+    .tr-card { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-md); padding: var(--neo-sp-4); margin-bottom: var(--neo-sp-3); }
+    .tr-card-title { font-size: var(--neo-fs-md); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin: 0 0 var(--neo-sp-3) 0; display: flex; align-items: center; gap: var(--neo-sp-2); }
+    .tr-badge-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--neo-accent-subtle); color: var(--neo-accent-hover); font-family: var(--neo-font-mono); font-size: 11px; font-weight: var(--neo-fw-extrabold); flex-shrink: 0; }
+
+    .tr-key-row { display: flex; gap: 8px; }
+    .tr-key-input { flex: 1; height: 38px; padding: 0 12px; background: var(--neo-bg-canvas); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-sm); color: var(--neo-accent-hover); font-family: var(--neo-font-mono); font-size: var(--neo-fs-sm); font-weight: 700; outline: none; }
+    .tr-copy-btn { height: 38px; padding: 0 16px; background: var(--neo-accent); color: white; border: none; border-radius: var(--neo-r-sm); font-family: inherit; font-size: var(--neo-fs-sm); font-weight: 700; cursor: pointer; transition: all var(--neo-dur-fast); white-space: nowrap; }
+    .tr-copy-btn:hover { background: var(--neo-accent-hover); }
+    .tr-copy-btn:active { transform: scale(0.97); }
+    .tr-copy-btn.copied { background: var(--neo-success); }
+    .tr-copy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .tr-info-box { background: var(--neo-accent-subtle); border: 1px solid var(--neo-accent-border); border-radius: var(--neo-r-sm); padding: var(--neo-sp-3); font-size: var(--neo-fs-xs); color: var(--neo-accent-hover); line-height: 1.7; margin-bottom: var(--neo-sp-3); }
+    .tr-info-box b { color: var(--neo-fg-primary); }
+    .tr-info-box code { background: rgba(99,102,241,0.15); color: var(--neo-accent-hover); padding: 1px 6px; border-radius: 3px; font-family: var(--neo-font-mono); font-size: 10px; }
+
+    .tr-code-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+    .tr-part-label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--neo-accent-subtle); border: 1px solid var(--neo-accent-border); border-radius: var(--neo-r-sm); color: var(--neo-accent-hover); font-size: var(--neo-fs-xs); font-weight: var(--neo-fw-extrabold); font-family: var(--neo-font-mono); }
+    .tr-code-wrap { background: var(--neo-bg-canvas); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-sm); padding: var(--neo-sp-3); max-height: 260px; overflow: auto; }
+    .tr-code-wrap pre { margin: 0; color: var(--neo-success); font-family: var(--neo-font-mono); font-size: 10px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; direction: ltr; text-align: left; }
+    .tr-code-wrap pre::-webkit-scrollbar { width: 6px; height: 6px; }
+    .tr-code-wrap pre::-webkit-scrollbar-thumb { background: var(--neo-border-default); border-radius: 3px; }
+
+    .tr-stats { display: flex; gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-3); font-size: var(--neo-fs-xs); color: var(--neo-fg-tertiary); font-family: var(--neo-font-mono); flex-wrap: wrap; }
+    .tr-stats strong { color: var(--neo-fg-primary); font-weight: var(--neo-fw-extrabold); }
+
+    .tr-success-box { background: var(--neo-success-bg); border: 1px solid var(--neo-success-border); border-radius: var(--neo-r-sm); padding: var(--neo-sp-3); margin-top: var(--neo-sp-3); font-size: var(--neo-fs-xs); color: var(--neo-success-fg); line-height: 1.7; }
+    .tr-success-box b { color: var(--neo-fg-primary); }
+    .tr-success-box code { background: rgba(16,185,129,0.15); color: var(--neo-success-fg); padding: 1px 6px; border-radius: 3px; font-family: var(--neo-font-mono); font-size: 10px; }
+
+    .tr-instructions { background: var(--neo-bg-canvas); border-radius: var(--neo-r-sm); padding: var(--neo-sp-3); margin-top: var(--neo-sp-3); }
+    .tr-instructions ol { margin: 0; padding-right: 20px; color: var(--neo-fg-secondary); font-size: var(--neo-fs-xs); line-height: 1.9; }
+    .tr-instructions li { margin-bottom: 4px; }
+    .tr-instructions code { background: var(--neo-accent-subtle); color: var(--neo-accent-hover); padding: 1px 6px; border-radius: 3px; font-family: var(--neo-font-mono); font-size: 10px; }
+
+    .tr-danger { background: var(--neo-danger-bg); border: 1px solid var(--neo-danger-border); border-radius: var(--neo-r-md); padding: var(--neo-sp-4); margin-top: var(--neo-sp-3); }
+    .tr-danger-title { font-size: var(--neo-fs-sm); font-weight: var(--neo-fw-extrabold); color: var(--neo-danger); margin: 0 0 6px 0; }
+    .tr-danger-desc { font-size: var(--neo-fs-xs); color: var(--neo-danger-fg); margin: 0 0 var(--neo-sp-3) 0; line-height: 1.6; }
+    .tr-btn-warn { height: 32px; padding: 0 14px; background: var(--neo-warning-bg); color: var(--neo-warning); border: 1px solid var(--neo-warning-border); border-radius: var(--neo-r-sm); font-family: inherit; font-size: var(--neo-fs-sm); font-weight: 700; cursor: pointer; transition: all var(--neo-dur-fast); }
+    .tr-btn-warn:hover { background: var(--neo-warning); color: white; }
+    .tr-btn-warn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .tr-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--neo-sp-2); margin-top: var(--neo-sp-3); }
+    .tr-feature { padding: var(--neo-sp-2) var(--neo-sp-3); background: var(--neo-bg-canvas); border-radius: var(--neo-r-sm); border-right: 3px solid var(--neo-accent); }
+    .tr-feature-title { font-size: 11px; font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin-bottom: 2px; }
+    .tr-feature-desc { font-size: 10px; color: var(--neo-fg-tertiary); line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+  <div class="tr-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="tr-header">
+        <div>
+          <h1 class="tr-header-title">🔧 كود التتبع</h1>
+          <div class="tr-header-sub">انسخ الكود وحطه في صفحة الهبوط عشان يبدأ يبعت الزيارات</div>
+        </div>
+      </div>
+
+      <!-- Campaign selector -->
+      <div class="tr-selector">
+        <div class="tr-selector-label">اختر الحملة</div>
+        <select id="trCampaign" class="neo-select neo-input-sm" style="width:100%;">
+          <option value="">— جاري التحميل —</option>
+        </select>
+      </div>
+
+      <div id="trContent" style="display:none;">
+
+        <!-- Features card -->
+        <div class="tr-card">
+          <div class="tr-card-title"><span class="tr-badge-num">✨</span> ليه v3 أحسن؟</div>
+          <div class="tr-features">
+            <div class="tr-feature"><div class="tr-feature-title">💓 Heartbeats</div><div class="tr-feature-desc">نبضة كل 10 ثواني</div></div>
+            <div class="tr-feature"><div class="tr-feature-title">📊 40+ حقل</div><div class="tr-feature-desc">scroll, mouse, keyboard</div></div>
+            <div class="tr-feature"><div class="tr-feature-title">🍯 Honeypots</div><div class="tr-feature-desc">فخاخ للبوتات</div></div>
+            <div class="tr-feature"><div class="tr-feature-title">🎯 Ad Tracking</div><div class="tr-feature-desc">مراقبة ظهور الإعلان</div></div>
+            <div class="tr-feature"><div class="tr-feature-title">💾 Offline Queue</div><div class="tr-feature-desc">يشتغل بدون نت</div></div>
+            <div class="tr-feature"><div class="tr-feature-title">🛡️ Anti-Detection</div><div class="tr-feature-desc">jitter + hidden endpoints</div></div>
+          </div>
+        </div>
+
+        <!-- Site Key -->
+        <div class="tr-card">
+          <div class="tr-card-title"><span class="tr-badge-num">1</span> Campaign Key</div>
+          <div class="tr-key-row">
+            <input type="text" id="trKeyInput" class="tr-key-input" readonly>
+            <button class="tr-copy-btn" id="trCopyKeyBtn" type="button">📋 نسخ</button>
+          </div>
+        </div>
+
+        <!-- Code -->
+        <div class="tr-card">
+          <div class="tr-card-title"><span class="tr-badge-num">2</span> كود التتبع — <strong style="color:var(--neo-accent-hover);">جزئين</strong></div>
+          <div class="tr-info-box">
+            💡 <b>ليه جزئين؟</b> الكود كبير، فالمتصفح ممكن يقطع النسخ لو نسخته مرة واحدة. <b>انسخ الجزء 1، بعدين الجزء 2، وحطهم ورا بعض.</b> أو استخدم زر "تحميل الملف" لجلب الكود كامل.
+          </div>
+
+          <div class="tr-stats" id="trCodeStats"></div>
+
+          <div class="tr-code-actions" style="margin-top: 12px;">
+            <div class="tr-part-label">📄 الجزء 1</div>
+            <button class="tr-copy-btn" id="trCopyPart1Btn" type="button">نسخ الجزء 1</button>
+          </div>
+          <div class="tr-code-wrap">
+            <pre id="trPart1">جاري التحميل…</pre>
+          </div>
+
+          <div class="tr-code-actions" style="margin-top: 12px;">
+            <div class="tr-part-label">📄 الجزء 2</div>
+            <button class="tr-copy-btn" id="trCopyPart2Btn" type="button">نسخ الجزء 2</button>
+          </div>
+          <div class="tr-code-wrap">
+            <pre id="trPart2">جاري التحميل…</pre>
+          </div>
+
+          <div class="tr-code-actions" style="margin-top: 14px;">
+            <div class="tr-part-label" style="background:var(--neo-success-bg);border-color:var(--neo-success-border);color:var(--neo-success-fg);">📦 الملف كامل</div>
+            <div style="display:flex;gap:6px;">
+              <button class="tr-copy-btn" id="trDownloadBtn" type="button" style="background: var(--neo-success);">⬇ تحميل الملف</button>
+              <button class="tr-copy-btn" id="trCopyFullBtn" type="button">📋 نسخ الكل</button>
+            </div>
+          </div>
+
+          <div class="tr-success-box">
+            ✅ <b>مهم:</b> أسهل طريقة — استخدم <b>"تحميل الملف"</b>، هتلاقي ملف <code>.txt</code> فيه الكود كامل. افتحه، انسخ اللي فيه، وحطه في موقعك.
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="tr-card">
+          <div class="tr-card-title"><span class="tr-badge-num">3</span> خطوات التركيب</div>
+          <div class="tr-instructions">
+            <ol>
+              <li>انسخ الجزئين (أو حمّل الملف) وحطهم ورا بعض</li>
+              <li>افتح ملف HTML بتاع صفحة الهبوط</li>
+              <li>حط الكود في <code>&lt;head&gt;</code> أو قبل <code>&lt;/body&gt;</code> مباشرة</li>
+              <li>لو بتستخدم ووردبريس: استخدم إضافة "Insert Headers and Footers"</li>
+              <li>تأكد إن روابطك فيها <code>?zoneId=XXX</code> عشان نعرف الزون</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="tr-danger">
+          <h3 class="tr-danger-title">⚠️ تجديد المفتاح</h3>
+          <p class="tr-danger-desc">لو المفتاح اتسرّب، اعمله rotate. الكود القديم هيبطّل يشتغل فوراً.</p>
+          <button class="tr-btn-warn" id="trRotateBtn" type="button">🔄 تجديد المفتاح</button>
+        </div>
+
+      </div>
+
+      <div id="trEmpty" class="neo-empty" style="display:none;">
+        <div class="neo-empty-icon">🌐</div>
+        <h3 class="neo-empty-title">مفيش حملات من نوع Landing أو Hybrid</h3>
+        <p class="neo-empty-msg">صفحة كود التتبع بتشتغل بس مع حملات Landing وHybrid. أضف حملة من نوع Landing الأول.</p>
+        <a href="/v2/campaigns" class="neo-btn neo-btn-primary" style="text-decoration:none;">+ أضف حملة</a>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const TR = { campaigns: [], currentId: null, codeData: null };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    function copyToClipboard(text, btn, okLabel) {
+      if (!text) { Neo.toast('مفيش محتوى', 'error'); return; }
+      const orig = btn.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = okLabel || '✓ تم';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+      }).catch(() => Neo.toast('فشل النسخ', 'error'));
+    }
+
+    async function loadCampaigns() {
+      try {
+        const all = await Neo.api('/api/campaigns');
+        TR.campaigns = all.filter(c => c.type === 'landing' || c.type === 'hybrid');
+
+        if (!TR.campaigns.length) {
+          document.getElementById('trEmpty').style.display = '';
+          return;
+        }
+
+        const sel = document.getElementById('trCampaign');
+        sel.innerHTML = TR.campaigns.map(c =>
+          `<option value="${c.id}">${esc(c.name)} (${c.type})</option>`
+        ).join('');
+
+        await loadTracker(TR.campaigns[0].id);
+      } catch (e) {
+        Neo.toast('فشل تحميل الحملات: ' + e.message, 'error');
+      }
+    }
+
+    async function loadTracker(campaignId) {
+      TR.currentId = campaignId;
+      const campaign = TR.campaigns.find(c => c.id === campaignId);
+      if (!campaign) return;
+
+      document.getElementById('trKeyInput').value = campaign.campaign_key;
+      document.getElementById('trPart1').textContent = 'جاري التحميل…';
+      document.getElementById('trPart2').textContent = 'جاري التحميل…';
+
+      try {
+        const data = await Neo.api(`/api/campaigns/${campaignId}/tracker-code-v3`);
+        TR.codeData = data;
+
+        document.getElementById('trPart1').textContent = data.part1 || '';
+        document.getElementById('trPart2').textContent = data.part2 || '';
+
+        document.getElementById('trCodeStats').innerHTML =
+          `📏 <strong>${data.lines || 0}</strong> سطر · 💾 <strong>${Math.round((data.size_bytes || 0) / 1024)} KB</strong> · 🔑 <strong>${esc(data.campaign_key || '')}</strong>`;
+
+        document.getElementById('trContent').style.display = '';
+      } catch (e) {
+        document.getElementById('trPart1').textContent = 'فشل: ' + e.message;
+        document.getElementById('trPart2').textContent = '';
+      }
+    }
+
+    function downloadCode() {
+      if (!TR.codeData || !TR.codeData.full) {
+        Neo.toast('مفيش كود متاح', 'error');
+        return;
+      }
+      const campaign = TR.campaigns.find(c => c.id === TR.currentId);
+      const filename = `ovg-tracker-v3-${(campaign?.campaign_key || 'unknown').substring(0, 8)}.txt`;
+
+      try {
+        const blob = new Blob([TR.codeData.full], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        Neo.toast('تم تحميل الملف ✅', 'success');
+      } catch (e) {
+        Neo.toast('فشل التحميل: ' + e.message, 'error');
+      }
+    }
+
+    async function rotateKey() {
+      if (!TR.currentId) return;
+      if (!confirm('تجديد المفتاح هيبطّل الكود القديم. متأكد؟')) return;
+
+      const btn = document.getElementById('trRotateBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ جاري…';
+
+      try {
+        const data = await Neo.api(`/api/campaigns/${TR.currentId}/rotate-key`, { method: 'POST' });
+        Neo.toast('تم تجديد المفتاح ✅', 'success');
+
+        // Reload campaign + tracker code
+        const campaign = TR.campaigns.find(c => c.id === TR.currentId);
+        if (campaign) campaign.campaign_key = data.campaign_key;
+        await loadTracker(TR.currentId);
+      } catch (err) {
+        Neo.toast('فشل: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 تجديد المفتاح';
+      }
+    }
+
+    (async function boot() {
+      try {
+        await Neo.mount({ active: 'tracker', lang: 'ar', breadcrumb: [{ label: 'كود التتبع' }] });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        document.getElementById('trCampaign').addEventListener('change', (e) => {
+          const id = parseInt(e.target.value, 10);
+          if (id) loadTracker(id);
+        });
+
+        document.getElementById('trCopyKeyBtn').addEventListener('click', function () {
+          copyToClipboard(document.getElementById('trKeyInput').value, this);
+        });
+        document.getElementById('trCopyPart1Btn').addEventListener('click', function () {
+          if (TR.codeData) copyToClipboard(TR.codeData.part1, this);
+        });
+        document.getElementById('trCopyPart2Btn').addEventListener('click', function () {
+          if (TR.codeData) copyToClipboard(TR.codeData.part2, this);
+        });
+        document.getElementById('trCopyFullBtn').addEventListener('click', function () {
+          if (TR.codeData) copyToClipboard(TR.codeData.full, this);
+        });
+        document.getElementById('trDownloadBtn').addEventListener('click', downloadCode);
+        document.getElementById('trRotateBtn').addEventListener('click', rotateKey);
+
+        await loadCampaigns();
+
+      } catch (e) {
+        console.error('[TR Boot] failed:', e);
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color: var(--neo-danger);">فشل: ${Neo.escape(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

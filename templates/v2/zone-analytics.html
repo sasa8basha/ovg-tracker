@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · Zone Analytics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .za-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .za-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: za-spin 0.8s linear infinite;
+    }
+    @keyframes za-spin { to { transform: rotate(360deg); } }
+
+    .za-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .za-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .za-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* Anomalies banner */
+    .za-anomaly-banner {
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3) var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-4);
+      display: flex;
+      gap: var(--neo-sp-3);
+      align-items: flex-start;
+      font-size: var(--neo-fs-sm);
+      border: 1px solid;
+    }
+    .za-anomaly-banner.critical {
+      background: rgba(239,68,68,0.08);
+      border-color: var(--neo-danger-border);
+      color: var(--neo-danger-fg);
+    }
+    .za-anomaly-banner.high {
+      background: var(--neo-warning-bg);
+      border-color: var(--neo-warning-border);
+      color: var(--neo-warning-fg);
+    }
+    .za-anomaly-banner.medium {
+      background: var(--neo-info-bg);
+      border-color: var(--neo-info-border);
+      color: var(--neo-info-fg);
+    }
+    .za-anomaly-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .za-anomaly-body { flex: 1; min-width: 0; }
+    .za-anomaly-title {
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin-bottom: 4px;
+    }
+    .za-anomaly-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: var(--neo-sp-2);
+    }
+    .za-anomaly-chip {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      background: rgba(0,0,0,0.3);
+      color: var(--neo-fg-primary);
+    }
+
+    /* Table */
+    .za-row { cursor: pointer; transition: background var(--neo-dur-fast); }
+    .za-row:hover td { background: var(--neo-bg-elevated); }
+
+    .za-sparkline {
+      width: 120px;
+      height: 28px;
+      display: inline-block;
+    }
+
+    .za-badge {
+      display: inline-flex;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      font-family: var(--neo-font-mono);
+    }
+    .za-badge.critical { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .za-badge.high { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .za-badge.medium { background: var(--neo-info-bg); color: var(--neo-info-fg); }
+    .za-badge.drop { background: var(--neo-info-bg); color: var(--neo-info-fg); }
+    .za-badge.normal { background: var(--neo-success-bg); color: var(--neo-success); }
+    .za-badge.insufficient { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    .za-trend {
+      font-size: 18px;
+      font-weight: var(--neo-fw-black);
+    }
+    .za-trend.rising { color: var(--neo-danger); }
+    .za-trend.falling { color: var(--neo-success); }
+    .za-trend.stable { color: var(--neo-fg-tertiary); }
+
+    .za-zscore {
+      font-family: var(--neo-font-mono);
+      font-weight: var(--neo-fw-extrabold);
+    }
+    .za-zscore.alert { color: var(--neo-danger); }
+    .za-zscore.warn { color: var(--neo-warning); }
+    .za-zscore.normal { color: var(--neo-fg-tertiary); }
+
+    /* Modal */
+    .za-modal-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: var(--neo-z-modal);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: var(--neo-sp-4);
+      background: var(--neo-bg-overlay);
+      backdrop-filter: blur(6px);
+    }
+    .za-modal-wrap.open { display: flex; }
+    .za-modal {
+      width: 100%;
+      max-width: 900px;
+      max-height: 90vh;
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      box-shadow: var(--neo-shadow-xl);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .za-modal-head {
+      padding: var(--neo-sp-4) var(--neo-sp-5);
+      border-bottom: 1px solid var(--neo-border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--neo-sp-3);
+    }
+    .za-modal-title {
+      font-size: var(--neo-fs-lg);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      font-family: var(--neo-font-mono);
+      margin: 0;
+    }
+    .za-modal-body {
+      padding: var(--neo-sp-5);
+      overflow-y: auto;
+    }
+    .za-modal-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-4);
+    }
+    @media (max-width: 600px) { .za-modal-stats { grid-template-columns: repeat(2, 1fr); } }
+    .za-modal-stat {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+      text-align: center;
+    }
+    .za-modal-stat-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      margin-bottom: 3px;
+    }
+    .za-modal-stat-val {
+      font-family: var(--neo-font-mono);
+      font-size: 18px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+    }
+    .za-modal-chart { height: 320px; position: relative; }
+  </style>
+</head>
+<body>
+
+  <div class="za-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل Zone Analytics…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="za-header">
+        <div>
+          <h1 class="za-header-title">🚨 Zone Analytics</h1>
+          <div class="za-header-sub">تتبع اتجاه كل زون وكشف الـ anomalies في آخر 24 ساعة</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select id="zaDays" class="neo-select neo-input-sm" style="width: 140px;">
+            <option value="7">آخر 7 أيام</option>
+            <option value="14" selected>آخر 14 يوم</option>
+            <option value="30">آخر 30 يوم</option>
+          </select>
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="zaRefreshBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+            تحديث
+          </button>
+        </div>
+      </div>
+
+      <!-- Anomalies -->
+      <div id="zaAnomalies"></div>
+
+      <!-- Table -->
+      <div class="neo-table-wrap">
+        <div style="padding: var(--neo-sp-3) var(--neo-sp-4); border-bottom: 1px solid var(--neo-border-subtle); display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: var(--neo-fs-sm); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary);">📊 الزونات (مرتبة بالخطورة)</div>
+          <span class="neo-mono" style="font-size: var(--neo-fs-xs); color: var(--neo-fg-tertiary);" id="zaZoneCount">0</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="neo-table">
+            <thead>
+              <tr>
+                <th>الزون</th>
+                <th class="neo-cell-center">Sparkline</th>
+                <th class="neo-cell-center">Bot Rate</th>
+                <th class="neo-cell-center">Baseline</th>
+                <th class="neo-cell-center">آخر ساعة</th>
+                <th class="neo-cell-center">Z-score</th>
+                <th class="neo-cell-center">الاتجاه</th>
+                <th class="neo-cell-center">الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="zaBody">
+              <tr><td colspan="8" class="neo-table-empty">جاري التحميل…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="zaEmpty" class="neo-empty" style="display:none;">
+          <div class="neo-empty-icon">📊</div>
+          <h3 class="neo-empty-title">مفيش زونات كفاية</h3>
+          <p class="neo-empty-msg">محتاج 20 زيارة على الأقل لكل زون عشان يبدأ التحليل.</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div class="za-modal-wrap" id="zaModal">
+    <div class="za-modal">
+      <div class="za-modal-head">
+        <h3 class="za-modal-title" id="zaModalTitle">—</h3>
+        <button class="neo-modal-close" onclick="ZA.closeModal()">✕</button>
+      </div>
+      <div class="za-modal-body">
+        <div class="za-modal-stats" id="zaModalStats"></div>
+        <div class="za-modal-chart">
+          <canvas id="zaModalChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const ZA = {
+      days: 14,
+      data: null,
+      modalChart: null,
+    };
+
+    function esc(s) { return Neo.escape(s); }
+
+    // =========================================================
+    // SPARKLINE
+    // =========================================================
+    function renderSparkline(series) {
+      if (!series || series.length < 2) {
+        return '<span style="color:var(--neo-fg-muted);font-size:10px;">—</span>';
+      }
+      const values = series.map(s => s.bot_rate);
+      const max = Math.max(...values, 10);
+      const min = 0;
+      const points = values.map((v, i) => {
+        const x = (i / (values.length - 1)) * 100;
+        const y = 30 - ((v - min) / (max - min)) * 28;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+
+      const last = values[values.length - 1];
+      const color = last > 30 ? '#EF4444' : last > 15 ? '#F59E0B' : '#10B981';
+
+      return `<svg class="za-sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
+        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+    }
+
+    // =========================================================
+    // ANOMALIES BANNER
+    // =========================================================
+    function renderAnomalies(anomalies) {
+      const container = document.getElementById('zaAnomalies');
+      if (!anomalies || !anomalies.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const criticals = anomalies.filter(a => a.anomaly.severity === 'critical');
+      const highs = anomalies.filter(a => a.anomaly.severity === 'high');
+      const meds = anomalies.filter(a => a.anomaly.severity === 'medium');
+
+      let severity = 'medium';
+      let icon = '⚠️';
+      let title = `${anomalies.length} anomaly(s) في آخر 24 ساعة`;
+
+      if (criticals.length) { severity = 'critical'; icon = '🚨'; title = `${criticals.length} critical anomaly(s)`; }
+      else if (highs.length) { severity = 'high'; icon = '⚠️'; title = `${highs.length} high anomaly(s)`; }
+
+      const chips = anomalies.slice(0, 6).map(a => {
+        const arrow = a.current_rate > a.baseline_mean ? '↑' : '↓';
+        return `<span class="za-anomaly-chip">${esc(a.zone)}: ${a.baseline_mean.toFixed(1)}% ${arrow} ${a.current_rate.toFixed(1)}% (z=${a.anomaly.z_score})</span>`;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="za-anomaly-banner ${severity}">
+          <span class="za-anomaly-icon">${icon}</span>
+          <div class="za-anomaly-body">
+            <div class="za-anomaly-title">${title}</div>
+            <div class="za-anomaly-chips">${chips}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================
+    // ZONES TABLE
+    // =========================================================
+    function renderZones(zones) {
+      const tbody = document.getElementById('zaBody');
+      const empty = document.getElementById('zaEmpty');
+      const wrap = tbody.closest('.neo-table-wrap');
+
+      document.getElementById('zaZoneCount').textContent = zones.length + ' زون';
+
+      if (!zones.length) {
+        wrap.style.display = 'none';
+        empty.style.display = '';
+        return;
+      }
+      wrap.style.display = '';
+      empty.style.display = 'none';
+
+      tbody.innerHTML = zones.map(z => {
+        const lastRate = z.series.length ? z.series[z.series.length - 1].bot_rate : 0;
+        const botColor = lastRate > 30 ? 'var(--neo-danger)' : lastRate > 15 ? 'var(--neo-warning)' : 'var(--neo-success)';
+
+        let baselineText = '<span style="color:var(--neo-warning);font-size:10px;">عينة ناقصة</span>';
+        if (z.baseline) {
+          baselineText = `${z.baseline.mean.toFixed(1)}% ± ${z.baseline.std.toFixed(1)}`;
+        }
+
+        let currentText = '<span style="color:var(--neo-fg-muted);font-size:10px;">&lt;20 زيارة</span>';
+        if (z.current) {
+          currentText = `${z.current.bot_rate.toFixed(1)}% <span style="color:var(--neo-fg-muted);font-size:10px;">(${z.current.total})</span>`;
+        }
+
+        let zScoreText = '—';
+        let zScoreClass = 'normal';
+        if (z.anomaly) {
+          const zs = z.anomaly.z_score;
+          zScoreText = (zs > 0 ? '+' : '') + zs;
+          const abs = Math.abs(zs);
+          zScoreClass = abs >= 3 ? 'alert' : abs >= 2 ? 'warn' : 'normal';
+        }
+
+        const trendDir = z.trend.direction;
+        const trendIcon = trendDir === 'rising' ? '↑' : trendDir === 'falling' ? '↓' : trendDir === 'stable' ? '→' : '?';
+
+        let statusBadge;
+        if (z.anomaly && z.anomaly.severity) {
+          const sev = z.anomaly.severity;
+          if (sev.includes('drop')) {
+            statusBadge = '<span class="za-badge drop">🔵 Drop</span>';
+          } else if (sev === 'critical') {
+            statusBadge = '<span class="za-badge critical">🚨 حرج</span>';
+          } else if (sev === 'high') {
+            statusBadge = '<span class="za-badge high">⚠️ عالي</span>';
+          } else {
+            statusBadge = '<span class="za-badge medium">⚡ متوسط</span>';
+          }
+        } else if (z.insufficient_data) {
+          statusBadge = '<span class="za-badge insufficient">عينة ناقصة</span>';
+        } else {
+          statusBadge = '<span class="za-badge normal">✓ طبيعي</span>';
+        }
+
+        return `
+          <tr class="za-row" data-zone="${esc(z.zone)}">
+            <td class="neo-mono neo-font-bold" style="color: var(--neo-fg-primary);">${esc(z.zone)}</td>
+            <td class="neo-cell-center">${renderSparkline(z.series)}</td>
+            <td class="neo-cell-center neo-mono neo-font-bold" style="color: ${botColor};">${lastRate.toFixed(1)}%</td>
+            <td class="neo-cell-center neo-mono" style="font-size:10px;color:var(--neo-fg-tertiary);">${baselineText}</td>
+            <td class="neo-cell-center neo-mono" style="font-size:10px;">${currentText}</td>
+            <td class="neo-cell-center za-zscore ${zScoreClass}">${zScoreText}</td>
+            <td class="neo-cell-center za-trend ${trendDir}">${trendIcon}</td>
+            <td class="neo-cell-center">${statusBadge}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Bind row clicks
+      tbody.querySelectorAll('.za-row').forEach(row => {
+        row.addEventListener('click', () => openModal(row.dataset.zone));
+      });
+    }
+
+    // =========================================================
+    // MODAL
+    // =========================================================
+    function openModal(zoneName) {
+      if (!ZA.data) return;
+      const z = ZA.data.zones.find(x => x.zone === zoneName);
+      if (!z) return;
+
+      document.getElementById('zaModalTitle').textContent = '📈 ' + zoneName;
+
+      const stats = [
+        { label: 'Baseline', val: z.baseline ? `${z.baseline.mean.toFixed(1)}%` : '—' },
+        { label: 'آخر ساعة', val: z.current ? `${z.current.bot_rate.toFixed(1)}%` : '—' },
+        { label: 'Z-score', val: z.anomaly ? ((z.anomaly.z_score > 0 ? '+' : '') + z.anomaly.z_score) : '—' },
+        { label: 'الاتجاه', val: z.trend.direction },
+      ];
+
+      document.getElementById('zaModalStats').innerHTML = stats.map(s => `
+        <div class="za-modal-stat">
+          <div class="za-modal-stat-label">${esc(s.label)}</div>
+          <div class="za-modal-stat-val">${esc(s.val)}</div>
+        </div>
+      `).join('');
+
+      // Chart
+      if (ZA.modalChart) { try { ZA.modalChart.destroy(); } catch (e) {} }
+
+      const labels = z.series.map(s => s.day);
+      const botRates = z.series.map(s => s.bot_rate);
+      const baselineLine = z.baseline ? z.series.map(() => z.baseline.mean) : [];
+      const upperLine = z.baseline ? z.series.map(() => z.baseline.mean + 2 * z.baseline.std) : [];
+      const lowerLine = z.baseline ? z.series.map(() => Math.max(0, z.baseline.mean - 2 * z.baseline.std)) : [];
+
+      const datasets = [
+        {
+          label: 'Bot Rate %',
+          data: botRates,
+          borderColor: '#6366F1',
+          backgroundColor: 'rgba(99,102,241,0.15)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          borderWidth: 2,
+        },
+      ];
+
+      if (z.baseline) {
+        datasets.push(
+          { label: 'Baseline', data: baselineLine, borderColor: '#7B8496', borderDash: [5, 5], fill: false, pointRadius: 0, borderWidth: 1.5 },
+          { label: '+2σ', data: upperLine, borderColor: '#F59E0B', borderDash: [2, 2], fill: false, pointRadius: 0, borderWidth: 1 },
+          { label: '-2σ', data: lowerLine, borderColor: '#10B981', borderDash: [2, 2], fill: false, pointRadius: 0, borderWidth: 1 }
+        );
+      }
+
+      ZA.modalChart = new Chart(document.getElementById('zaModalChart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: { labels: { color: '#B0B8C4', font: { family: 'Inter', size: 10 }, usePointStyle: true, padding: 12 } },
+            tooltip: {
+              backgroundColor: '#1A1D26', borderColor: '#232734', borderWidth: 1,
+              titleColor: '#F5F7FA', bodyColor: '#B0B8C4', padding: 8, cornerRadius: 6,
+            },
+          },
+          scales: {
+            x: { ticks: { color: '#7B8496', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: {
+              min: 0,
+              ticks: { color: '#7B8496', font: { size: 10 }, callback: (v) => v + '%' },
+              grid: { color: 'rgba(255,255,255,0.04)' },
+            },
+          },
+        },
+      });
+
+      document.getElementById('zaModal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('zaModal').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // =========================================================
+    // LOADER
+    // =========================================================
+    async function loadAnalytics() {
+      try {
+        const d = await Neo.api('/api/zones/analytics?days=' + ZA.days);
+        ZA.data = d;
+        renderAnomalies(d.anomalies);
+        renderZones(d.zones);
+      } catch (e) {
+        console.error('[ZA] load failed:', e);
+        Neo.toast('فشل التحميل: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // BIND
+    // =========================================================
+    function bindControls() {
+      document.getElementById('zaDays').addEventListener('change', (e) => {
+        ZA.days = parseInt(e.target.value, 10);
+        loadAnalytics();
+      });
+
+      document.getElementById('zaRefreshBtn').addEventListener('click', loadAnalytics);
+
+      document.getElementById('zaModal').addEventListener('click', (e) => {
+        if (e.target.id === 'zaModal') closeModal();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+      });
+
+      // Auto-refresh every 60s
+      setInterval(() => {
+        if (!document.hidden) loadAnalytics();
+      }, 60000);
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'analytics',
+          lang: 'ar',
+          breadcrumb: [{ label: 'الحملات' }, { label: 'Zone Analytics' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindControls();
+        await loadAnalytics();
+
+      } catch (e) {
+        console.error('[ZA Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+
+    // Expose
+    ZA.closeModal = closeModal;
+  </script>
+</body>
+</html>

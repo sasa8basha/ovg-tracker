@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · تفاصيل الزيارة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .vd-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .vd-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: vd-spin 0.8s linear infinite;
+    }
+    @keyframes vd-spin { to { transform: rotate(360deg); } }
+
+    .vd-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .vd-header-title {
+      font-size: var(--neo-fs-2xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 6px 0;
+      line-height: 1.2;
+      font-family: var(--neo-font-mono);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+    }
+    .vd-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* Ground truth bar */
+    .vd-gt {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-3);
+      flex-wrap: wrap;
+    }
+    .vd-gt-label {
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-tertiary);
+    }
+    .vd-gt-status {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-secondary);
+      flex: 1;
+      min-width: 200px;
+    }
+
+    /* Mismatch banner */
+    .vd-mismatch {
+      background: var(--neo-warning-bg);
+      border: 1px solid var(--neo-warning-border);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+      display: flex;
+      gap: var(--neo-sp-3);
+      align-items: flex-start;
+      color: var(--neo-warning-fg);
+      font-size: var(--neo-fs-sm);
+    }
+    .vd-mismatch.high {
+      background: var(--neo-danger-bg);
+      border-color: var(--neo-danger-border);
+      color: var(--neo-danger-fg);
+    }
+    .vd-mismatch-icon { font-size: 22px; flex-shrink: 0; }
+    .vd-mismatch-body { flex: 1; min-width: 0; }
+    .vd-mismatch-title {
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin-bottom: var(--neo-sp-1);
+    }
+
+    /* Tabs */
+    .vd-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-default);
+    }
+    .vd-tab {
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .vd-tab:hover { color: var(--neo-fg-secondary); }
+    .vd-tab.active { color: var(--neo-fg-primary); border-bottom-color: var(--neo-accent); }
+    .vd-panel { display: none; }
+    .vd-panel.active { display: block; }
+
+    /* Score ring */
+    .vd-score-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-lg);
+      padding: var(--neo-sp-6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .vd-score-ring {
+      position: relative;
+      width: 150px;
+      height: 150px;
+      margin-bottom: var(--neo-sp-4);
+    }
+    .vd-score-ring svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .vd-score-ring circle {
+      fill: none;
+      stroke-width: 8;
+      stroke-linecap: round;
+    }
+    .vd-score-ring .bg { stroke: var(--neo-border-default); }
+    .vd-score-ring .fg {
+      stroke-dasharray: 408;
+      stroke-dashoffset: 408;
+      transition: stroke-dashoffset 1.5s var(--neo-ease-out);
+    }
+    .vd-score-val {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .vd-score-num {
+      font-size: 42px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      line-height: 1;
+    }
+    .vd-score-label {
+      font-size: 9px;
+      color: var(--neo-fg-tertiary);
+      font-weight: var(--neo-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 4px;
+    }
+    .vd-verdict-text {
+      font-size: var(--neo-fs-lg);
+      font-weight: var(--neo-fw-extrabold);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .vd-cats {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* Info boxes */
+    .vd-box {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .vd-box-title {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin-bottom: var(--neo-sp-3);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+    .vd-kv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: var(--neo-sp-2);
+    }
+    .vd-kv {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+    }
+    .vd-kv-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.05em;
+      margin-bottom: 3px;
+    }
+    .vd-kv-value {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-primary);
+      font-family: var(--neo-font-mono);
+      font-weight: var(--neo-fw-bold);
+      word-break: break-all;
+    }
+
+    /* Category badges */
+    .vd-cat {
+      display: inline-flex;
+      padding: 3px 10px;
+      border-radius: var(--neo-r-full);
+      font-size: 10px;
+      font-weight: var(--neo-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .vd-cat.critical { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .vd-cat.high { background: rgba(249,115,22,0.15); color: #FDBA74; }
+    .vd-cat.medium { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .vd-cat.low { background: rgba(234,179,8,0.15); color: #FDE68A; }
+    .vd-cat.human { background: var(--neo-success-bg); color: var(--neo-success); }
+
+    /* Decision rows */
+    .vd-decision-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-4);
+    }
+    @media (max-width: 700px) { .vd-decision-row { grid-template-columns: 1fr; } }
+    .vd-decision-box {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+    }
+    .vd-decision-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .vd-decision-value {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-lg);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      word-break: break-word;
+    }
+
+    /* Signal row */
+    .vd-signal {
+      display: grid;
+      grid-template-columns: 180px 60px 1fr 50px;
+      gap: var(--neo-sp-2);
+      align-items: center;
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      margin-bottom: 4px;
+      font-size: var(--neo-fs-xs);
+    }
+    @media (max-width: 700px) { .vd-signal { grid-template-columns: 1fr; gap: 4px; } }
+    .vd-signal-code {
+      font-family: var(--neo-font-mono);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .vd-signal-dir {
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-align: center;
+    }
+    .vd-signal-dir.bot { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .vd-signal-dir.human { background: var(--neo-success-bg); color: var(--neo-success); }
+    .vd-signal-bar {
+      height: 6px;
+      background: var(--neo-bg-elevated);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .vd-signal-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width var(--neo-dur-slow) var(--neo-ease-out);
+    }
+    .vd-signal-strength {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      font-weight: var(--neo-fw-extrabold);
+      text-align: right;
+    }
+
+    /* Behavior grid */
+    .vd-behavior-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: var(--neo-sp-2);
+    }
+    .vd-behavior-item {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+    }
+    .vd-behavior-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      margin-bottom: 3px;
+    }
+    .vd-behavior-value {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      word-break: break-all;
+    }
+
+    /* PopAds grid */
+    .vd-macro-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: var(--neo-sp-2);
+    }
+    .vd-macro {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+    }
+    .vd-macro-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      font-weight: var(--neo-fw-bold);
+      margin-bottom: 3px;
+    }
+    .vd-macro-value {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+      word-break: break-all;
+    }
+
+    /* Risk bar */
+    .vd-risk-bar {
+      height: 6px;
+      background: var(--neo-bg-elevated);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: var(--neo-sp-2);
+    }
+    .vd-risk-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 600ms var(--neo-ease-out);
+    }
+
+    .vd-error-card {
+      max-width: 520px;
+      margin: 80px auto;
+      padding: var(--neo-sp-8) var(--neo-sp-6);
+      background: var(--neo-danger-bg);
+      border: 1px solid var(--neo-danger-border);
+      border-radius: var(--neo-r-xl);
+      text-align: center;
+    }
+    .vd-error-icon { font-size: 56px; margin-bottom: var(--neo-sp-3); }
+    .vd-error-title { font-size: var(--neo-fs-xl); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin-bottom: var(--neo-sp-2); }
+    .vd-error-msg { font-size: var(--neo-fs-sm); color: var(--neo-danger-fg); margin-bottom: var(--neo-sp-4); line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+  <div class="vd-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل الزيارة…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div id="vdLoading" style="text-align:center;padding:80px 20px;color:var(--neo-fg-tertiary);">
+        <div style="display:inline-block;width:32px;height:32px;border:3px solid var(--neo-border-default);border-top-color:var(--neo-accent);border-radius:50%;animation:vd-spin 0.8s linear infinite;margin-bottom:12px;"></div>
+        <div>جاري التحميل…</div>
+      </div>
+
+      <div id="vdError" style="display:none;">
+        <div class="vd-error-card">
+          <div class="vd-error-icon">⚠️</div>
+          <h2 class="vd-error-title">فشل تحميل الزيارة</h2>
+          <p class="vd-error-msg" id="vdErrorMsg">الزيارة غير موجودة أو غير مصرح لك بعرضها.</p>
+          <a href="/v2/visits" class="neo-btn neo-btn-primary" style="text-decoration:none;">← رجوع للزيارات</a>
+        </div>
+      </div>
+
+      <div id="vdContent" style="display:none;">
+
+        <div class="vd-header">
+          <div>
+            <div class="vd-header-title">
+              زيارة <span id="vdId" style="color: var(--neo-accent-hover);">#—</span>
+              <span id="vdVerdictBadge" class="neo-badge"></span>
+              <span id="vdDqBadge" class="neo-badge neo-badge-default" style="display:none;"></span>
+            </div>
+            <div class="vd-header-sub" id="vdTime">—</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a id="vdSessionLink" href="#" class="neo-btn neo-btn-secondary neo-btn-sm" style="display:none;text-decoration:none;">🔗 Session</a>
+            <a href="/v2/visits" class="neo-btn neo-btn-ghost neo-btn-sm" style="text-decoration:none;">← الزيارات</a>
+          </div>
+        </div>
+
+        <!-- Ground Truth -->
+        <div class="vd-gt">
+          <div style="flex:1;min-width:200px;">
+            <div class="vd-gt-label">🏷️ تصنيفك اليدوي (Ground Truth)</div>
+            <div class="vd-gt-status" id="vdGtStatus">لم يتم التصنيف بعد</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="neo-btn neo-btn-success neo-btn-sm" onclick="VD.setGT('human')">✓ يوزر حقيقي</button>
+            <button class="neo-btn neo-btn-danger neo-btn-sm" onclick="VD.setGT('bot')">✗ بوت</button>
+            <button class="neo-btn neo-btn-ghost neo-btn-sm" id="vdGtClearBtn" onclick="VD.clearGT()" style="display:none;">مسح</button>
+          </div>
+        </div>
+
+        <!-- Mismatches -->
+        <div id="vdMismatches" style="display:none;"></div>
+
+        <!-- Tabs -->
+        <div class="vd-tabs">
+          <button class="vd-tab active" data-tab="overview">📋 نظرة عامة</button>
+          <button class="vd-tab" data-tab="decision">🔬 القرار الكامل</button>
+          <button class="vd-tab" data-tab="behavior">🧠 السلوك العميق</button>
+        </div>
+
+        <!-- Overview Panel -->
+        <div class="vd-panel active" data-panel="overview">
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:var(--neo-sp-4);">
+            <div class="space-y-4">
+              <div class="vd-score-card">
+                <div class="vd-score-ring">
+                  <svg viewBox="0 0 150 150">
+                    <circle class="bg" cx="75" cy="75" r="65"></circle>
+                    <circle id="vdScoreCircle" class="fg" cx="75" cy="75" r="65"></circle>
+                  </svg>
+                  <div class="vd-score-val">
+                    <div class="vd-score-num" id="vdScore">0</div>
+                    <div class="vd-score-label">Risk Score</div>
+                  </div>
+                </div>
+                <div class="vd-verdict-text" id="vdVerdictText">—</div>
+                <div class="vd-cats" id="vdCats"></div>
+              </div>
+
+              <div class="vd-box">
+                <div class="vd-box-title">💰 الأرباح</div>
+                <div class="vd-kv-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                  <div class="vd-kv">
+                    <div class="vd-kv-label">BID</div>
+                    <div class="vd-kv-value" id="vdBid" style="color: var(--neo-danger);">$0.00</div>
+                  </div>
+                  <div class="vd-kv">
+                    <div class="vd-kv-label">الإيراد</div>
+                    <div class="vd-kv-value" id="vdRevenue" style="color: var(--neo-success);">$0.00</div>
+                  </div>
+                  <div class="vd-kv">
+                    <div class="vd-kv-label">الربح</div>
+                    <div class="vd-kv-value" id="vdProfit">$0.00</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="vd-box">
+                <div class="vd-box-title">🧠 السلوك</div>
+                <div class="vd-kv-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                  <div class="vd-kv">
+                    <div class="vd-kv-label">المكوث</div>
+                    <div class="vd-kv-value" id="vdTimeOnPage" style="color: var(--neo-info);">0s</div>
+                  </div>
+                  <div class="vd-kv">
+                    <div class="vd-kv-label">نقرات</div>
+                    <div class="vd-kv-value" id="vdClicks" style="color: var(--neo-success);">0</div>
+                  </div>
+                  <div class="vd-kv">
+                    <div class="vd-kv-label">سكرول</div>
+                    <div class="vd-kv-value" id="vdScrolls" style="color: var(--neo-warning);">0</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div class="vd-box">
+                <div class="vd-box-title">🌐 IP Intelligence</div>
+                <div class="vd-kv-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+                  <div class="vd-kv"><div class="vd-kv-label">IP</div><div class="vd-kv-value" id="vdIpIntelIp" style="font-size: 10px;">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Country</div><div class="vd-kv-value" id="vdIpIntelCountry">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">ISP</div><div class="vd-kv-value" id="vdIpIntelIsp" style="font-size: 10px;">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">ASN</div><div class="vd-kv-value" id="vdIpIntelAsn">—</div></div>
+                </div>
+                <div style="margin-top: var(--neo-sp-2);">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="font-size: 10px; color: var(--neo-fg-tertiary);">Risk Score</span>
+                    <span class="neo-mono" style="font-size: 12px; font-weight: 700;" id="vdIpRiskScore">0</span>
+                  </div>
+                  <div class="vd-risk-bar"><div class="vd-risk-bar-fill" id="vdIpRiskBar"></div></div>
+                </div>
+                <div id="vdIpReasons" style="margin-top: var(--neo-sp-2);"></div>
+              </div>
+
+              <div class="vd-box">
+                <div class="vd-box-title">📊 PopAds Macros</div>
+                <div class="vd-macro-grid" id="vdPopadsKnown"></div>
+              </div>
+
+              <div class="vd-box">
+                <div class="vd-box-title">💻 الجهاز والبصمة</div>
+                <div class="vd-kv-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+                  <div class="vd-kv"><div class="vd-kv-label">OS</div><div class="vd-kv-value" id="vdOs">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Browser</div><div class="vd-kv-value" id="vdBrowser">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Device</div><div class="vd-kv-value" id="vdDevice">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Hardware</div><div class="vd-kv-value" id="vdHardware">—</div></div>
+                  <div class="vd-kv" style="grid-column: span 2;"><div class="vd-kv-label">Canvas</div><div class="vd-kv-value" id="vdCanvas" style="font-size: 10px;">—</div></div>
+                  <div class="vd-kv" style="grid-column: span 2;"><div class="vd-kv-label">Zone</div><div class="vd-kv-value" id="vdZone">—</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision Panel -->
+        <div class="vd-panel" data-panel="decision">
+          <div class="vd-box">
+            <div class="vd-box-title">🎯 القرار النهائي</div>
+            <div class="vd-decision-row">
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Verdict</div>
+                <div class="vd-decision-value" id="vdDecVerdict">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Mode</div>
+                <div class="vd-decision-value" id="vdDecMode">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Bot Probability</div>
+                <div class="vd-decision-value" id="vdDecBotProb">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Confidence</div>
+                <div class="vd-decision-value" id="vdDecConf">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Reason</div>
+                <div class="vd-decision-value" id="vdDecReason" style="font-size: 12px;">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Filter Reason</div>
+                <div class="vd-decision-value" id="vdDecFilter" style="font-size: 12px;">—</div>
+              </div>
+            </div>
+            <div id="vdDecReasonDetail" style="display:none;padding:var(--neo-sp-3);background:var(--neo-accent-subtle);border-radius:var(--neo-r-sm);font-size:var(--neo-fs-xs);color:var(--neo-accent-hover);line-height:1.6;"></div>
+          </div>
+
+          <div class="vd-box">
+            <div class="vd-box-title">🧬 Fusion Engine</div>
+            <div class="vd-decision-row">
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Bot Evidence</div>
+                <div class="vd-decision-value" id="vdFusBotEv" style="color: var(--neo-danger);">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Human Evidence</div>
+                <div class="vd-decision-value" id="vdFusHumanEv" style="color: var(--neo-success);">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Prior Risk</div>
+                <div class="vd-decision-value" id="vdFusPrior">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Impossible?</div>
+                <div class="vd-decision-value" id="vdFusImpossible">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="vd-box">
+            <div class="vd-box-title">📊 جودة البيانات</div>
+            <div class="vd-decision-row">
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Level</div>
+                <div class="vd-decision-value" id="vdDqLevel">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Completeness</div>
+                <div class="vd-decision-value" id="vdDqCompleteness">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Reliability</div>
+                <div class="vd-decision-value" id="vdDqReliability">—</div>
+              </div>
+              <div class="vd-decision-box">
+                <div class="vd-decision-label">Max Confidence Cap</div>
+                <div class="vd-decision-value" id="vdDqCap">—</div>
+              </div>
+            </div>
+            <div id="vdDqFields" style="margin-top:var(--neo-sp-2);"></div>
+          </div>
+
+          <div class="vd-box">
+            <div class="vd-box-title">
+              🔔 Signals (<span id="vdSigCount">0</span>)
+              <div style="margin-right:auto;display:flex;gap:4px;">
+                <button class="neo-btn neo-btn-secondary neo-btn-xs" data-sig-filter="all" style="padding: 3px 10px;">الكل</button>
+                <button class="neo-btn neo-btn-ghost neo-btn-xs" data-sig-filter="bot" style="padding: 3px 10px;">Bot</button>
+                <button class="neo-btn neo-btn-ghost neo-btn-xs" data-sig-filter="human" style="padding: 3px 10px;">Human</button>
+              </div>
+            </div>
+            <div id="vdSigList"></div>
+            <div id="vdSigEmpty" style="display:none;text-align:center;padding:var(--neo-sp-6);color:var(--neo-fg-muted);font-size:var(--neo-fs-sm);">مفيش signals مسجلة (زيارة legacy أو v2)</div>
+          </div>
+
+          <div class="vd-box">
+            <div class="vd-box-title">💾 Full Payload (raw)</div>
+            <pre id="vdFullPayload" style="font-family:var(--neo-font-mono);font-size:10px;background:var(--neo-bg-canvas);padding:var(--neo-sp-3);border-radius:var(--neo-r-sm);overflow:auto;max-height:400px;color:var(--neo-success);direction:ltr;text-align:left;line-height:1.6;margin:0;"></pre>
+          </div>
+        </div>
+
+        <!-- Behavior Panel -->
+        <div class="vd-panel" data-panel="behavior">
+          <div class="vd-box">
+            <div class="vd-box-title">🖱️ تحليل الماوس</div>
+            <div class="vd-behavior-grid" id="vdBehMouse"></div>
+          </div>
+          <div class="vd-box">
+            <div class="vd-box-title">⌨️ الكتابة والسكرول</div>
+            <div class="vd-behavior-grid" id="vdBehKeys"></div>
+          </div>
+          <div class="vd-box">
+            <div class="vd-box-title">⚡ الأحداث</div>
+            <div class="vd-behavior-grid" id="vdBehEvents"></div>
+          </div>
+          <div class="vd-box">
+            <div class="vd-box-title">⏱️ أول 30 ثانية</div>
+            <div class="vd-behavior-grid" id="vdBehFirst30"></div>
+          </div>
+          <div class="vd-box">
+            <div class="vd-box-title">📍 Milestones</div>
+            <div class="vd-behavior-grid" id="vdBehMilestones"></div>
+          </div>
+          <div class="vd-box">
+            <div class="vd-box-title">📺 Ad Events</div>
+            <div id="vdBehAdEvents"></div>
+          </div>
+          <div class="vd-box">
+            <div class="vd-box-title">🎯 Fingerprint & Flags</div>
+            <div class="vd-behavior-grid" id="vdBehFlags"></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const VD = {
+      visitId: null,
+      data: null,
+      sigFilter: 'all',
+    };
+
+    function esc(s) { return Neo.escape(s); }
+
+    const MACRO_LABELS = {
+      bid: 'BID', impressionid: 'Impression ID', websiteid: 'Website ID',
+      categoryid: 'Category ID', categoryname: 'Category', ispid: 'ISP ID',
+      ispname: 'ISP Name', country: 'Country', quality: 'Quality',
+      screenresolution: 'Screen Res', osname: 'OS', browsername: 'Browser',
+      formfactorname: 'Form Factor', devicename: 'Device', campaignid: 'Campaign ID',
+      campaignname: 'Campaign Name', adblock: 'AdBlock',
+    };
+
+    function showError(msg) {
+      document.getElementById('vdLoading').style.display = 'none';
+      document.getElementById('vdContent').style.display = 'none';
+      document.getElementById('vdError').style.display = '';
+      document.getElementById('vdErrorMsg').textContent = msg || 'حدث خطأ غير متوقع.';
+    }
+
+    // =========================================================
+    // GROUND TRUTH
+    // =========================================================
+    VD.setGT = async function(label) {
+      try {
+        const r = await fetch(`/api/visits/${VD.visitId}/ground-truth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label }),
+          credentials: 'same-origin',
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        renderGT(d.ground_truth, d.labeled_at, 'أنت');
+        Neo.toast(label === 'human' ? '✓ تم التصنيف: إنسان' : '✗ تم التصنيف: بوت', 'success');
+      } catch (e) { Neo.toast('فشل: ' + e.message, 'error'); }
+    };
+
+    VD.clearGT = async function() {
+      if (!confirm('مسح التصنيف؟')) return;
+      try {
+        const r = await fetch(`/api/visits/${VD.visitId}/ground-truth`, { method: 'DELETE', credentials: 'same-origin' });
+        if (r.ok) renderGT(null, null, null);
+      } catch (e) {}
+    };
+
+    function renderGT(gt, at, by) {
+      const status = document.getElementById('vdGtStatus');
+      const clearBtn = document.getElementById('vdGtClearBtn');
+
+      if (gt === 'human') {
+        status.innerHTML = '<span class="neo-badge neo-badge-success">✓ يوزر حقيقي</span> ' + (at ? `<span style="font-size: 10px; color: var(--neo-fg-muted); margin-right: 8px;">${esc(at.slice(0, 19).replace('T', ' '))} · ${esc(by || '')}</span>` : '');
+        clearBtn.style.display = '';
+      } else if (gt === 'bot') {
+        status.innerHTML = '<span class="neo-badge neo-badge-danger">✗ بوت</span> ' + (at ? `<span style="font-size: 10px; color: var(--neo-fg-muted); margin-right: 8px;">${esc(at.slice(0, 19).replace('T', ' '))} · ${esc(by || '')}</span>` : '');
+        clearBtn.style.display = '';
+      } else {
+        status.innerHTML = '<span style="color: var(--neo-fg-muted);">لم يتم التصنيف بعد</span>';
+        clearBtn.style.display = 'none';
+      }
+    }
+
+    // =========================================================
+    // TABS
+    // =========================================================
+    function setupTabs() {
+      document.querySelectorAll('.vd-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.vd-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.vd-panel').forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+        });
+      });
+    }
+
+    // =========================================================
+    // RENDER POPADS
+    // =========================================================
+    function renderPopads(known) {
+      const container = document.getElementById('vdPopadsKnown');
+      const keys = Object.keys(known || {});
+      if (!keys.length) {
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--neo-fg-muted);font-size:12px;padding:12px;">مفيش ماكروز PopAds</div>';
+        return;
+      }
+      container.innerHTML = keys.map(k => {
+        const val = known[k];
+        const label = MACRO_LABELS[k] || k;
+        let display = String(val);
+        let color = 'var(--neo-fg-primary)';
+        if (k === 'bid') { display = '$' + Number(val).toFixed(6); color = 'var(--neo-danger)'; }
+        else if (k === 'quality') { const q = Number(val); display = q + '/10'; color = q >= 8 ? 'var(--neo-success)' : q >= 5 ? 'var(--neo-warning)' : 'var(--neo-danger)'; }
+        else if (k === 'adblock') { const blocked = (val === '1' || val === true); display = blocked ? 'نعم' : 'لا'; color = blocked ? 'var(--neo-danger)' : 'var(--neo-success)'; }
+        return `<div class="vd-macro"><div class="vd-macro-label">${esc(label)}</div><div class="vd-macro-value" style="color:${color};">${esc(display)}</div></div>`;
+      }).join('');
+    }
+
+    // =========================================================
+    // RENDER IP INTEL
+    // =========================================================
+    function renderIpIntel(intel) {
+      if (!intel) return;
+      document.getElementById('vdIpIntelIp').textContent = intel.ip || '—';
+      document.getElementById('vdIpIntelCountry').textContent = intel.country || '—';
+      document.getElementById('vdIpIntelIsp').textContent = intel.isp || '—';
+      document.getElementById('vdIpIntelAsn').textContent = intel.asn || '—';
+
+      const risk = Number(intel.risk_score || 0);
+      document.getElementById('vdIpRiskScore').textContent = risk;
+      const riskColor = risk >= 80 ? 'var(--neo-danger)' : risk >= 60 ? 'var(--neo-orange)' : risk >= 40 ? 'var(--neo-warning)' : 'var(--neo-success)';
+      const bar = document.getElementById('vdIpRiskBar');
+      bar.style.width = risk + '%';
+      bar.style.background = riskColor;
+      document.getElementById('vdIpRiskScore').style.color = riskColor;
+
+      const reasonsEl = document.getElementById('vdIpReasons');
+      const reasons = intel.reasons || [];
+      if (!reasons.length) {
+        reasonsEl.innerHTML = '<div style="font-size:11px;color:var(--neo-success);text-align:center;padding:4px;">لا أسباب مشبوهة ✅</div>';
+      } else {
+        reasonsEl.innerHTML = reasons.map(r => {
+          const c = r.severity === 'high' ? 'var(--neo-danger)' : r.severity === 'medium' ? 'var(--neo-warning)' : 'var(--neo-fg-tertiary)';
+          return `<div style="display:flex;gap:6px;font-size:11px;margin-bottom:2px;"><span style="color:${c};">●</span><span style="color:var(--neo-fg-secondary);">${esc(r.reason || '')}</span></div>`;
+        }).join('');
+      }
+    }
+
+    // =========================================================
+    // RENDER MISMATCHES
+    // =========================================================
+    function renderMismatches(mismatches) {
+      const banner = document.getElementById('vdMismatches');
+      if (!mismatches || !mismatches.length) { banner.style.display = 'none'; return; }
+      const hasHigh = mismatches.some(m => m.severity === 'high');
+      banner.className = 'vd-mismatch' + (hasHigh ? ' high' : '');
+      banner.innerHTML = `
+        <span class="vd-mismatch-icon">${hasHigh ? '🚨' : '⚠️'}</span>
+        <div class="vd-mismatch-body">
+          <div class="vd-mismatch-title">${hasHigh ? 'تناقضات في البيانات' : 'ملاحظات'}</div>
+          ${mismatches.map(m => `<div style="font-size:11px;margin-top:4px;"><b style="color:var(--neo-fg-primary);">${esc(m.field.toUpperCase())}:</b> إحنا: <span style="font-family:var(--neo-font-mono);">${esc(m.ours)}</span> · PopAds: <span style="font-family:var(--neo-font-mono);">${esc(m.popads)}</span></div>`).join('')}
+        </div>
+      `;
+      banner.style.display = 'flex';
+    }
+
+    // =========================================================
+    // RENDER CATEGORIES
+    // =========================================================
+    function renderCats(cats) {
+      const container = document.getElementById('vdCats');
+      if (!cats) { container.innerHTML = ''; return; }
+      const icons = { critical: '🚨', high: '⚠️', medium: '⚡', low: '💡', human: '✅' };
+      container.innerHTML = '';
+      ['critical', 'high', 'medium', 'low', 'human'].forEach(sev => {
+        const n = Number(cats[sev] || 0);
+        if (n <= 0) return;
+        const chip = document.createElement('span');
+        chip.className = `vd-cat ${sev}`;
+        chip.textContent = `${icons[sev] || ''} ${sev} × ${n}`;
+        container.appendChild(chip);
+      });
+    }
+
+    // =========================================================
+    // DECISION
+    // =========================================================
+    function renderDecision(d) {
+      const dec = d.decision || {};
+      const fus = d.fusion || {};
+      const dq = d.data_quality_report || {};
+
+      document.getElementById('vdDecVerdict').textContent = (dec.verdict || d.verdict || '—').toUpperCase();
+      document.getElementById('vdDecMode').textContent = (dec.mode || d.mode || '—').toUpperCase();
+      document.getElementById('vdDecBotProb').textContent = dec.bot_probability != null ? (dec.bot_probability * 100).toFixed(1) + '%' : (d.bot_probability != null ? (d.bot_probability * 100).toFixed(1) + '%' : '—');
+      document.getElementById('vdDecConf').textContent = dec.confidence != null ? (dec.confidence * 100).toFixed(1) + '%' : (d.confidence != null ? (d.confidence * 100).toFixed(1) + '%' : '—');
+      document.getElementById('vdDecReason').textContent = dec.reason || d.reason || '—';
+      document.getElementById('vdDecFilter').textContent = d.filter_reason || '—';
+
+      if (dec.reason_detail) {
+        const el = document.getElementById('vdDecReasonDetail');
+        el.textContent = dec.reason_detail;
+        el.style.display = 'block';
+      }
+
+      document.getElementById('vdFusBotEv').textContent = fus.bot_evidence != null ? (fus.bot_evidence * 100).toFixed(1) + '%' : '—';
+      document.getElementById('vdFusHumanEv').textContent = fus.human_evidence != null ? (fus.human_evidence * 100).toFixed(1) + '%' : '—';
+      document.getElementById('vdFusPrior').textContent = fus.prior_risk != null ? (fus.prior_risk * 100).toFixed(1) + '%' : '—';
+      document.getElementById('vdFusImpossible').textContent = fus.has_impossible ? '🚨 نعم' : 'لا';
+      document.getElementById('vdFusImpossible').style.color = fus.has_impossible ? 'var(--neo-danger)' : 'var(--neo-fg-primary)';
+
+      document.getElementById('vdDqLevel').textContent = (dq.level || d.data_quality || '—').toUpperCase();
+      document.getElementById('vdDqCompleteness').textContent = dq.completeness != null ? (dq.completeness * 100).toFixed(0) + '%' : '—';
+      document.getElementById('vdDqReliability').textContent = dq.reliability != null ? (dq.reliability * 100).toFixed(0) + '%' : '—';
+      document.getElementById('vdDqCap').textContent = dq.max_confidence_cap != null ? (dq.max_confidence_cap * 100).toFixed(0) + '%' : '—';
+
+      const missing = dq.missing || [];
+      const weak = dq.weak || [];
+      const fields = [...missing.map(f => ({ f, t: 'missing' })), ...weak.map(f => ({ f, t: 'weak' }))];
+      if (fields.length) {
+        document.getElementById('vdDqFields').innerHTML = fields.map(x => `
+          <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--neo-bg-canvas);border-radius:4px;margin-bottom:3px;font-size:11px;">
+            <span style="font-family:var(--neo-font-mono);color:var(--neo-fg-secondary);">${esc(x.f)}</span>
+            <span class="neo-badge neo-badge-${x.t === 'missing' ? 'danger' : 'warning'}" style="font-size:9px;padding:1px 6px;">${x.t === 'missing' ? 'MISSING' : 'WEAK'}</span>
+          </div>
+        `).join('');
+      } else {
+        document.getElementById('vdDqFields').innerHTML = '<div style="text-align:center;color:var(--neo-success);font-size:12px;padding:8px;">✅ كل الحقول موجودة</div>';
+      }
+
+      renderSignals(d.signals || []);
+      document.getElementById('vdFullPayload').textContent = JSON.stringify(d.full_payload || {}, null, 2);
+    }
+
+    function renderSignals(signals) {
+      const listEl = document.getElementById('vdSigList');
+      const emptyEl = document.getElementById('vdSigEmpty');
+      document.getElementById('vdSigCount').textContent = signals.length;
+
+      if (!signals.length) { listEl.innerHTML = ''; emptyEl.style.display = ''; return; }
+      emptyEl.style.display = 'none';
+
+      let filtered = signals.slice();
+      if (VD.sigFilter === 'bot') filtered = filtered.filter(s => s.direction === 'bot');
+      else if (VD.sigFilter === 'human') filtered = filtered.filter(s => s.direction === 'human');
+
+      if (!filtered.length) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--neo-fg-muted);font-size:12px;">مفيش signals بالنوع المختار</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(s => {
+        const strength = Number(s.strength || s.base_strength || 0);
+        const pct = Math.round(strength * 100);
+        const dir = s.direction || 'bot';
+        const color = dir === 'human' ? 'var(--neo-success)' : (pct > 70 ? 'var(--neo-danger)' : pct > 40 ? 'var(--neo-warning)' : 'var(--neo-fg-tertiary)');
+        return `
+          <div class="vd-signal">
+            <div class="vd-signal-code" title="${esc(s.code || '')}">${esc(s.code || 'UNKNOWN')}</div>
+            <div class="vd-signal-dir ${dir}">${dir === 'bot' ? 'BOT' : 'HUMAN'}</div>
+            <div class="vd-signal-bar"><div class="vd-signal-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+            <div class="vd-signal-strength" style="color:${color};">${pct}%</div>
+            ${s.detail ? `<div style="grid-column:1/-1;font-size:10px;color:var(--neo-fg-muted);">${esc(s.detail)} · ${esc(s.severity || '')}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // =========================================================
+    // BEHAVIOR
+    // =========================================================
+    function kv(label, value) {
+      if (value === undefined || value === null || value === '') return '';
+      return `<div class="vd-behavior-item"><div class="vd-behavior-label">${esc(label)}</div><div class="vd-behavior-value">${esc(String(value))}</div></div>`;
+    }
+
+    function renderBehavior(d) {
+      const b = d.behavioral || {};
+      const f30 = d.first_30s || {};
+      const ms = d.milestones || {};
+      const ad = d.ad_events || [];
+
+      document.getElementById('vdBehMouse').innerHTML = [
+        kv('Mouse Points', b.mouse_points ? b.mouse_points.length : 0),
+        kv('Velocity Variance', b.mouse_velocity_variance),
+        kv('Direction Changes', b.mouse_direction_changes),
+        kv('Total Distance', b.mouse_distance_total),
+        kv('Pauses', b.mouse_pauses),
+        kv('First Move (ms)', b.first_move_delay_ms),
+      ].filter(Boolean).join('') || '<div style="color:var(--neo-fg-muted);font-size:12px;grid-column:1/-1;">مفيش بيانات ماوس</div>';
+
+      document.getElementById('vdBehKeys').innerHTML = [
+        kv('Keydown', b.keydown_count),
+        kv('Backspace', b.backspace_count),
+        kv('Typing Bursts', b.typing_bursts),
+        kv('Key Intervals', b.key_intervals ? b.key_intervals.length : 0),
+        kv('Scroll Depth %', b.scroll_depth_pct),
+        kv('Scroll Direction Changes', b.scroll_direction_changes),
+        kv('Scroll Pauses', b.scroll_pauses),
+      ].filter(Boolean).join('') || '<div style="color:var(--neo-fg-muted);font-size:12px;grid-column:1/-1;">مفيش بيانات</div>';
+
+      const ev = b.events || {};
+      document.getElementById('vdBehEvents').innerHTML = [
+        kv('Clicks', b.clicks),
+        kv('Wheel', b.wheel_events),
+        kv('Mousemove', ev.mousemove),
+        kv('Touchstart', ev.touchstart),
+        kv('Scrolls', ev.scrolls),
+        kv('Keydown', ev.keydown),
+        kv('Total Time (ms)', b.total_time_ms),
+        kv('Visible Time (ms)', b.visible_time_ms),
+      ].filter(Boolean).join('') || '<div style="color:var(--neo-fg-muted);font-size:12px;grid-column:1/-1;">مفيش بيانات</div>';
+
+      document.getElementById('vdBehFirst30').innerHTML = [
+        kv('Start (ms)', f30.start_ms),
+        kv('Clicks 30s', f30.clicks_30s),
+        kv('Scrolls 30s', f30.scrolls_30s),
+        kv('Mousemoves 30s', f30.mousemoves_30s),
+        kv('Keys 30s', f30.keys_30s),
+        kv('Has Interaction', f30.has_interaction_30s ? 'نعم' : 'لا'),
+      ].filter(Boolean).join('') || '<div style="color:var(--neo-fg-muted);font-size:12px;grid-column:1/-1;">مفيش بيانات</div>';
+
+      document.getElementById('vdBehMilestones').innerHTML = Object.keys(ms).length
+        ? Object.keys(ms).map(k => kv(k, ms[k] + 'ms')).join('')
+        : '<div style="color:var(--neo-fg-muted);font-size:12px;grid-column:1/-1;">مفيش milestones</div>';
+
+      if (!ad || !ad.length) {
+        document.getElementById('vdBehAdEvents').innerHTML = '<div style="text-align:center;color:var(--neo-fg-muted);font-size:12px;padding:12px;">مفيش ad events</div>';
+      } else {
+        document.getElementById('vdBehAdEvents').innerHTML = ad.map(e => `
+          <div style="display:flex;justify-content:space-between;padding:6px 12px;background:var(--neo-bg-canvas);border-radius:6px;margin-bottom:4px;font-size:12px;">
+            <span style="font-family:var(--neo-font-mono);color:var(--neo-info);font-weight:700;">${esc(e.event || '—')}</span>
+            <span style="color:var(--neo-fg-muted);font-family:var(--neo-font-mono);font-size:10px;">${esc(e.t || e.t_ms || '—')}ms</span>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('vdBehFlags').innerHTML = [
+        kv('Strikes', d.fingerprint_strikes != null ? d.fingerprint_strikes : '—'),
+        kv('Honeypot', d.is_honeypot_triggered ? '🚨 TRIGGERED' : '✅ لا'),
+        kv('Clock Drift', d.clock_drift_ms + 'ms'),
+        kv('Consent', d.consent_state),
+        kv('DQ Level', (d.data_quality || '—').toUpperCase()),
+      ].filter(Boolean).join('');
+    }
+
+    // =========================================================
+    // LOAD
+    // =========================================================
+    async function loadDetails() {
+      try {
+        const r = await fetch(`/api/visits/${VD.visitId}`, { credentials: 'same-origin' });
+        if (!r.ok) {
+          if (r.status === 404) showError('الزيارة غير موجودة أو غير مصرح لك بعرضها.');
+          else if (r.status === 401) showError('انتهت الجلسة. سجّل الدخول من جديد.');
+          else showError('فشل التحميل (HTTP ' + r.status + ')');
+          return;
+        }
+        const d = await r.json();
+        VD.data = d;
+
+        document.getElementById('vdLoading').style.display = 'none';
+        document.getElementById('vdContent').style.display = '';
+
+        document.getElementById('vdId').textContent = '#' + d.id;
+        document.getElementById('vdTime').textContent = d.timestamp;
+
+        if (d.session_id) {
+          const link = document.getElementById('vdSessionLink');
+          link.href = '/v2/sessions/' + encodeURIComponent(d.session_id);
+          link.style.display = '';
+        }
+
+        const dqLevel = d.data_quality || 'unknown';
+        const dqBadge = document.getElementById('vdDqBadge');
+        dqBadge.style.display = '';
+        dqBadge.textContent = 'DQ: ' + dqLevel.toUpperCase();
+        dqBadge.className = 'neo-badge ' + (dqLevel === 'full' ? 'neo-badge-success' : dqLevel === 'partial' ? 'neo-badge-warning' : 'neo-badge-default');
+
+        document.getElementById('vdScore').textContent = d.score;
+        document.getElementById('vdOs').textContent = d.os;
+        document.getElementById('vdBrowser').textContent = d.browser;
+        document.getElementById('vdDevice').textContent = d.device;
+        document.getElementById('vdHardware').textContent = d.hardware;
+        document.getElementById('vdCanvas').textContent = d.canvas_hash;
+        document.getElementById('vdZone').textContent = d.zone_id;
+        document.getElementById('vdTimeOnPage').textContent = d.time_on_page + 's';
+        document.getElementById('vdClicks').textContent = d.clicks;
+        document.getElementById('vdScrolls').textContent = d.scrolls;
+
+        renderPopads(d.popads_known || {});
+        renderIpIntel(d.ip_intel);
+        renderMismatches(d.mismatches);
+        renderCats(d.categories);
+
+        const bid = Number(d.bid || 0);
+        const rev = Number(d.revenue || 0);
+        const profit = rev - bid;
+        document.getElementById('vdBid').textContent = '$' + bid.toFixed(6);
+        document.getElementById('vdRevenue').textContent = '$' + rev.toFixed(6);
+        const profitEl = document.getElementById('vdProfit');
+        profitEl.textContent = (profit >= 0 ? '+' : '') + '$' + profit.toFixed(6);
+        profitEl.style.color = profit >= 0 ? 'var(--neo-success)' : 'var(--neo-danger)';
+
+        // Verdict
+        const badge = document.getElementById('vdVerdictBadge');
+        const circle = document.getElementById('vdScoreCircle');
+        const verdictText = document.getElementById('vdVerdictText');
+        let color = '';
+
+        if (d.verdict === 'valid') {
+          color = 'var(--neo-success)';
+          badge.className = 'neo-badge neo-badge-success';
+          badge.textContent = 'VALID';
+          verdictText.textContent = 'زيارة سليمة';
+          verdictText.style.color = color;
+        } else if (d.verdict === 'invalid') {
+          color = 'var(--neo-danger)';
+          badge.className = 'neo-badge neo-badge-danger';
+          badge.textContent = 'INVALID';
+          verdictText.textContent = 'بوت / وهمية';
+          verdictText.style.color = color;
+        } else if (d.verdict === 'pending') {
+          color = 'var(--neo-info)';
+          badge.className = 'neo-badge neo-badge-info';
+          badge.textContent = 'PENDING';
+          verdictText.textContent = 'قيد التحليل';
+          verdictText.style.color = color;
+        } else {
+          color = 'var(--neo-warning)';
+          badge.className = 'neo-badge neo-badge-warning';
+          badge.textContent = 'SUSPICIOUS';
+          verdictText.textContent = 'مشبوهة';
+          verdictText.style.color = color;
+        }
+
+        circle.style.stroke = color;
+        setTimeout(() => {
+          const pct = Math.min(Number(d.score || 0) / 100, 1);
+          const offset = 408 - (pct * 408);
+          circle.style.strokeDashoffset = offset;
+        }, 100);
+
+        // Render decision + behavior
+        renderDecision(d);
+        renderBehavior(d);
+
+        renderGT(d.ground_truth, d.ground_truth_at, d.ground_truth_by);
+
+        // Signal filter binding
+        document.querySelectorAll('[data-sig-filter]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            VD.sigFilter = btn.dataset.sigFilter;
+            document.querySelectorAll('[data-sig-filter]').forEach(b => {
+              b.classList.toggle('neo-btn-secondary', b.dataset.sigFilter === VD.sigFilter);
+              b.classList.toggle('neo-btn-ghost', b.dataset.sigFilter !== VD.sigFilter);
+            });
+            renderSignals(d.signals || []);
+          });
+        });
+
+      } catch (e) {
+        showError('فشل الاتصال: ' + (e.message || 'خطأ غير متوقع'));
+      }
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        VD.visitId = parseInt(parts[parts.length - 1], 10) || 0;
+        if (!VD.visitId) throw new Error('Visit ID غير صالح');
+
+        await Neo.mount({
+          active: 'visits',
+          lang: 'ar',
+          breadcrumb: [
+            { label: 'الزيارات', href: '/v2/visits' },
+            { label: 'تفاصيل' },
+          ],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        setupTabs();
+        await loadDetails();
+
+      } catch (e) {
+        console.error('[VD Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

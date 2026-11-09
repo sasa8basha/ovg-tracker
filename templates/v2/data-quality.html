@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · جودة البيانات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .dq-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .dq-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: dq-spin 0.8s linear infinite;
+    }
+    @keyframes dq-spin { to { transform: rotate(360deg); } }
+
+    .dq-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .dq-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .dq-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* Filters */
+    .dq-filters {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: var(--neo-sp-2);
+      align-items: end;
+    }
+    @media (max-width: 700px) { .dq-filters { grid-template-columns: 1fr; } }
+    .dq-filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .dq-filter-label {
+      font-size: var(--neo-fs-2xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Hero grid */
+    .dq-hero {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+    }
+    @media (max-width: 900px) { .dq-hero { grid-template-columns: 1fr; } }
+
+    .dq-score-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .dq-score-ring {
+      position: relative;
+      width: 180px;
+      height: 180px;
+      margin-bottom: var(--neo-sp-3);
+    }
+    .dq-score-ring svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .dq-score-ring circle {
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: round;
+    }
+    .dq-score-ring .bg { stroke: var(--neo-border-default); }
+    .dq-score-ring .fg {
+      stroke-dasharray: 490;
+      stroke-dashoffset: 490;
+      transition: stroke-dashoffset 1s var(--neo-ease-out), stroke 500ms;
+    }
+    .dq-score-val {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .dq-score-num {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 42px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      line-height: 1;
+    }
+    .dq-score-label {
+      font-size: 10px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 4px;
+    }
+    .dq-score-sub {
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-tertiary);
+      text-align: center;
+    }
+
+    .dq-collector-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-4);
+      display: flex;
+      flex-direction: column;
+    }
+    .dq-collector-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--neo-sp-3);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .dq-collector-title {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+    }
+    .dq-collector-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--neo-sp-2);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .dq-collector-kpi {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+      text-align: center;
+    }
+    .dq-collector-kpi-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      margin-bottom: 2px;
+    }
+    .dq-collector-kpi-val {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+    }
+    .dq-health-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: var(--neo-r-sm);
+      font-size: 10px;
+      font-weight: var(--neo-fw-extrabold);
+      font-family: var(--neo-font-mono);
+      text-transform: uppercase;
+    }
+    .dq-health-badge.ok { background: var(--neo-success-bg); color: var(--neo-success); }
+    .dq-health-badge.degraded { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .dq-health-badge.critical { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .dq-chart-wrap { height: 180px; position: relative; }
+
+    /* Table */
+    .dq-field-bar {
+      height: 6px;
+      background: var(--neo-bg-elevated);
+      border-radius: 3px;
+      overflow: hidden;
+      min-width: 100px;
+    }
+    .dq-field-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 500ms var(--neo-ease-out);
+    }
+    .dq-field-name {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-primary);
+    }
+    .dq-sample-warn {
+      font-size: 9px;
+      color: var(--neo-warning);
+      font-weight: var(--neo-fw-bold);
+      margin-right: 4px;
+    }
+
+    /* Timeline card */
+    .dq-timeline-card {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-4);
+    }
+    .dq-timeline-head {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .dq-timeline-wrap { height: 220px; position: relative; }
+  </style>
+</head>
+<body>
+
+  <div class="dq-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل جودة البيانات…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="dq-header">
+        <div>
+          <h1 class="dq-header-title">📊 جودة البيانات</h1>
+          <div class="dq-header-sub">تأكد إن كل الحقول بتتجمع صح — بيانات ناقصة = تحليل ضعيف</div>
+        </div>
+        <button class="neo-btn neo-btn-secondary neo-btn-sm" id="dqRefreshBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+          تحديث
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="dq-filters">
+        <div class="dq-filter-field">
+          <label class="dq-filter-label">من تاريخ</label>
+          <input type="date" id="dqFrom" class="neo-input neo-input-sm">
+        </div>
+        <div class="dq-filter-field">
+          <label class="dq-filter-label">إلى تاريخ</label>
+          <input type="date" id="dqTo" class="neo-input neo-input-sm">
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="dqApplyBtn">تطبيق</button>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="dqClearBtn">مسح</button>
+        </div>
+      </div>
+
+      <!-- Hero -->
+      <div class="dq-hero">
+        <div class="dq-score-card">
+          <div class="dq-score-ring">
+            <svg viewBox="0 0 180 180">
+              <circle class="bg" cx="90" cy="90" r="78"></circle>
+              <circle id="dqScoreCircle" class="fg" cx="90" cy="90" r="78"></circle>
+            </svg>
+            <div class="dq-score-val">
+              <div class="dq-score-num" id="dqScore">0</div>
+              <div class="dq-score-label" id="dqScoreLabel">—</div>
+            </div>
+          </div>
+          <div class="dq-score-sub" id="dqTotalText">—</div>
+        </div>
+
+        <div class="dq-collector-card">
+          <div class="dq-collector-head">
+            <div class="dq-collector-title">🚦 حالة الـ Collector</div>
+            <span class="dq-health-badge" id="dqHealthBadge">—</span>
+          </div>
+          <div class="dq-collector-kpis">
+            <div class="dq-collector-kpi">
+              <div class="dq-collector-kpi-label">آخر ساعة</div>
+              <div class="dq-collector-kpi-val" id="dqLastHour">—</div>
+            </div>
+            <div class="dq-collector-kpi">
+              <div class="dq-collector-kpi-label">Baseline (7ي)</div>
+              <div class="dq-collector-kpi-val" id="dqBaseline" style="color: var(--neo-fg-tertiary);">—</div>
+            </div>
+            <div class="dq-collector-kpi">
+              <div class="dq-collector-kpi-label">آخر 24س</div>
+              <div class="dq-collector-kpi-val" id="dqLast24h" style="color: var(--neo-info);">—</div>
+            </div>
+          </div>
+          <div class="dq-chart-wrap">
+            <canvas id="dqCollectorChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fields table -->
+      <div class="neo-table-wrap" style="margin-bottom: var(--neo-sp-4);">
+        <div style="padding: var(--neo-sp-3) var(--neo-sp-4); border-bottom: 1px solid var(--neo-border-subtle);">
+          <div class="dq-collector-title">📋 اكتمال الحقول</div>
+          <div style="font-size: var(--neo-fs-xs); color: var(--neo-fg-tertiary); margin-top: 2px;">كل حقل له وزن في الـ score النهائي</div>
+        </div>
+        <table class="neo-table">
+          <thead>
+            <tr>
+              <th>الحقل</th>
+              <th class="neo-cell-center" style="color: var(--neo-success);">Valid</th>
+              <th class="neo-cell-center" style="color: var(--neo-danger);">Invalid</th>
+              <th class="neo-cell-center">الوزن</th>
+              <th>الاكتمال</th>
+            </tr>
+          </thead>
+          <tbody id="dqFieldsBody">
+            <tr><td colspan="5" class="neo-table-empty">جاري التحميل…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Timeline -->
+      <div class="dq-timeline-card">
+        <div class="dq-timeline-head">📈 الاكتمال عبر الزمن (آخر 30 يوم)</div>
+        <div class="dq-timeline-wrap">
+          <canvas id="dqTimelineChart"></canvas>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const DQ = {
+      filters: { from: '', to: '' },
+      collectorChart: null,
+      timelineChart: null,
+    };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    function scoreColor(s) {
+      if (s >= 95) return '#10B981';
+      if (s >= 85) return '#34D399';
+      if (s >= 70) return '#F59E0B';
+      if (s >= 50) return '#F97316';
+      return '#EF4444';
+    }
+
+    function fieldLabel(f) {
+      const map = {
+        canvas_hash: 'Canvas Hash', asn: 'ASN', country: 'الدولة',
+        timezone: 'Timezone', isp: 'ISP', hardware: 'الهاردوير',
+        webrtc_ip: 'WebRTC', evidence: 'Evidence',
+      };
+      return map[f] || f;
+    }
+
+    // =========================================================
+    // OVERVIEW
+    // =========================================================
+    async function loadOverview() {
+      try {
+        const params = new URLSearchParams();
+        if (DQ.filters.from) params.set('from_date', DQ.filters.from);
+        if (DQ.filters.to) params.set('to_date', DQ.filters.to);
+        const q = params.toString();
+
+        const d = await Neo.api('/api/data-quality/overview' + (q ? '?' + q : ''));
+
+        if (d.total === 0) {
+          document.getElementById('dqTotalText').textContent = 'لا بيانات في الفترة المحددة';
+          document.getElementById('dqFieldsBody').innerHTML = '<tr><td colspan="5" class="neo-table-empty">لا توجد بيانات</td></tr>';
+          return;
+        }
+
+        // Score
+        document.getElementById('dqScore').textContent = d.score.toFixed(0);
+        const labels = { excellent: 'ممتاز', good: 'جيد', fair: 'مقبول', poor: 'ضعيف', critical: 'حرج' };
+        const lblEl = document.getElementById('dqScoreLabel');
+        lblEl.textContent = labels[d.score_label] || d.score_label;
+        const color = scoreColor(d.score);
+        lblEl.style.color = color;
+
+        document.getElementById('dqTotalText').textContent = `${fmtInt(d.total)} زيارة في الفترة`;
+
+        const circle = document.getElementById('dqScoreCircle');
+        const circumference = 490;
+        const offset = circumference - (d.score / 100) * circumference;
+        setTimeout(() => {
+          circle.style.stroke = color;
+          circle.style.strokeDashoffset = offset;
+        }, 100);
+
+        // Fields table
+        const tbody = document.getElementById('dqFieldsBody');
+        tbody.innerHTML = d.fields.map(f => {
+          if (f.completeness === null) {
+            return `
+              <tr>
+                <td class="dq-field-name">${esc(fieldLabel(f.field))}</td>
+                <td class="neo-cell-center neo-fg-muted">—</td>
+                <td class="neo-cell-center neo-fg-muted">—</td>
+                <td class="neo-cell-center neo-mono neo-fg-muted">${f.weight}</td>
+                <td style="color: var(--neo-danger); font-size: 11px;">خطأ في الحساب</td>
+              </tr>
+            `;
+          }
+          const col = scoreColor(f.completeness);
+          return `
+            <tr>
+              <td class="dq-field-name">${esc(fieldLabel(f.field))}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-success);">${fmtInt(f.valid)}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-danger);">${fmtInt(f.invalid)}</td>
+              <td class="neo-cell-center neo-mono neo-fg-tertiary" style="font-size: 11px;">${f.weight}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="dq-field-bar" style="flex:1;">
+                    <div class="dq-field-bar-fill" style="width:${f.completeness}%;background:${col};"></div>
+                  </div>
+                  <span class="neo-mono" style="font-size: 11px; font-weight: 700; color: ${col}; min-width: 50px; text-align: left;">${f.completeness.toFixed(1)}%</span>
+                  ${!f.reliable ? '<span class="dq-sample-warn">عينة صغيرة</span>' : ''}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error('[DQ] overview failed:', e);
+        Neo.toast('فشل تحميل overview: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // COLLECTOR
+    // =========================================================
+    async function loadCollector() {
+      try {
+        const d = await Neo.api('/api/data-quality/collector-rate?hours=24');
+
+        document.getElementById('dqLastHour').textContent = fmtInt(d.last_hour_count);
+        document.getElementById('dqBaseline').textContent = fmtInt(d.baseline_per_hour);
+
+        const last24 = d.series.reduce((sum, s) => sum + s.count, 0);
+        document.getElementById('dqLast24h').textContent = fmtInt(last24);
+
+        const badge = document.getElementById('dqHealthBadge');
+        const labels = { ok: '✓ سليم', degraded: '⚠️ ضعيف', critical: '🚨 حرج' };
+        badge.className = 'dq-health-badge ' + d.health;
+        badge.textContent = labels[d.health] || d.health;
+
+        const labelsX = d.series.map(s => s.hour.slice(11, 16));
+        const data = d.series.map(s => s.count);
+        const baseline = d.series.map(() => d.baseline_per_hour);
+
+        if (DQ.collectorChart) { try { DQ.collectorChart.destroy(); } catch (e) {} }
+
+        DQ.collectorChart = new Chart(document.getElementById('dqCollectorChart').getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: labelsX,
+            datasets: [
+              {
+                label: 'زيارات/ساعة',
+                data: data,
+                borderColor: '#6366F1',
+                backgroundColor: 'rgba(99,102,241,0.15)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+              {
+                label: 'Baseline',
+                data: baseline,
+                borderColor: '#7B8496',
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0,
+                borderWidth: 1.5,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+              legend: {
+                labels: { color: '#B0B8C4', font: { family: 'Inter', size: 10 }, usePointStyle: true, padding: 12 },
+              },
+              tooltip: {
+                backgroundColor: '#1A1D26',
+                borderColor: '#232734',
+                borderWidth: 1,
+                titleColor: '#F5F7FA',
+                bodyColor: '#B0B8C4',
+                padding: 8,
+                cornerRadius: 6,
+              },
+            },
+            scales: {
+              x: { ticks: { color: '#7B8496', font: { size: 9 }, maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+              y: { ticks: { color: '#7B8496', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            },
+          },
+        });
+      } catch (e) {
+        console.error('[DQ] collector failed:', e);
+      }
+    }
+
+    // =========================================================
+    // TIMELINE
+    // =========================================================
+    async function loadTimeline() {
+      try {
+        const d = await Neo.api('/api/data-quality/timeline?days=30');
+
+        const labels = d.timeline.map(t => t.day);
+        const canvasData = d.timeline.map(t => t.canvas_completeness);
+        const asnData = d.timeline.map(t => t.asn_completeness);
+
+        if (DQ.timelineChart) { try { DQ.timelineChart.destroy(); } catch (e) {} }
+
+        DQ.timelineChart = new Chart(document.getElementById('dqTimelineChart').getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Canvas %',
+                data: canvasData,
+                borderColor: '#10B981',
+                backgroundColor: 'rgba(16,185,129,0.10)',
+                tension: 0.3,
+                pointRadius: 2,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+              },
+              {
+                label: 'ASN %',
+                data: asnData,
+                borderColor: '#6366F1',
+                backgroundColor: 'rgba(99,102,241,0.10)',
+                tension: 0.3,
+                pointRadius: 2,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+              legend: {
+                labels: { color: '#B0B8C4', font: { family: 'Inter', size: 10 }, usePointStyle: true, padding: 12 },
+              },
+              tooltip: {
+                backgroundColor: '#1A1D26',
+                borderColor: '#232734',
+                borderWidth: 1,
+                titleColor: '#F5F7FA',
+                bodyColor: '#B0B8C4',
+                padding: 8,
+                cornerRadius: 6,
+                callbacks: {
+                  label: (ctx) => ctx.dataset.label + ': ' + Number(ctx.parsed.y).toFixed(1) + '%',
+                },
+              },
+            },
+            scales: {
+              x: { ticks: { color: '#7B8496', font: { size: 9 }, maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+              y: {
+                min: 0,
+                max: 100,
+                ticks: { color: '#7B8496', font: { size: 10 }, callback: (v) => v + '%' },
+                grid: { color: 'rgba(255,255,255,0.04)' },
+              },
+            },
+          },
+        });
+      } catch (e) {
+        console.error('[DQ] timeline failed:', e);
+      }
+    }
+
+    // =========================================================
+    // BIND
+    // =========================================================
+    function bindControls() {
+      document.getElementById('dqApplyBtn').addEventListener('click', () => {
+        DQ.filters.from = document.getElementById('dqFrom').value;
+        DQ.filters.to = document.getElementById('dqTo').value;
+        loadOverview();
+      });
+
+      document.getElementById('dqClearBtn').addEventListener('click', () => {
+        document.getElementById('dqFrom').value = '';
+        document.getElementById('dqTo').value = '';
+        DQ.filters = { from: '', to: '' };
+        loadOverview();
+      });
+
+      document.getElementById('dqRefreshBtn').addEventListener('click', () => {
+        loadOverview();
+        loadCollector();
+        loadTimeline();
+      });
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'dataquality',
+          lang: 'ar',
+          breadcrumb: [{ label: 'جودة البيانات' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindControls();
+        await Promise.all([loadOverview(), loadCollector(), loadTimeline()]);
+
+        // Auto-refresh collector every 60s
+        setInterval(loadCollector, 60000);
+
+      } catch (e) {
+        console.error('[DQ Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

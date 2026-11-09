@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · المراجعة اليدوية</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .lbl-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .lbl-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: lbl-spin 0.8s linear infinite;
+    }
+    @keyframes lbl-spin { to { transform: rotate(360deg); } }
+
+    .lbl-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
+      flex-wrap: wrap;
+    }
+    .lbl-header-title {
+      font-size: var(--neo-fs-3xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 4px 0;
+      line-height: 1.1;
+    }
+    .lbl-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+    }
+
+    /* KPI strip */
+    .lbl-kpis {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+    }
+    @media (max-width: 1000px) { .lbl-kpis { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px) { .lbl-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+    .lbl-kpi {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+    }
+    .lbl-kpi-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .lbl-kpi-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 22px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      line-height: 1.1;
+    }
+    .lbl-kpi-sub {
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      margin-top: 3px;
+    }
+
+    /* Progress bar */
+    .lbl-progress-wrap {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+    }
+    .lbl-progress-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--neo-sp-2);
+    }
+    .lbl-progress-label {
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-secondary);
+    }
+    .lbl-progress-text {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-accent-hover);
+      font-weight: var(--neo-fw-bold);
+    }
+    .lbl-progress-bar {
+      height: 8px;
+      background: var(--neo-bg-elevated);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .lbl-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--neo-accent), var(--neo-accent-hover));
+      border-radius: 4px;
+      transition: width 600ms var(--neo-ease-out);
+    }
+
+    /* Tabs */
+    .lbl-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-default);
+    }
+    .lbl-tab {
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .lbl-tab:hover { color: var(--neo-fg-secondary); }
+    .lbl-tab.active {
+      color: var(--neo-fg-primary);
+      border-bottom-color: var(--neo-accent);
+    }
+    .lbl-panel { display: none; }
+    .lbl-panel.active { display: block; }
+
+    /* Filters */
+    .lbl-filters {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-3);
+      display: flex;
+      gap: var(--neo-sp-2);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .lbl-filter-label {
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-bold);
+      color: var(--neo-fg-tertiary);
+    }
+    .lbl-shortcuts {
+      font-size: var(--neo-fs-xs);
+      color: var(--neo-fg-muted);
+      display: flex;
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+      margin-left: auto;
+    }
+    .lbl-shortcuts kbd {
+      background: var(--neo-bg-elevated);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      color: var(--neo-fg-secondary);
+      border: 1px solid var(--neo-border-default);
+    }
+
+    /* Bulk bar */
+    .lbl-bulk-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--neo-bg-elevated);
+      border: 1px solid var(--neo-accent-border);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-3);
+      display: none;
+      align-items: center;
+      gap: var(--neo-sp-3);
+      box-shadow: var(--neo-shadow-md);
+    }
+    .lbl-bulk-bar.active { display: flex; }
+    .lbl-bulk-count {
+      font-family: var(--neo-font-mono);
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-accent-hover);
+      padding: 3px 10px;
+      background: var(--neo-accent-subtle);
+      border-radius: var(--neo-r-sm);
+    }
+
+    /* Table */
+    .lbl-row { transition: background var(--neo-dur-fast); }
+    .lbl-row:hover td { background: var(--neo-bg-elevated); }
+    .lbl-row.selected td { background: var(--neo-accent-subtle); }
+    .lbl-row.labeled { opacity: 0.35; }
+
+    .lbl-score {
+      font-family: var(--neo-font-mono);
+      font-weight: var(--neo-fw-extrabold);
+    }
+
+    .lbl-ev-chip {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-bold);
+      margin: 1px;
+      font-family: var(--neo-font-mono);
+    }
+    .lbl-ev-chip.critical { background: rgba(220,38,38,0.2); color: #FCA5A5; }
+    .lbl-ev-chip.high { background: rgba(249,115,22,0.2); color: #FDBA74; }
+    .lbl-ev-chip.medium { background: var(--neo-warning-bg); color: var(--neo-warning-fg); }
+    .lbl-ev-chip.low { background: rgba(234,179,8,0.2); color: #FDE68A; }
+    .lbl-ev-chip.human { background: var(--neo-success-bg); color: var(--neo-success-fg); }
+
+    .lbl-btn-human {
+      background: var(--neo-success-bg);
+      color: var(--neo-success-fg);
+      border: 1px solid var(--neo-success-border);
+      padding: 4px 10px;
+      border-radius: var(--neo-r-sm);
+      font-family: inherit;
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .lbl-btn-human:hover {
+      background: var(--neo-success);
+      color: white;
+    }
+    .lbl-btn-bot {
+      background: var(--neo-danger-bg);
+      color: var(--neo-danger-fg);
+      border: 1px solid var(--neo-danger-border);
+      padding: 4px 10px;
+      border-radius: var(--neo-r-sm);
+      font-family: inherit;
+      font-size: var(--neo-fs-xs);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .lbl-btn-bot:hover {
+      background: var(--neo-danger);
+      color: white;
+    }
+
+    .lbl-skel {
+      height: 60px;
+      background: linear-gradient(90deg, var(--neo-bg-elevated) 0%, var(--neo-bg-raised) 50%, var(--neo-bg-elevated) 100%);
+      background-size: 1000px 100%;
+      animation: lbl-shimmer 1.5s infinite linear;
+      border-radius: var(--neo-r-sm);
+      margin-bottom: 6px;
+    }
+    @keyframes lbl-shimmer {
+      0% { background-position: -1000px 0; }
+      100% { background-position: 1000px 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="lbl-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري تحميل المراجعة…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="lbl-header">
+        <div>
+          <h1 class="lbl-header-title">🏷️ المراجعة اليدوية</h1>
+          <div class="lbl-header-sub">الزيارات الحدّية (score 40-80) اللي محتاجة نظر بشري</div>
+        </div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="lbl-kpis">
+        <div class="lbl-kpi">
+          <div class="lbl-kpi-label">تم تصنيفه</div>
+          <div class="lbl-kpi-value" id="kpiLabeled" style="color: var(--neo-accent-hover);">0</div>
+          <div class="lbl-kpi-sub" id="kpiProgress">0%</div>
+        </div>
+        <div class="lbl-kpi">
+          <div class="lbl-kpi-label">محتاج مراجعة</div>
+          <div class="lbl-kpi-value" id="kpiPending" style="color: var(--neo-warning);">0</div>
+          <div class="lbl-kpi-sub">المنطقة الرمادية</div>
+        </div>
+        <div class="lbl-kpi">
+          <div class="lbl-kpi-label">Precision (بوت)</div>
+          <div class="lbl-kpi-value" id="kpiPrecision" style="color: var(--neo-success);">—</div>
+          <div class="lbl-kpi-sub" id="kpiPrecisionSub">يحتاج 30 تصنيف</div>
+        </div>
+        <div class="lbl-kpi">
+          <div class="lbl-kpi-label">Recall (صارم)</div>
+          <div class="lbl-kpi-value" id="kpiRecallStrict" style="color: var(--neo-info);">—</div>
+          <div class="lbl-kpi-sub">كام بوت كشفنا</div>
+        </div>
+        <div class="lbl-kpi">
+          <div class="lbl-kpi-label">Recall (فضفاض)</div>
+          <div class="lbl-kpi-value" id="kpiRecallLoose" style="color: var(--neo-accent-hover);">—</div>
+          <div class="lbl-kpi-sub">مع suspicious</div>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="lbl-progress-wrap">
+        <div class="lbl-progress-head">
+          <span class="lbl-progress-label">تقدم التصنيف</span>
+          <span class="lbl-progress-text" id="progressText">0 / 0</span>
+        </div>
+        <div class="lbl-progress-bar">
+          <div class="lbl-progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="lbl-tabs">
+        <button class="lbl-tab active" data-tab="queue">📋 Queue</button>
+        <button class="lbl-tab" data-tab="rules">⚖️ Rule Performance</button>
+      </div>
+
+      <!-- Queue Panel -->
+      <div class="lbl-panel active" data-panel="queue">
+        <div class="lbl-filters">
+          <label class="lbl-filter-label">ترتيب:</label>
+          <select id="lblOrder" class="neo-select neo-input-sm" style="width: 240px;">
+            <option value="uncertainty">الأكثر غموضاً (score≈60)</option>
+            <option value="oldest">الأقدم</option>
+            <option value="newest">الأحدث</option>
+          </select>
+          <div class="lbl-shortcuts">
+            <kbd>H</kbd> يوزر <kbd>B</kbd> بوت <kbd>S</kbd> تخطي <kbd>A</kbd> تحديد الكل
+          </div>
+        </div>
+
+        <!-- Bulk bar -->
+        <div class="lbl-bulk-bar" id="lblBulkBar">
+          <span class="lbl-bulk-count" id="lblBulkCount">0 محدد</span>
+          <div style="display:flex;gap:6px;">
+            <button class="neo-btn neo-btn-success neo-btn-sm" id="lblBulkHuman">✓ إنسان</button>
+            <button class="neo-btn neo-btn-danger neo-btn-sm" id="lblBulkBot">✗ بوت</button>
+          </div>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="lblBulkClear" style="margin-left:auto;">إلغاء التحديد</button>
+        </div>
+
+        <div class="neo-table-wrap">
+          <table class="neo-table">
+            <thead>
+              <tr>
+                <th class="neo-cell-check" style="width: 40px;">
+                  <input type="checkbox" class="neo-table-checkbox" id="lblSelectAll">
+                </th>
+                <th>#</th>
+                <th class="neo-cell-center">Score</th>
+                <th class="neo-cell-center">Verdict</th>
+                <th>Country</th>
+                <th>Browser</th>
+                <th>ASN</th>
+                <th>Top Evidence</th>
+                <th class="neo-cell-center">Decision</th>
+              </tr>
+            </thead>
+            <tbody id="lblBody">
+              <tr><td colspan="9" class="neo-table-empty">جاري التحميل…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="lblEmpty" class="neo-empty" style="display:none;">
+          <div class="neo-empty-icon">🎉</div>
+          <h3 class="neo-empty-title">مفيش زيارات محتاجة مراجعة</h3>
+          <p class="neo-empty-msg">النظام نظيف! كل الزيارات الحدّية اتصنفت.</p>
+        </div>
+      </div>
+
+      <!-- Rules Panel -->
+      <div class="lbl-panel" data-panel="rules">
+        <div class="neo-alert neo-alert-info" style="margin-bottom: var(--neo-sp-3);">
+          <span class="neo-alert-icon">💡</span>
+          <div class="neo-alert-body">
+            <div class="neo-alert-title">Precision = TP / (TP + FP)</div>
+            <div>من الزيارات اللي فعّلت الـ rule، كام % كانت فعلاً بوت. الـ rules مرتبة من الأسوأ للأفضل — عشان تعدّل الأوزان اللي بتغلط كتير.</div>
+          </div>
+        </div>
+
+        <div class="neo-alert neo-alert-warning" id="lblRulesSample" style="display:none;margin-bottom: var(--neo-sp-3);">
+          <span class="neo-alert-icon">⚠️</span>
+          <div class="neo-alert-body" id="lblRulesSampleText">—</div>
+        </div>
+
+        <div class="neo-table-wrap">
+          <table class="neo-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Source</th>
+                <th class="neo-cell-center" style="color: var(--neo-success);">TP</th>
+                <th class="neo-cell-center" style="color: var(--neo-danger);">FP</th>
+                <th class="neo-cell-center">Unlabeled</th>
+                <th class="neo-cell-center">Precision</th>
+                <th class="neo-cell-center">Status</th>
+              </tr>
+            </thead>
+            <tbody id="lblRulesBody">
+              <tr><td colspan="7" class="neo-table-empty">جاري التحميل…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const LBL = {
+      queueItems: [],
+      selected: new Set(),
+      currentFocusIdx: 0,
+      tab: 'queue',
+    };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+    function fmtPct(n) { return n === null || n === undefined ? '—' : Number(n).toFixed(1) + '%'; }
+
+    // =========================================================
+    // STATS
+    // =========================================================
+    async function loadStats() {
+      try {
+        const d = await Neo.api('/api/labeling/stats');
+        document.getElementById('kpiLabeled').textContent = fmtInt(d.labeled);
+        document.getElementById('kpiProgress').textContent = d.progress_percent.toFixed(1) + '% من الإجمالي';
+        document.getElementById('kpiPending').textContent = fmtInt(d.pending_review);
+        document.getElementById('kpiPrecision').textContent = fmtPct(d.precision);
+        document.getElementById('kpiPrecisionSub').textContent = d.reliable ? 'موثوق' : 'يحتاج 30+ تصنيف';
+        document.getElementById('kpiRecallStrict').textContent = fmtPct(d.recall_strict);
+        document.getElementById('kpiRecallLoose').textContent = fmtPct(d.recall_loose);
+        document.getElementById('progressText').textContent = `${d.labeled} / ${d.total}`;
+        document.getElementById('progressFill').style.width = d.progress_percent + '%';
+      } catch (e) {
+        console.error('[LBL] stats failed:', e);
+      }
+    }
+
+    // =========================================================
+    // QUEUE
+    // =========================================================
+    async function loadQueue() {
+      const order = document.getElementById('lblOrder').value;
+      try {
+        const url = `/api/labeling/queue?order=${order}&limit=50`;
+        const d = await Neo.api(url);
+        LBL.queueItems = d.items || [];
+        LBL.selected.clear();
+        LBL.currentFocusIdx = 0;
+        updateBulkBar();
+        renderQueue();
+      } catch (e) {
+        console.error('[LBL] queue failed:', e);
+        Neo.toast('فشل تحميل الـ queue: ' + e.message, 'error');
+      }
+    }
+
+    function renderQueue() {
+      const tbody = document.getElementById('lblBody');
+      const empty = document.getElementById('lblEmpty');
+      const table = tbody.closest('.neo-table-wrap');
+
+      if (!LBL.queueItems.length) {
+        table.style.display = 'none';
+        empty.style.display = '';
+        return;
+      }
+      table.style.display = '';
+      empty.style.display = 'none';
+
+      tbody.innerHTML = LBL.queueItems.map(v => {
+        const scoreColor = v.score >= 70 ? 'var(--neo-danger)' : v.score >= 55 ? 'var(--neo-warning)' : 'var(--neo-info)';
+        const verdictClass = v.verdict === 'suspicious' ? 'warning' : v.verdict === 'valid' ? 'success' : 'danger';
+        const verdictBadge = `<span class="neo-badge neo-badge-${verdictClass}">${esc(v.verdict.toUpperCase())}</span>`;
+
+        const chips = (v.top_evidence || []).slice(0, 4).map(e => {
+          const sign = e.score > 0 ? '+' : '';
+          return `<span class="lbl-ev-chip ${e.severity}" title="${esc(e.detail)}">${esc(e.code)} ${sign}${e.score}</span>`;
+        }).join('');
+
+        const isSelected = LBL.selected.has(v.id);
+
+        return `
+          <tr class="lbl-row ${isSelected ? 'selected' : ''}" data-visit-id="${v.id}">
+            <td class="neo-cell-check">
+              <input type="checkbox" class="neo-table-checkbox lbl-check" data-id="${v.id}" ${isSelected ? 'checked' : ''}>
+            </td>
+            <td class="neo-mono">
+              <a href="/v2/visits/${v.id}" target="_blank" style="color: var(--neo-accent-hover); text-decoration: none; font-weight: 700;">#${v.id}</a>
+              <div style="font-size: 10px; color: var(--neo-fg-muted); margin-top: 2px;">${esc(v.time)}</div>
+            </td>
+            <td class="neo-cell-center lbl-score" style="color: ${scoreColor};">${v.score}</td>
+            <td class="neo-cell-center">${verdictBadge}</td>
+            <td style="font-size: 11px;">${esc(v.country)} ${v.is_vpn ? '🛡️' : ''}</td>
+            <td style="font-size: 11px;">${esc(v.browser)} / ${esc(v.device)}</td>
+            <td class="neo-mono" style="font-size: 10px; color: var(--neo-fg-tertiary);">${esc(v.asn || '—')}</td>
+            <td>${chips || '<span style="color: var(--neo-fg-muted); font-size: 11px;">—</span>'}</td>
+            <td class="neo-cell-center">
+              <button class="lbl-btn-human" data-action="human" data-id="${v.id}" style="margin-left: 4px;">✓</button>
+              <button class="lbl-btn-bot" data-action="bot" data-id="${v.id}">✗</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Bind checkboxes
+      tbody.querySelectorAll('.lbl-check').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const id = Number(cb.dataset.id);
+          if (cb.checked) LBL.selected.add(id);
+          else LBL.selected.delete(id);
+          const row = tbody.querySelector(`[data-visit-id="${id}"]`);
+          if (row) row.classList.toggle('selected', cb.checked);
+          updateBulkBar();
+          updateSelectAll();
+        });
+      });
+
+      // Bind action buttons
+      tbody.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = Number(btn.dataset.id);
+          const action = btn.dataset.action;
+          labelVisit(id, action);
+        });
+      });
+
+      // Click row to open visit detail
+      tbody.querySelectorAll('.lbl-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) return;
+          window.open('/v2/visits/' + row.dataset.visitId, '_blank');
+        });
+      });
+    }
+
+    function updateBulkBar() {
+      const bar = document.getElementById('lblBulkBar');
+      const count = document.getElementById('lblBulkCount');
+      count.textContent = LBL.selected.size + ' محدد';
+      if (LBL.selected.size > 0) bar.classList.add('active');
+      else bar.classList.remove('active');
+    }
+
+    function updateSelectAll() {
+      const selectAll = document.getElementById('lblSelectAll');
+      if (!selectAll) return;
+      const total = LBL.queueItems.length;
+      const selected = LBL.selected.size;
+      selectAll.checked = total > 0 && selected === total;
+      selectAll.indeterminate = selected > 0 && selected < total;
+    }
+
+    async function labelVisit(visitId, label) {
+      try {
+        const r = await fetch(`/api/visits/${visitId}/ground-truth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label }),
+          credentials: 'same-origin',
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        Neo.toast(label === 'human' ? '✓ تم التصنيف: إنسان' : '✗ تم التصنيف: بوت', 'success', 2000);
+        LBL.queueItems = LBL.queueItems.filter(x => x.id !== visitId);
+        LBL.selected.delete(visitId);
+        renderQueue();
+        loadStats();
+        updateBulkBar();
+        updateSelectAll();
+      } catch (e) {
+        Neo.toast('فشل التصنيف: ' + e.message, 'error');
+      }
+    }
+
+    async function bulkLabel(label) {
+      if (LBL.selected.size === 0) return;
+      const ids = Array.from(LBL.selected);
+
+      try {
+        const r = await fetch('/api/labeling/visits/bulk-label', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visit_ids: ids, label }),
+          credentials: 'same-origin',
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'HTTP ' + r.status);
+        Neo.toast(`✓ ${d.updated} زيارة اتصنفت`, 'success', 3000);
+        LBL.queueItems = LBL.queueItems.filter(x => !LBL.selected.has(x.id));
+        LBL.selected.clear();
+        renderQueue();
+        loadStats();
+        updateBulkBar();
+        updateSelectAll();
+      } catch (e) {
+        Neo.toast('فشل: ' + e.message, 'error');
+      }
+    }
+
+    // =========================================================
+    // RULES
+    // =========================================================
+    async function loadRules() {
+      try {
+        const d = await Neo.api('/api/labeling/rule-performance');
+
+        const sampleEl = document.getElementById('lblRulesSample');
+        const sampleText = document.getElementById('lblRulesSampleText');
+        if (d.truncated) {
+          sampleEl.style.display = '';
+          sampleText.innerHTML = `عينة من <b>${fmtInt(d.labeled_sample_size)}</b> زيارة مصنّفة (حد أقصى 20,000)`;
+        } else {
+          sampleEl.style.display = 'none';
+        }
+
+        const tbody = document.getElementById('lblRulesBody');
+        if (!d.rules.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="neo-table-empty">مفيش بيانات — ابدأ بتصنيف زيارات أولاً</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = d.rules.map(r => {
+          const precisionColor = r.precision === null ? 'var(--neo-fg-muted)'
+            : r.precision >= 90 ? 'var(--neo-success)'
+            : r.precision >= 70 ? 'var(--neo-warning)' : 'var(--neo-danger)';
+          const status = r.precision === null ? '<span style="font-size:10px;color:var(--neo-fg-muted);">لا تصنيفات</span>'
+            : !r.reliable ? '<span style="font-size:10px;color:var(--neo-warning);">عينة صغيرة</span>'
+            : r.precision < 70 ? '<span style="font-size:10px;color:var(--neo-danger);">⚠️ يحتاج تعديل</span>'
+            : '<span style="font-size:10px;color:var(--neo-success);">✓ جيد</span>';
+
+          return `
+            <tr>
+              <td class="neo-mono" style="font-size: 11px; color: var(--neo-fg-primary); font-weight: 700;">${esc(r.code)}</td>
+              <td class="neo-mono" style="font-size: 10px; color: var(--neo-fg-tertiary);">${esc(r.source)}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-success); font-weight: 700;">${r.tp}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-danger); font-weight: 700;">${r.fp}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-fg-tertiary);">${r.unlabeled}</td>
+              <td class="neo-cell-center neo-mono" style="color: ${precisionColor}; font-weight: 800;">${fmtPct(r.precision)}</td>
+              <td class="neo-cell-center">${status}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error('[LBL] rules failed:', e);
+      }
+    }
+
+    // =========================================================
+    // TABS
+    // =========================================================
+    function switchTab(tab) {
+      LBL.tab = tab;
+      document.querySelectorAll('.lbl-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.querySelectorAll('.lbl-panel').forEach(p => {
+        p.classList.toggle('active', p.dataset.panel === tab);
+      });
+      if (tab === 'rules') loadRules();
+    }
+
+    // =========================================================
+    // BIND
+    // =========================================================
+    function bindControls() {
+      document.querySelectorAll('.lbl-tab').forEach(t => {
+        t.addEventListener('click', () => switchTab(t.dataset.tab));
+      });
+
+      document.getElementById('lblOrder').addEventListener('change', loadQueue);
+      document.getElementById('lblBulkHuman').addEventListener('click', () => bulkLabel('human'));
+      document.getElementById('lblBulkBot').addEventListener('click', () => bulkLabel('bot'));
+      document.getElementById('lblBulkClear').addEventListener('click', () => {
+        LBL.selected.clear();
+        renderQueue();
+        updateBulkBar();
+        updateSelectAll();
+      });
+
+      document.getElementById('lblSelectAll').addEventListener('change', (e) => {
+        if (e.target.checked) LBL.queueItems.forEach(v => LBL.selected.add(v.id));
+        else LBL.selected.clear();
+        renderQueue();
+        updateBulkBar();
+      });
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+        if (LBL.tab !== 'queue') return;
+        if (!LBL.queueItems.length) return;
+
+        if (e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          if (LBL.selected.size === LBL.queueItems.length) LBL.selected.clear();
+          else LBL.queueItems.forEach(v => LBL.selected.add(v.id));
+          renderQueue();
+          updateBulkBar();
+          updateSelectAll();
+          return;
+        }
+
+        if (LBL.selected.size > 0) return;
+
+        const v = LBL.queueItems[LBL.currentFocusIdx];
+        if (!v) return;
+
+        if (e.key === 'h' || e.key === 'H') { labelVisit(v.id, 'human'); e.preventDefault(); }
+        else if (e.key === 'b' || e.key === 'B') { labelVisit(v.id, 'bot'); e.preventDefault(); }
+        else if (e.key === 's' || e.key === 'S') { LBL.currentFocusIdx = Math.min(LBL.currentFocusIdx + 1, LBL.queueItems.length - 1); e.preventDefault(); }
+        else if (e.key === 'ArrowDown') { LBL.currentFocusIdx = Math.min(LBL.currentFocusIdx + 1, LBL.queueItems.length - 1); e.preventDefault(); }
+        else if (e.key === 'ArrowUp') { LBL.currentFocusIdx = Math.max(LBL.currentFocusIdx - 1, 0); e.preventDefault(); }
+      });
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        await Neo.mount({
+          active: 'labeling',
+          lang: 'ar',
+          breadcrumb: [{ label: 'المراجعة اليدوية' }],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        bindControls();
+        await Promise.all([loadStats(), loadQueue()]);
+
+      } catch (e) {
+        console.error('[LBL Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

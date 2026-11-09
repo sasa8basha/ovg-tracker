@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · Session Detail</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .sd-shell-skel {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--neo-bg-canvas);
+      color: var(--neo-fg-tertiary);
+      font-size: 13px;
+      z-index: 9998;
+    }
+    .sd-shell-skel .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--neo-border-default);
+      border-top-color: var(--neo-accent);
+      border-radius: 50%;
+      animation: sd-spin 0.8s linear infinite;
+    }
+    @keyframes sd-spin { to { transform: rotate(360deg); } }
+
+    .sd-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-4);
+      flex-wrap: wrap;
+    }
+    .sd-header-title {
+      font-size: var(--neo-fs-2xl);
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      letter-spacing: -0.02em;
+      margin: 0 0 6px 0;
+      line-height: 1.2;
+      font-family: var(--neo-font-mono);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+    }
+    .sd-header-sub {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-tertiary);
+      display: flex;
+      gap: var(--neo-sp-2);
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .sd-kpis {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: var(--neo-sp-3);
+      margin-bottom: var(--neo-sp-4);
+    }
+    @media (max-width: 900px) { .sd-kpis { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 500px) { .sd-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+    .sd-kpi {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-3);
+    }
+    .sd-kpi-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .sd-kpi-value {
+      font-family: var(--neo-font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+      font-weight: var(--neo-fw-black);
+      color: var(--neo-fg-primary);
+      line-height: 1.2;
+      word-break: break-all;
+    }
+
+    .sd-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: var(--neo-sp-4);
+      border-bottom: 1px solid var(--neo-border-default);
+    }
+    .sd-tab {
+      padding: var(--neo-sp-2) var(--neo-sp-4);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--neo-fg-tertiary);
+      font-family: inherit;
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      cursor: pointer;
+      transition: all var(--neo-dur-fast);
+    }
+    .sd-tab:hover { color: var(--neo-fg-secondary); }
+    .sd-tab.active { color: var(--neo-fg-primary); border-bottom-color: var(--neo-accent); }
+    .sd-panel { display: none; }
+    .sd-panel.active { display: block; }
+
+    .sd-box {
+      background: var(--neo-bg-surface);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-md);
+      padding: var(--neo-sp-4);
+      margin-bottom: var(--neo-sp-3);
+    }
+    .sd-box-title {
+      font-size: var(--neo-fs-sm);
+      font-weight: var(--neo-fw-extrabold);
+      color: var(--neo-fg-primary);
+      margin-bottom: var(--neo-sp-3);
+      display: flex;
+      align-items: center;
+      gap: var(--neo-sp-2);
+    }
+    .sd-kv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--neo-sp-2);
+    }
+    .sd-kv {
+      background: var(--neo-bg-canvas);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-2) var(--neo-sp-3);
+    }
+    .sd-kv-label {
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      letter-spacing: 0.05em;
+      margin-bottom: 3px;
+    }
+    .sd-kv-value {
+      font-size: var(--neo-fs-sm);
+      color: var(--neo-fg-primary);
+      font-family: var(--neo-font-mono);
+      font-weight: var(--neo-fw-bold);
+      word-break: break-all;
+    }
+    .sd-kv-value.muted { color: var(--neo-fg-tertiary); font-style: italic; font-weight: normal; font-family: inherit; }
+
+    /* Timeline */
+    .sd-timeline {
+      background: var(--neo-bg-canvas);
+      border: 1px solid var(--neo-border-default);
+      border-radius: var(--neo-r-sm);
+      padding: var(--neo-sp-3);
+    }
+    .sd-timeline-svg {
+      width: 100%;
+      height: 100px;
+      display: block;
+    }
+    .sd-timeline-legend {
+      display: flex;
+      gap: var(--neo-sp-4);
+      margin-top: var(--neo-sp-2);
+      font-size: 10px;
+      color: var(--neo-fg-tertiary);
+      flex-wrap: wrap;
+    }
+    .sd-timeline-legend span { display: inline-flex; align-items: center; gap: 4px; }
+    .sd-timeline-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Heartbeat table */
+    .sd-hb-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    .sd-hb-table th {
+      padding: 6px 8px;
+      text-align: right;
+      font-size: 9px;
+      color: var(--neo-fg-muted);
+      text-transform: uppercase;
+      font-weight: var(--neo-fw-bold);
+      border-bottom: 1px solid var(--neo-border-subtle);
+    }
+    .sd-hb-table th.center { text-align: center; }
+    .sd-hb-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--neo-border-subtle);
+      font-family: var(--neo-font-mono);
+    }
+    .sd-hb-table td.center { text-align: center; }
+    .sd-hb-table tr:last-child td { border-bottom: none; }
+    .sd-hb-table tr.gap td { background: rgba(239,68,68,0.05); }
+    .sd-hb-gap-warn { color: var(--neo-danger); font-weight: var(--neo-fw-extrabold); font-size: 10px; }
+    .sd-hb-ok { color: var(--neo-success); font-size: 10px; }
+
+    .sd-dq-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      font-family: var(--neo-font-mono);
+    }
+    .sd-dq-badge.full { background: var(--neo-success-bg); color: var(--neo-success); }
+    .sd-dq-badge.partial { background: var(--neo-info-bg); color: var(--neo-info-fg); }
+    .sd-dq-badge.legacy { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .sd-dq-badge.pending, .sd-dq-badge.unknown { background: var(--neo-accent-subtle); color: var(--neo-accent-hover); }
+
+    .sd-verdict-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
+      font-size: 9px;
+      font-weight: var(--neo-fw-extrabold);
+      text-transform: uppercase;
+      font-family: var(--neo-font-mono);
+    }
+    .sd-verdict-badge.valid { background: var(--neo-success-bg); color: var(--neo-success); }
+    .sd-verdict-badge.invalid { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .sd-verdict-badge.suspicious { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .sd-verdict-badge.pending { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    .sd-meta-pre {
+      font-family: var(--neo-font-mono);
+      font-size: 10px;
+      background: var(--neo-bg-canvas);
+      padding: var(--neo-sp-3);
+      border-radius: var(--neo-r-sm);
+      overflow: auto;
+      max-height: 500px;
+      color: var(--neo-success);
+      direction: ltr;
+      text-align: left;
+      line-height: 1.6;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sd-shell-skel" id="bootSkeleton">
+    <div class="spinner"></div>
+    <div>جاري التحميل…</div>
+  </div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div id="sdLoading" style="text-align:center;padding:80px 20px;color:var(--neo-fg-tertiary);">جاري التحميل…</div>
+
+      <div id="sdError" style="display:none;text-align:center;padding:40px;color:var(--neo-danger);">
+        <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
+        <div id="sdErrorMsg" style="font-size:14px;margin-bottom:16px;">—</div>
+        <a href="/v2/sessions" class="neo-btn neo-btn-primary" style="text-decoration:none;">← رجوع للـ Sessions</a>
+      </div>
+
+      <div id="sdContent" style="display:none;">
+
+        <div class="sd-header">
+          <div>
+            <div class="sd-header-title">
+              Session <span id="sdSid" style="color: var(--neo-accent-hover);">#—</span>
+              <span id="sdDqBadge" class="sd-dq-badge">—</span>
+              <span id="sdVerdictBadge" class="sd-verdict-badge">—</span>
+            </div>
+            <div class="sd-header-sub" id="sdSub">—</div>
+          </div>
+          <a href="/v2/sessions" class="neo-btn neo-btn-ghost neo-btn-sm" style="text-decoration:none;">← Sessions</a>
+        </div>
+
+        <div class="sd-kpis" id="sdKpis"></div>
+
+        <div class="sd-tabs">
+          <button class="sd-tab active" data-tab="overview">📊 Overview</button>
+          <button class="sd-tab" data-tab="visit">🎯 Visit & Behavior</button>
+          <button class="sd-tab" data-tab="meta">📦 Meta كامل</button>
+        </div>
+
+        <!-- Overview Panel -->
+        <div class="sd-panel active" data-panel="overview">
+          <div class="sd-box">
+            <div class="sd-box-title">📋 معلومات الجلسة</div>
+            <div class="sd-kv-grid" id="sdInfo"></div>
+          </div>
+
+          <div class="sd-box">
+            <div class="sd-box-title">📊 Heartbeat Timeline</div>
+            <div class="sd-timeline">
+              <svg class="sd-timeline-svg" id="sdTimelineSvg" viewBox="0 0 800 100" preserveAspectRatio="none"></svg>
+              <div class="sd-timeline-legend">
+                <span><span class="sd-timeline-dot" style="background:var(--neo-success);"></span> تفاعل</span>
+                <span><span class="sd-timeline-dot" style="background:var(--neo-fg-tertiary);"></span> ساكت</span>
+                <span><span class="sd-timeline-dot" style="background:var(--neo-danger);"></span> فجوة >30s</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sd-box">
+            <div class="sd-box-title">💓 Heartbeats (<span id="sdHbCount">0</span>)</div>
+            <div id="sdHbBody"></div>
+          </div>
+        </div>
+
+        <!-- Visit Panel -->
+        <div class="sd-panel" data-panel="visit">
+          <div class="sd-box" id="sdVisitCard">
+            <div class="sd-box-title">🎯 بيانات الزيارة</div>
+            <div id="sdVisitBody"></div>
+          </div>
+
+          <div class="sd-box" id="sdBehaviorCard" style="display:none;">
+            <div class="sd-box-title">🧠 السلوك</div>
+            <div class="sd-kv-grid" id="sdBehaviorGrid"></div>
+          </div>
+
+          <div class="sd-box" id="sdEvidenceCard" style="display:none;">
+            <div class="sd-box-title">📋 الأدلة</div>
+            <div id="sdEvidenceBody"></div>
+          </div>
+        </div>
+
+        <!-- Meta Panel -->
+        <div class="sd-panel" data-panel="meta">
+          <div class="sd-box">
+            <div class="sd-box-title">💾 Meta (raw)</div>
+            <pre id="sdMetaJson" class="sd-meta-pre">{}</pre>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const SD = { sessionId: null, data: null };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    function hbTotal(hb) {
+      return (hb.clicks || 0) + (hb.scrolls || 0) + (hb.keydowns || 0) + Math.floor((hb.mousemoves || 0) / 10);
+    }
+
+    // =========================================================
+    // TIMELINE
+    // =========================================================
+    function renderTimeline(heartbeats) {
+      const svg = document.getElementById('sdTimelineSvg');
+      if (!heartbeats || !heartbeats.length) {
+        svg.innerHTML = '<text x="400" y="50" text-anchor="middle" fill="var(--neo-fg-muted)" font-size="12" font-family="Inter">No heartbeats</text>';
+        return;
+      }
+
+      const maxT = Math.max(...heartbeats.map(h => h.t_ms || 0), 1);
+      const W = 800, H = 100;
+      const PAD = 20;
+      const plotW = W - 2 * PAD;
+      const plotH = H - 2 * PAD;
+
+      let html = `<line x1="${PAD}" y1="${H - PAD}" x2="${W - PAD}" y2="${H - PAD}" stroke="var(--neo-border-default)" stroke-width="1"/>`;
+
+      let prevX = null, prevY = null;
+      for (const hb of heartbeats) {
+        const x = PAD + ((hb.t_ms || 0) / maxT) * plotW;
+        const total = hbTotal(hb);
+        const y = H - PAD - Math.min(plotH, total * 8 + 4);
+        const color = total > 0 ? 'var(--neo-success)' : 'var(--neo-fg-tertiary)';
+
+        if (prevX !== null) {
+          const isGap = hb.gap_ms && hb.gap_ms > 30000;
+          html += `<line x1="${prevX}" y1="${prevY}" x2="${x}" y2="${y}" stroke="${isGap ? 'var(--neo-danger)' : 'var(--neo-border-strong)'}" stroke-width="${isGap ? 2 : 1.5}" ${isGap ? 'stroke-dasharray="4 4"' : ''}/>`;
+        }
+
+        html += `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="var(--neo-bg-canvas)" stroke-width="1.5"/>`;
+        html += `<text x="${x}" y="${H - 4}" text-anchor="middle" fill="var(--neo-fg-muted)" font-size="8" font-family="Inter, monospace">${hb.seq}</text>`;
+
+        prevX = x;
+        prevY = y;
+      }
+
+      html += `<text x="${PAD}" y="14" text-anchor="start" fill="var(--neo-fg-tertiary)" font-size="9" font-family="Inter, monospace">0s</text>`;
+      html += `<text x="${W - PAD}" y="14" text-anchor="end" fill="var(--neo-fg-tertiary)" font-size="9" font-family="Inter, monospace">${Math.round(maxT / 1000)}s</text>`;
+
+      svg.innerHTML = html;
+    }
+
+    // =========================================================
+    // HEARTBEATS
+    // =========================================================
+    function renderHeartbeats(hbs) {
+      document.getElementById('sdHbCount').textContent = hbs.length;
+
+      if (!hbs.length) {
+        document.getElementById('sdHbBody').innerHTML = `
+          <div style="text-align:center;padding:24px;color:var(--neo-fg-muted);font-size:12px;">
+            💔 مفيش heartbeats — الزيارة قفلت قبل 10 ثواني، أو البوت مش بعت أي نبضة.
+          </div>`;
+        return;
+      }
+
+      let html = `<div style="overflow-x:auto;"><table class="sd-hb-table">
+        <thead><tr>
+          <th class="center">#</th><th>الوقت</th><th class="center">Gap</th>
+          <th class="center">Clicks</th><th class="center">Scrolls</th><th class="center">Moves</th>
+          <th class="center">Keys</th><th class="center">Visible</th><th class="center">Focused</th>
+        </tr></thead><tbody>`;
+
+      for (const hb of hbs) {
+        const isGap = hb.gap_ms && hb.gap_ms > 30000;
+        const gapLabel = hb.gap_ms === null || hb.gap_ms === undefined ? '—' : (hb.gap_ms > 1000 ? `${Math.round(hb.gap_ms / 1000)}s` : `${hb.gap_ms}ms`);
+        const gapClass = isGap ? 'sd-hb-gap-warn' : (hb.gap_ms && hb.gap_ms < 15000 ? 'sd-hb-ok' : '');
+
+        html += `<tr class="${isGap ? 'gap' : ''}">
+          <td class="center">${hb.seq}</td>
+          <td>${esc(hb.t_human || '—')}</td>
+          <td class="center ${gapClass}">${esc(gapLabel)}</td>
+          <td class="center">${hb.clicks || 0}</td>
+          <td class="center">${hb.scrolls || 0}</td>
+          <td class="center">${hb.mousemoves || 0}</td>
+          <td class="center">${hb.keydowns || 0}</td>
+          <td class="center" style="color:${hb.is_visible ? 'var(--neo-success)' : 'var(--neo-fg-muted)'};">${hb.is_visible ? '✓' : '—'}</td>
+          <td class="center" style="color:${hb.is_focused ? 'var(--neo-success)' : 'var(--neo-fg-muted)'};">${hb.is_focused ? '✓' : '—'}</td>
+        </tr>`;
+      }
+      html += '</tbody></table></div>';
+      document.getElementById('sdHbBody').innerHTML = html;
+    }
+
+    // =========================================================
+    // VISIT
+    // =========================================================
+    function renderVisit(visit) {
+      if (!visit) {
+        document.getElementById('sdVisitBody').innerHTML = `
+          <div style="text-align:center;padding:24px;color:var(--neo-fg-muted);font-size:12px;">
+            ⏳ مفيش زيارة مسجلة بعد — الـ final beacon ماجاش.
+          </div>`;
+        return;
+      }
+
+      document.getElementById('sdVisitBody').innerHTML = `
+        <div class="sd-kv-grid" style="margin-bottom:var(--neo-sp-3);">
+          <div class="sd-kv"><div class="sd-kv-label">Verdict</div><div class="sd-kv-value" style="color:${visit.verdict === 'valid' ? 'var(--neo-success)' : visit.verdict === 'invalid' ? 'var(--neo-danger)' : 'var(--neo-warning)'};">${esc((visit.verdict || '').toUpperCase())}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Score</div><div class="sd-kv-value">${visit.score}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Time on Page</div><div class="sd-kv-value">${esc(visit.time_on_page_human || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Country</div><div class="sd-kv-value">${esc(visit.country || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Device</div><div class="sd-kv-value">${esc(visit.device || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Browser</div><div class="sd-kv-value">${esc(visit.browser || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">OS</div><div class="sd-kv-value">${esc(visit.os || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">ISP</div><div class="sd-kv-value">${esc(visit.isp || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">VPN</div><div class="sd-kv-value" style="color:${visit.is_vpn ? 'var(--neo-danger)' : 'var(--neo-success)'};">${visit.is_vpn ? 'YES' : 'NO'}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Honeypot</div><div class="sd-kv-value" style="color:${visit.is_honeypot_triggered ? 'var(--neo-danger)' : 'var(--neo-fg-muted)'};">${visit.is_honeypot_triggered ? 'TRIGGERED' : 'no'}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Canvas</div><div class="sd-kv-value" style="font-size:10px;">${esc(visit.canvas_hash || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Hardware</div><div class="sd-kv-value">${esc(visit.hardware || '—')}</div></div>
+        </div>
+        <div style="text-align:center;margin-top:var(--neo-sp-3);">
+          <a href="/v2/visits/${visit.id}" class="neo-btn neo-btn-primary neo-btn-sm" style="text-decoration:none;">🔍 افتح صفحة الزيارة الكاملة</a>
+        </div>
+      `;
+
+      if (visit.behavioral && Object.keys(visit.behavioral).length > 0) {
+        document.getElementById('sdBehaviorCard').style.display = '';
+        const b = visit.behavioral;
+        const fields = [
+          ['scroll_depth_pct', 'Scroll %'],
+          ['scroll_pattern', 'Scroll Pattern'],
+          ['mouse_distance_total', 'Mouse Distance'],
+          ['mouse_velocity_median', 'Mouse Velocity'],
+          ['first_move_delay_ms', 'First Move'],
+          ['keydown_count', 'Keydowns'],
+          ['clicks', 'Clicks'],
+          ['idle_periods_count', 'Idle Periods'],
+          ['tab_switches', 'Tab Switches'],
+          ['total_unfocused_ms', 'Unfocused Time'],
+        ];
+        document.getElementById('sdBehaviorGrid').innerHTML = fields
+          .filter(([key]) => b[key] !== undefined && b[key] !== null)
+          .map(([key, label]) => `<div class="sd-kv"><div class="sd-kv-label">${esc(label)}</div><div class="sd-kv-value">${esc(String(b[key]))}</div></div>`)
+          .join('');
+      }
+
+      if (visit.evidence && Array.isArray(visit.evidence) && visit.evidence.length > 0) {
+        document.getElementById('sdEvidenceCard').style.display = '';
+        document.getElementById('sdEvidenceBody').innerHTML = visit.evidence
+          .filter(e => e && typeof e === 'object')
+          .map(ev => {
+            const score = parseInt(ev.score) || 0;
+            const scoreClass = score >= 0 ? 'pos' : 'neg';
+            const scoreColor = score >= 0 ? 'var(--neo-danger)' : 'var(--neo-success)';
+            const sign = score >= 0 ? '+' : '';
+            return `
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--neo-bg-canvas);border-radius:6px;margin-bottom:4px;font-size:11px;">
+                <span style="font-family:var(--neo-font-mono);font-weight:800;color:var(--neo-fg-primary);min-width:140px;">${esc(ev.code || 'UNKNOWN')}</span>
+                <span style="font-family:var(--neo-font-mono);font-weight:800;padding:2px 6px;border-radius:3px;font-size:10px;color:${scoreColor};background:${score >= 0 ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'};">${sign}${score}</span>
+                <span style="color:var(--neo-fg-tertiary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(ev.detail || '')}</span>
+              </div>
+            `;
+          }).join('');
+      }
+    }
+
+    // =========================================================
+    // LOAD
+    // =========================================================
+    async function loadDetail() {
+      try {
+        const d = await Neo.api('/api/sessions/' + encodeURIComponent(SD.sessionId));
+        SD.data = d;
+
+        document.getElementById('sdSid').textContent = '#' + d.session_id.substring(0, 8);
+
+        const dq = d.data_quality || 'unknown';
+        const dqBadge = document.getElementById('sdDqBadge');
+        dqBadge.className = 'sd-dq-badge ' + dq;
+        dqBadge.textContent = dq.toUpperCase();
+
+        const verdict = (d.verdict || 'pending').toLowerCase();
+        const vBadge = document.getElementById('sdVerdictBadge');
+        vBadge.className = 'sd-verdict-badge ' + verdict;
+        vBadge.textContent = verdict.toUpperCase();
+
+        const started = d.started_at ? new Date(d.started_at).toLocaleString('en-GB') : '—';
+        document.getElementById('sdSub').innerHTML = `
+          <span>بدأت: ${esc(started)}</span>
+          <span>·</span>
+          <span>${d.heartbeats.length} heartbeats</span>
+          ${d.duration_human ? `<span>·</span><span>مدة: ${esc(d.duration_human)}</span>` : ''}
+        `;
+
+        // KPIs
+        const kpis = [
+          { label: 'Duration', value: d.duration_human || '—' },
+          { label: 'Heartbeats', value: d.total_heartbeats },
+          { label: 'Data Quality', value: dq.toUpperCase() },
+          { label: 'IP', value: d.ip || '—' },
+          { label: 'Country', value: d.country_code || '—' },
+        ];
+        document.getElementById('sdKpis').innerHTML = kpis.map(k => `
+          <div class="sd-kpi">
+            <div class="sd-kpi-label">${esc(k.label)}</div>
+            <div class="sd-kpi-value">${esc(String(k.value))}</div>
+          </div>
+        `).join('');
+
+        // Info
+        const infoItems = [
+          ['Session ID', d.session_id],
+          ['Started', started],
+          ['Ended', d.ended_at ? new Date(d.ended_at).toLocaleString('en-GB') : '—'],
+          ['Last Heartbeat', d.last_heartbeat_at ? new Date(d.last_heartbeat_at).toLocaleString('en-GB') : '—'],
+          ['Consent', d.consent_state || '—'],
+          ['Clock Drift', d.clock_drift_ms ? d.clock_drift_ms + 'ms' : '—'],
+          ['Campaign ID', d.campaign_id || '—'],
+          ['URL', d.url || '—'],
+          ['Visitor FP Hash', d.visitor_fp_hash || '—'],
+        ];
+        document.getElementById('sdInfo').innerHTML = infoItems.map(([k, v]) => `
+          <div class="sd-kv">
+            <div class="sd-kv-label">${esc(k)}</div>
+            <div class="sd-kv-value ${v === '—' ? 'muted' : ''}">${esc(String(v || '—'))}</div>
+          </div>
+        `).join('');
+
+        renderTimeline(d.heartbeats);
+        renderHeartbeats(d.heartbeats);
+        renderVisit(d.visit);
+
+        document.getElementById('sdMetaJson').textContent = JSON.stringify(d.meta || {}, null, 2);
+
+        document.getElementById('sdLoading').style.display = 'none';
+        document.getElementById('sdContent').style.display = '';
+
+      } catch (e) {
+        document.getElementById('sdLoading').style.display = 'none';
+        document.getElementById('sdError').style.display = '';
+        document.getElementById('sdErrorMsg').textContent = e.message;
+      }
+    }
+
+    // =========================================================
+    // BOOT
+    // =========================================================
+    (async function boot() {
+      try {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        SD.sessionId = parts[parts.length - 1];
+        if (!SD.sessionId || SD.sessionId.length < 8) throw new Error('Session ID غير صالح');
+
+        await Neo.mount({
+          active: 'sessions',
+          lang: 'ar',
+          breadcrumb: [
+            { label: 'Sessions', href: '/v2/sessions' },
+            { label: '#' + SD.sessionId.substring(0, 8) },
+          ],
+        });
+
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        // Tabs
+        document.querySelectorAll('.sd-tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            document.querySelectorAll('.sd-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.sd-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+          });
+        });
+
+        await loadDetail();
+
+      } catch (e) {
+        console.error('[SD Boot] failed:', e);
+        const skel = document.getElementById('bootSkeleton');
+        if (skel) {
+          skel.innerHTML = `
+            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
+            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
+            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
+          `;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

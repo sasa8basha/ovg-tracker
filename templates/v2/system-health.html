@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · حالة النظام</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .sh-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: var(--neo-bg-canvas); color: var(--neo-fg-tertiary); font-size: 13px; z-index: 9998; }
+    .sh-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid var(--neo-border-default); border-top-color: var(--neo-accent); border-radius: 50%; animation: sh-spin 0.8s linear infinite; }
+    @keyframes sh-spin { to { transform: rotate(360deg); } }
+
+    .sh-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5); flex-wrap: wrap; }
+    .sh-header-title { font-size: var(--neo-fs-3xl); font-weight: var(--neo-fw-black); color: var(--neo-fg-primary); letter-spacing: -0.02em; margin: 0 0 4px 0; line-height: 1.1; }
+    .sh-header-sub { font-size: var(--neo-fs-sm); color: var(--neo-fg-tertiary); display: flex; gap: var(--neo-sp-2); align-items: center; flex-wrap: wrap; }
+    .sh-last-updated { font-family: var(--neo-font-mono); font-size: 10px; color: var(--neo-fg-muted); }
+
+    .sh-overall { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-lg); padding: var(--neo-sp-5); margin-bottom: var(--neo-sp-4); display: flex; align-items: center; gap: var(--neo-sp-4); position: relative; overflow: hidden; }
+    .sh-overall::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; opacity: 0.7; }
+    .sh-overall.ok::before { background: var(--neo-success); }
+    .sh-overall.warn::before { background: var(--neo-warning); }
+    .sh-overall.critical::before { background: var(--neo-danger); }
+    .sh-overall.unknown::before { background: var(--neo-fg-muted); }
+    .sh-overall-emoji { font-size: 42px; flex-shrink: 0; }
+    .sh-overall-body { flex: 1; min-width: 0; }
+    .sh-overall-title { font-size: var(--neo-fs-lg); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin-bottom: 4px; }
+    .sh-overall-desc { font-size: var(--neo-fs-sm); color: var(--neo-fg-tertiary); }
+
+    .sh-workers { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--neo-sp-3); }
+    .sh-worker { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-md); padding: var(--neo-sp-4); position: relative; overflow: hidden; }
+    .sh-worker::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.6; }
+    .sh-worker.ok::before { background: var(--neo-success); }
+    .sh-worker.warn::before { background: var(--neo-warning); }
+    .sh-worker.critical::before { background: var(--neo-danger); }
+    .sh-worker.unknown::before { background: var(--neo-fg-muted); }
+    .sh-worker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--neo-sp-2); margin-bottom: var(--neo-sp-3); }
+    .sh-worker-title { font-size: var(--neo-fs-md); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .sh-worker-emoji { font-size: 16px; flex-shrink: 0; }
+    .sh-worker-interval { font-family: var(--neo-font-mono); font-size: 9px; font-weight: var(--neo-fw-bold); color: var(--neo-fg-muted); padding: 2px 6px; background: var(--neo-bg-canvas); border-radius: var(--neo-r-xs); flex-shrink: 0; text-transform: uppercase; }
+    .sh-status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--neo-r-sm); font-size: 10px; font-weight: var(--neo-fw-extrabold); text-transform: uppercase; font-family: var(--neo-font-mono); letter-spacing: 0.03em; margin-bottom: var(--neo-sp-3); }
+    .sh-status-badge.ok { background: var(--neo-success-bg); color: var(--neo-success); }
+    .sh-status-badge.warn { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .sh-status-badge.critical { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .sh-status-badge.unknown { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+
+    .sh-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--neo-sp-2); }
+    .sh-metric { padding: var(--neo-sp-2) var(--neo-sp-3); background: var(--neo-bg-canvas); border-radius: var(--neo-r-sm); }
+    .sh-metric-label { font-size: 9px; font-weight: var(--neo-fw-bold); color: var(--neo-fg-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+    .sh-metric-value { font-family: var(--neo-font-mono); font-size: var(--neo-fs-md); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); }
+
+    .sh-feeds { margin-top: var(--neo-sp-3); padding-top: var(--neo-sp-3); border-top: 1px solid var(--neo-border-subtle); }
+    .sh-feed-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 11px; }
+    .sh-feed-name { font-family: var(--neo-font-mono); color: var(--neo-fg-secondary); font-weight: 700; }
+    .sh-feed-count { font-family: var(--neo-font-mono); color: var(--neo-fg-tertiary); font-size: 10px; }
+    .sh-feed-status { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-family: var(--neo-font-mono); font-weight: 700; }
+    .sh-feed-status.ok { background: var(--neo-success-bg); color: var(--neo-success); }
+    .sh-feed-status.stale { background: var(--neo-warning-bg); color: var(--neo-warning); }
+
+    .sh-skel { background: linear-gradient(90deg, var(--neo-bg-elevated) 0%, var(--neo-bg-raised) 50%, var(--neo-bg-elevated) 100%); background-size: 1000px 100%; animation: sh-shimmer 1.5s infinite linear; border-radius: var(--neo-r-md); height: 180px; }
+    @keyframes sh-shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+
+    .sh-auto-refresh { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--neo-r-sm); background: var(--neo-accent-subtle); border: 1px solid var(--neo-accent-border); color: var(--neo-accent-hover); font-family: var(--neo-font-mono); font-size: 10px; font-weight: var(--neo-fw-extrabold); }
+    .sh-auto-refresh .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--neo-accent-hover); animation: sh-pulse 2s ease-in-out infinite; }
+    @keyframes sh-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+  </style>
+</head>
+<body>
+
+  <div class="sh-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="sh-header">
+        <div>
+          <h1 class="sh-header-title">🩺 حالة النظام</h1>
+          <div class="sh-header-sub">
+            <span>مراقبة كل الـ background workers</span>
+            <span class="sh-last-updated" id="shLastUpdated">—</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="sh-auto-refresh"><span class="dot"></span> تلقائي 30s</span>
+          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="shRefreshBtn">🔄 تحديث</button>
+        </div>
+      </div>
+
+      <div class="sh-overall" id="shOverall">
+        <div class="sh-overall-emoji" id="shOverallEmoji">✅</div>
+        <div class="sh-overall-body">
+          <div class="sh-overall-title" id="shOverallTitle">جاري الفحص…</div>
+          <div class="sh-overall-desc" id="shOverallDesc">—</div>
+        </div>
+      </div>
+
+      <div id="shWorkersSkeleton" class="sh-workers">
+        <div class="sh-skel"></div>
+        <div class="sh-skel"></div>
+        <div class="sh-skel"></div>
+        <div class="sh-skel"></div>
+      </div>
+
+      <div id="shWorkers" class="sh-workers" style="display:none;"></div>
+
+      <div id="shError" class="neo-empty" style="display:none;">
+        <div class="neo-empty-icon">⚠️</div>
+        <h3 class="neo-empty-title">فشل تحميل حالة النظام</h3>
+        <p class="neo-empty-msg" id="shErrorMsg">—</p>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const SH = { data: null, timer: null };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    const STATUS_LABELS = {
+      ok: { text: 'سليم', cls: 'ok', emoji: '✅' },
+      warn: { text: 'تحذير', cls: 'warn', emoji: '⚠️' },
+      critical: { text: 'حرج', cls: 'critical', emoji: '🚨' },
+      unknown: { text: 'غير معروف', cls: 'unknown', emoji: '❓' },
+    };
+
+    function renderWorker(key, w) {
+      const feeds = w.feeds || [];
+      const feedsHtml = feeds.length > 0 ? `
+        <div class="sh-feeds">
+          ${feeds.map(f => `
+            <div class="sh-feed-row">
+              <span class="sh-feed-name">${esc(f.name)}</span>
+              <span class="sh-feed-count">${fmtInt(f.record_count)}</span>
+              <span class="sh-feed-status ${f.status}">${f.status === 'ok' ? '✓' : '⚠️'} ${f.age_hours != null ? f.age_hours + 'h' : '—'}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : '';
+
+      const metricsHtml = (w.metrics || []).map(m => `
+        <div class="sh-metric">
+          <div class="sh-metric-label">${esc(m.label)}</div>
+          <div class="sh-metric-value">${esc(String(m.value))}</div>
+        </div>
+      `).join('');
+
+      const statusMeta = STATUS_LABELS[w.status] || STATUS_LABELS.unknown;
+
+      return `
+        <div class="sh-worker ${w.status}">
+          <div class="sh-worker-head">
+            <div class="sh-worker-title">
+              <span class="sh-worker-emoji">${w.emoji || '⚙️'}</span>
+              <span>${esc(w.name_ar || w.name)}</span>
+            </div>
+            <span class="sh-worker-interval">${esc(w.interval || '')}</span>
+          </div>
+          <span class="sh-status-badge ${statusMeta.cls}">${statusMeta.text}</span>
+          <div class="sh-metrics">${metricsHtml}</div>
+          ${feedsHtml}
+        </div>
+      `;
+    }
+
+    function render(data) {
+      SH.data = data;
+
+      const overall = data.overall_status || 'unknown';
+      const banner = document.getElementById('shOverall');
+      banner.className = `sh-overall ${overall}`;
+
+      const meta = STATUS_LABELS[overall] || STATUS_LABELS.unknown;
+      const titleMap = {
+        ok: 'كل حاجة شغالة تمام',
+        warn: 'في حاجة محتاجة انتباه',
+        critical: 'في مشكلة حرجة — تدخل فوري',
+        unknown: 'حالة غير معروفة',
+      };
+      document.getElementById('shOverallEmoji').textContent = meta.emoji;
+      document.getElementById('shOverallTitle').textContent = titleMap[overall] || '—';
+
+      const workers = data.workers || {};
+      const statuses = Object.values(workers).map(w => w.status);
+      const okCount = statuses.filter(s => s === 'ok').length;
+      const warnCount = statuses.filter(s => s === 'warn').length;
+      const criticalCount = statuses.filter(s => s === 'critical').length;
+      document.getElementById('shOverallDesc').textContent =
+        `${okCount} سليم · ${warnCount} تحذير · ${criticalCount} حرج (من ${statuses.length} workers)`;
+
+      const now = new Date();
+      document.getElementById('shLastUpdated').textContent =
+        'آخر تحديث: ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      const workersEl = document.getElementById('shWorkers');
+      workersEl.innerHTML = Object.entries(workers).map(([k, w]) => renderWorker(k, w)).join('');
+
+      document.getElementById('shWorkersSkeleton').style.display = 'none';
+      workersEl.style.display = 'grid';
+      document.getElementById('shError').style.display = 'none';
+    }
+
+    async function loadHealth() {
+      try {
+        const data = await Neo.api('/api/system/health');
+        render(data);
+      } catch (e) {
+        document.getElementById('shWorkersSkeleton').style.display = 'none';
+        document.getElementById('shWorkers').style.display = 'none';
+        document.getElementById('shError').style.display = '';
+        document.getElementById('shErrorMsg').textContent = e.message;
+      }
+    }
+
+    (async function boot() {
+      try {
+        await Neo.mount({ active: 'system-health', lang: 'ar', breadcrumb: [{ label: 'حالة النظام' }] });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        document.getElementById('shRefreshBtn').addEventListener('click', loadHealth);
+        await loadHealth();
+        SH.timer = setInterval(loadHealth, 30000);
+
+      } catch (e) {
+        console.error('[SH Boot] failed:', e);
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color: var(--neo-danger);">فشل: ${Neo.escape(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OVG · تقرير استرداد PopAds</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/neo/tokens.css">
+  <link rel="stylesheet" href="/static/css/neo/utilities.css">
+  <link rel="stylesheet" href="/static/css/neo/components.css">
+  <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
+    #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
+
+    .pr-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: var(--neo-bg-canvas); color: var(--neo-fg-tertiary); font-size: 13px; z-index: 9998; }
+    .pr-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid var(--neo-border-default); border-top-color: var(--neo-accent); border-radius: 50%; animation: pr-spin 0.8s linear infinite; }
+    @keyframes pr-spin { to { transform: rotate(360deg); } }
+
+    .pr-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5); flex-wrap: wrap; }
+    .pr-header-title { font-size: var(--neo-fs-3xl); font-weight: var(--neo-fw-black); color: var(--neo-fg-primary); letter-spacing: -0.02em; margin: 0 0 4px 0; line-height: 1.1; }
+    .pr-header-sub { font-size: var(--neo-fs-sm); color: var(--neo-fg-tertiary); }
+
+    .pr-selector { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-md); padding: var(--neo-sp-3); margin-bottom: var(--neo-sp-4); }
+    .pr-selector-label { font-size: 10px; font-weight: var(--neo-fw-bold); color: var(--neo-fg-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+
+    .pr-hero { background: var(--neo-danger-bg); border: 1px solid var(--neo-danger-border); border-radius: var(--neo-r-md); padding: var(--neo-sp-5); margin-bottom: var(--neo-sp-4); display: flex; align-items: center; justify-content: space-between; gap: var(--neo-sp-3); flex-wrap: wrap; }
+    .pr-hero-val { font-family: var(--neo-font-mono); font-variant-numeric: tabular-nums; font-size: 36px; font-weight: var(--neo-fw-black); color: var(--neo-danger); line-height: 1; }
+    .pr-hero-label { font-size: 10px; color: var(--neo-fg-tertiary); text-transform: uppercase; font-weight: var(--neo-fw-bold); letter-spacing: 0.08em; margin-bottom: 6px; }
+    .pr-hero-sub { font-size: var(--neo-fs-xs); color: var(--neo-danger-fg); margin-top: 6px; }
+
+    .pr-copy-box { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-md); padding: var(--neo-sp-4); margin-bottom: var(--neo-sp-3); }
+    .pr-copy-title { font-size: var(--neo-fs-sm); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin-bottom: var(--neo-sp-2); }
+    .pr-textarea { width: 100%; height: 220px; background: var(--neo-bg-canvas); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-sm); color: var(--neo-success); font-family: var(--neo-font-mono); font-size: 11px; padding: var(--neo-sp-3); resize: none; box-sizing: border-box; line-height: 1.6; outline: none; direction: ltr; text-align: left; }
+
+    .pr-warning { background: var(--neo-warning-bg); border: 1px solid var(--neo-warning-border); border-radius: var(--neo-r-sm); padding: var(--neo-sp-3); margin-bottom: var(--neo-sp-3); font-size: var(--neo-fs-xs); color: var(--neo-warning-fg); line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+  <div class="pr-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
+
+  <div id="neoAppRoot" style="display:none;">
+    <main id="neoContent">
+
+      <div class="pr-header">
+        <div>
+          <h1 class="pr-header-title">🛡️ تقرير استرداد PopAds</h1>
+          <div class="pr-header-sub">تقرير احترافي لتقديمه لـ PopAds Support لاسترداد فلوس الزيارات الوهمية</div>
+        </div>
+      </div>
+
+      <div class="pr-selector">
+        <div class="pr-selector-label">فلتر الحملة</div>
+        <select id="prCampaign" class="neo-select neo-input-sm" style="width:100%;">
+          <option value="">كل الحملات</option>
+        </select>
+      </div>
+
+      <div id="prLoading" style="text-align:center;padding:40px;color:var(--neo-fg-tertiary);">جاري التحميل…</div>
+
+      <div id="prContent" style="display:none;">
+
+        <div class="pr-hero">
+          <div>
+            <div class="pr-hero-label">إجمالي الفلوس المهدورة على البوتات</div>
+            <div class="pr-hero-val" id="prWasted">$0.000000</div>
+            <div class="pr-hero-sub" id="prWastedInfo">—</div>
+          </div>
+          <button class="neo-btn neo-btn-danger" id="prCopyBtn">
+            📋 نسخ الرسالة الجاهزة
+          </button>
+        </div>
+
+        <div id="prBidWarning" class="pr-warning" style="display:none;">
+          ⚠️ <b>ملاحظة:</b> بعض المواقع المشبوهة مفيهاش BID data — التكلفة المهدورة قد تكون أقل من الحقيقة.
+        </div>
+
+        <div class="neo-table-wrap" style="margin-bottom: var(--neo-sp-3);">
+          <table class="neo-table">
+            <thead>
+              <tr>
+                <th>Website ID (Zone)</th>
+                <th class="neo-cell-center">إجمالي</th>
+                <th class="neo-cell-center" style="color:var(--neo-danger);">Bot</th>
+                <th class="neo-cell-center" style="color:var(--neo-danger);">Bot %</th>
+                <th class="neo-cell-center">التكلفة الكلية</th>
+                <th class="neo-cell-center" style="color:var(--neo-danger);">التكلفة المهدورة</th>
+              </tr>
+            </thead>
+            <tbody id="prTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="pr-copy-box">
+          <div class="pr-copy-title">📧 الرسالة الجاهزة للإرسال:</div>
+          <textarea id="prTextarea" class="pr-textarea" readonly></textarea>
+        </div>
+
+      </div>
+
+      <div id="prEmpty" class="neo-empty" style="display:none;">
+        <div class="neo-empty-icon">✅</div>
+        <h3 class="neo-empty-title">مفيش بوتات من PopAds في الفترة دي</h3>
+        <p class="neo-empty-msg">مفيش بيانات استرداد متاحة. الترافيك نظيف!</p>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/js/neo-shell.js"></script>
+  <script>
+    const PR = { campaigns: [], currentCampaign: '' };
+
+    function esc(s) { return Neo.escape(s); }
+    function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+    async function loadCampaigns() {
+      try {
+        PR.campaigns = await Neo.api('/api/campaigns');
+        const sel = document.getElementById('prCampaign');
+        sel.innerHTML = '<option value="">كل الحملات</option>' +
+          PR.campaigns.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+
+        const urlParams = new URLSearchParams(location.search);
+        const initial = urlParams.get('campaign_id') || '';
+        if (initial) { sel.value = initial; PR.currentCampaign = initial; }
+      } catch (e) { console.error(e); }
+    }
+
+    async function loadReport() {
+      document.getElementById('prLoading').style.display = '';
+      document.getElementById('prContent').style.display = 'none';
+      document.getElementById('prEmpty').style.display = 'none';
+
+      try {
+        const q = PR.currentCampaign ? `?campaign_id=${PR.currentCampaign}` : '';
+        const data = await Neo.api('/api/reports/popads-refund' + q);
+
+        if (!data.websites || !data.websites.length) {
+          document.getElementById('prLoading').style.display = 'none';
+          document.getElementById('prEmpty').style.display = '';
+          return;
+        }
+
+        const s = data.summary;
+
+        document.getElementById('prWasted').textContent = '$' + s.total_wasted_amount.toFixed(6);
+        document.getElementById('prWastedInfo').textContent = `${fmtInt(s.total_bot_visits)} زيارة بوت من ${s.suspicious_websites_count} موقع`;
+
+        document.getElementById('prBidWarning').style.display = s.has_bid_gaps ? '' : 'none';
+
+        document.getElementById('prTableBody').innerHTML = data.websites.map(w => `
+          <tr>
+            <td class="neo-mono neo-font-bold" style="color: var(--neo-accent-hover);">${esc(w.website_id)}</td>
+            <td class="neo-cell-center neo-mono">${fmtInt(w.total_visits)}</td>
+            <td class="neo-cell-center neo-mono" style="color: var(--neo-danger); font-weight: 800;">${fmtInt(w.bot_visits)}</td>
+            <td class="neo-cell-center neo-mono" style="color: var(--neo-danger);">${w.bot_rate}%</td>
+            <td class="neo-cell-center neo-mono">$${w.total_cost.toFixed(6)}</td>
+            <td class="neo-cell-center neo-mono" style="color: var(--neo-danger); font-weight: 800;">$${w.wasted_cost.toFixed(6)}</td>
+          </tr>
+        `).join('');
+
+        // Generate text
+        let text = `Hello PopAds Support Team,\n\nI am writing to request a refund for bot traffic received from the following websites. My tracking system uses advanced AI and behavioral analysis to confirm these are 100% non-human visits.\n\nHere is the breakdown of the wasted budget:\n\n`;
+        text += `Website ID | Total Visits | Bot Visits | Wasted Amount\n`;
+        text += `----------------------------------------------------\n`;
+        data.websites.forEach(w => {
+          text += `${w.website_id} | ${w.total_visits} | ${w.bot_visits} | $${w.wasted_cost.toFixed(6)}\n`;
+        });
+        text += `----------------------------------------------------\n`;
+        text += `Total Wasted Amount: $${s.total_wasted_amount.toFixed(6)}\n\n`;
+        text += `Please block these websites from my campaigns and refund the wasted amount to my balance.\n\nThank you,\nOVG Tracker User`;
+
+        document.getElementById('prTextarea').value = text;
+
+        document.getElementById('prLoading').style.display = 'none';
+        document.getElementById('prContent').style.display = '';
+      } catch (e) {
+        document.getElementById('prLoading').innerHTML = `<span style="color: var(--neo-danger);">فشل: ${esc(e.message)}</span>`;
+      }
+    }
+
+    (async function boot() {
+      try {
+        await Neo.mount({ active: 'popads-report', lang: 'ar', breadcrumb: [{ label: 'تقارير' }, { label: 'PopAds Refund' }] });
+        document.getElementById('bootSkeleton').style.display = 'none';
+        document.getElementById('neoAppRoot').style.display = '';
+
+        await loadCampaigns();
+
+        document.getElementById('prCampaign').addEventListener('change', (e) => {
+          PR.currentCampaign = e.target.value;
+          loadReport();
+        });
+
+        document.getElementById('prCopyBtn').addEventListener('click', function () {
+          const text = document.getElementById('prTextarea').value;
+          if (!text) return;
+          navigator.clipboard.writeText(text).then(() => {
+            const orig = this.textContent;
+            this.textContent = '✓ تم النسخ';
+            this.classList.remove('neo-btn-danger');
+            this.classList.add('neo-btn-success');
+            setTimeout(() => { this.textContent = orig; this.classList.add('neo-btn-danger'); this.classList.remove('neo-btn-success'); }, 1800);
+          });
+        });
+
+        await loadReport();
+
+      } catch (e) {
+        console.error('[PR Boot] failed:', e);
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color: var(--neo-danger);">فشل: ${Neo.escape(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OVG · التقارير الذكية</title>
+  <title>OVG · الخريطة والتقارير</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -11,1027 +11,427 @@
   <link rel="stylesheet" href="/static/css/neo/utilities.css">
   <link rel="stylesheet" href="/static/css/neo/components.css">
   <link rel="stylesheet" href="/static/css/neo/shell.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: var(--neo-bg-canvas); }
     #neoAppRoot { height: 100vh; width: 100vw; overflow: hidden; background: var(--neo-bg-canvas); }
 
-    .rep-shell-skel {
-      position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 16px;
-      background: var(--neo-bg-canvas);
-      color: var(--neo-fg-tertiary);
-      font-size: 13px;
-      z-index: 9998;
-    }
-    .rep-shell-skel .spinner {
-      width: 32px; height: 32px;
-      border: 3px solid var(--neo-border-default);
-      border-top-color: var(--neo-accent);
-      border-radius: 50%;
-      animation: rep-spin 0.8s linear infinite;
-    }
-    @keyframes rep-spin { to { transform: rotate(360deg); } }
+    .rp-shell-skel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: var(--neo-bg-canvas); color: var(--neo-fg-tertiary); font-size: 13px; z-index: 9998; }
+    .rp-shell-skel .spinner { width: 32px; height: 32px; border: 3px solid var(--neo-border-default); border-top-color: var(--neo-accent); border-radius: 50%; animation: rp-spin 0.8s linear infinite; }
+    @keyframes rp-spin { to { transform: rotate(360deg); } }
 
-    /* Header */
-    .rep-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-5);
-      flex-wrap: wrap;
-    }
-    .rep-header-title {
-      font-size: var(--neo-fs-3xl);
-      font-weight: var(--neo-fw-black);
-      color: var(--neo-fg-primary);
-      letter-spacing: -0.02em;
-      margin: 0 0 4px 0;
-      line-height: 1.1;
-    }
-    .rep-header-sub {
-      font-size: var(--neo-fs-sm);
-      color: var(--neo-fg-tertiary);
-    }
-    .rep-header-actions {
-      display: flex;
-      gap: var(--neo-sp-2);
-      align-items: center;
-      flex-wrap: wrap;
-    }
+    .rp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--neo-sp-4); margin-bottom: var(--neo-sp-4); flex-wrap: wrap; }
+    .rp-header-title { font-size: var(--neo-fs-3xl); font-weight: var(--neo-fw-black); color: var(--neo-fg-primary); letter-spacing: -0.02em; margin: 0 0 4px 0; line-height: 1.1; }
+    .rp-header-sub { font-size: var(--neo-fs-sm); color: var(--neo-fg-tertiary); }
 
-    /* Period + Compare bar */
-    .rep-controls {
-      background: var(--neo-bg-surface);
-      border: 1px solid var(--neo-border-default);
-      border-radius: var(--neo-r-lg);
-      padding: var(--neo-sp-4);
-      margin-bottom: var(--neo-sp-5);
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--neo-sp-3);
-      align-items: flex-end;
-    }
-    .rep-control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-    .rep-control-label {
-      font-size: var(--neo-fs-2xs);
-      font-weight: var(--neo-fw-bold);
-      color: var(--neo-fg-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
+    .rp-filters { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-md); padding: var(--neo-sp-3); margin-bottom: var(--neo-sp-3); display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--neo-sp-2); align-items: end; }
+    @media (max-width: 700px) { .rp-filters { grid-template-columns: 1fr; } }
+    .rp-filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .rp-filter-label { font-size: var(--neo-fs-2xs); font-weight: var(--neo-fw-bold); color: var(--neo-fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
-    /* Compare delta */
-    .rep-compare-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-family: var(--neo-font-mono);
-      font-size: var(--neo-fs-xs);
-      font-weight: var(--neo-fw-bold);
-      padding: 2px 8px;
-      border-radius: var(--neo-r-sm);
-    }
-    .rep-compare-pill.up { background: var(--neo-success-bg); color: var(--neo-success); }
-    .rep-compare-pill.down { background: var(--neo-danger-bg); color: var(--neo-danger); }
-    .rep-compare-pill.flat { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
+    .rp-tabs { display: flex; gap: 4px; margin-bottom: var(--neo-sp-4); border-bottom: 1px solid var(--neo-border-default); flex-wrap: wrap; }
+    .rp-tab { padding: var(--neo-sp-2) var(--neo-sp-4); background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--neo-fg-tertiary); font-family: inherit; font-size: var(--neo-fs-sm); font-weight: var(--neo-fw-extrabold); cursor: pointer; transition: all var(--neo-dur-fast); }
+    .rp-tab:hover { color: var(--neo-fg-secondary); }
+    .rp-tab.active { color: var(--neo-fg-primary); border-bottom-color: var(--neo-accent); }
+    .rp-panel { display: none; }
+    .rp-panel.active { display: block; }
 
-    /* Warnings */
-    .rep-warnings { display: flex; flex-direction: column; gap: var(--neo-sp-2); margin-bottom: var(--neo-sp-4); }
+    #rpMap { height: 550px; width: 100%; border-radius: var(--neo-r-md); z-index: 1; background: var(--neo-bg-canvas); border: 1px solid var(--neo-border-default); }
+    .leaflet-layer { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+    .leaflet-container { background: var(--neo-bg-canvas) !important; }
+    .marker-cluster-small { background-color: rgba(16,185,129,0.6); }
+    .marker-cluster-small div { background-color: rgba(16,185,129,0.9); color: white; font-weight: 700; }
+    .marker-cluster-medium { background-color: rgba(245,158,11,0.6); }
+    .marker-cluster-medium div { background-color: rgba(245,158,11,0.9); color: white; font-weight: 700; }
+    .marker-cluster-large { background-color: rgba(239,68,68,0.6); }
+    .marker-cluster-large div { background-color: rgba(239,68,68,0.9); color: white; font-weight: 700; }
 
-    /* Hero + Funnel */
-    .rep-hero-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--neo-sp-4);
-      margin-bottom: var(--neo-sp-5);
-    }
-    @media (max-width: 900px) { .rep-hero-grid { grid-template-columns: 1fr; } }
+    .rp-map-stats { padding: var(--neo-sp-2); text-align: center; font-size: var(--neo-fs-xs); color: var(--neo-fg-tertiary); }
 
-    .rep-hero-main {
-      background: var(--neo-bg-surface);
-      border: 1px solid var(--neo-border-default);
-      border-radius: var(--neo-r-lg);
-      padding: var(--neo-sp-5);
-      position: relative;
-      overflow: hidden;
-    }
-    .rep-hero-main::before {
-      content: "";
-      position: absolute;
-      top: -50%; right: -30%;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(34,211,238,0.2) 0%, transparent 70%);
-      pointer-events: none;
-      transition: background 400ms;
-    }
-    .rep-hero-main.neg::before {
-      background: radial-gradient(circle, rgba(244,63,94,0.2) 0%, transparent 70%);
-    }
-    .rep-hero-label {
-      font-size: var(--neo-fs-2xs);
-      font-weight: var(--neo-fw-bold);
-      color: var(--neo-fg-tertiary);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-    .rep-hero-value {
-      font-family: var(--neo-font-mono);
-      font-variant-numeric: tabular-nums;
-      font-feature-settings: var(--neo-fv-numeric);
-      font-size: 44px;
-      font-weight: var(--neo-fw-black);
-      line-height: 1;
-      margin-top: var(--neo-sp-2);
-      letter-spacing: -0.03em;
-      color: var(--neo-info);
-      text-shadow: 0 0 32px rgba(34,211,238,0.35);
-    }
-    .rep-hero-main.neg .rep-hero-value {
-      color: var(--neo-danger);
-      text-shadow: 0 0 32px rgba(244,63,94,0.35);
-    }
-    .rep-hero-value.muted {
-      color: var(--neo-fg-muted);
-      text-shadow: none;
-      font-size: 32px;
-    }
-    .rep-hero-roi {
-      display: inline-flex; align-items: center; gap: 6px;
-      margin-top: var(--neo-sp-3);
-      padding: 3px 10px;
-      border-radius: var(--neo-r-sm);
-      font-size: var(--neo-fs-sm);
-      font-weight: var(--neo-fw-extrabold);
-      font-family: var(--neo-font-mono);
-    }
-    .rep-hero-roi.pos { background: rgba(34,211,238,0.12); color: var(--neo-info); }
-    .rep-hero-roi.neg { background: var(--neo-danger-bg); color: var(--neo-danger); }
-    .rep-hero-roi.muted { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
-    .rep-hero-stats {
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: var(--neo-sp-4);
-      margin-top: var(--neo-sp-4);
-      position: relative;
-    }
-    @media (max-width: 500px) { .rep-hero-stats { grid-template-columns: 1fr 1fr; } }
-    .rep-hero-stat-label {
-      font-size: 9px;
-      color: var(--neo-fg-muted);
-      font-weight: var(--neo-fw-bold);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 4px;
-    }
-    .rep-hero-stat-value {
-      font-family: var(--neo-font-mono);
-      font-variant-numeric: tabular-nums;
-      font-size: 16px;
-      font-weight: var(--neo-fw-extrabold);
-      color: var(--neo-fg-primary);
-    }
+    .rp-card { background: var(--neo-bg-surface); border: 1px solid var(--neo-border-default); border-radius: var(--neo-r-md); padding: var(--neo-sp-4); }
+    .rp-card-title { font-size: var(--neo-fs-sm); font-weight: var(--neo-fw-extrabold); color: var(--neo-fg-primary); margin: 0 0 var(--neo-sp-3) 0; }
+    .rp-chart-wrap { height: 300px; position: relative; }
 
-    /* Funnel */
-    .rep-funnel {
-      background: var(--neo-bg-surface);
-      border: 1px solid var(--neo-border-default);
-      border-radius: var(--neo-r-lg);
-      padding: var(--neo-sp-5);
-    }
-    .rep-funnel-title {
-      font-size: var(--neo-fs-sm);
-      font-weight: var(--neo-fw-bold);
-      color: var(--neo-fg-primary);
-      margin: 0 0 var(--neo-sp-3) 0;
-    }
-    .rep-funnel-steps {
-      display: flex;
-      flex-direction: column;
-      gap: var(--neo-sp-2);
-    }
-    .rep-funnel-step {
-      display: grid;
-      grid-template-columns: 110px 1fr 80px;
-      gap: var(--neo-sp-2);
-      align-items: center;
-    }
-    .rep-funnel-step-label {
-      font-size: var(--neo-fs-xs);
-      color: var(--neo-fg-secondary);
-      font-weight: var(--neo-fw-semibold);
-    }
-    .rep-funnel-step-bar {
-      height: 24px;
-      background: var(--neo-bg-elevated);
-      border-radius: var(--neo-r-sm);
-      overflow: hidden;
-      position: relative;
-    }
-    .rep-funnel-step-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--neo-accent), var(--neo-accent-hover));
-      border-radius: var(--neo-r-sm);
-      transition: width 800ms var(--neo-ease-out);
-      position: relative;
-    }
-    .rep-funnel-step-fill.valid { background: linear-gradient(90deg, #10B981, #34D399); }
-    .rep-funnel-step-fill.revenue { background: linear-gradient(90deg, #22D3EE, #67E8F9); }
-    .rep-funnel-step-pct {
-      position: absolute;
-      right: 8px; top: 50%;
-      transform: translateY(-50%);
-      font-family: var(--neo-font-mono);
-      font-size: 10px;
-      font-weight: var(--neo-fw-extrabold);
-      color: white;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-    }
-    .rep-funnel-step-value {
-      font-family: var(--neo-font-mono);
-      font-variant-numeric: tabular-nums;
-      font-size: var(--neo-fs-sm);
-      font-weight: var(--neo-fw-extrabold);
-      color: var(--neo-fg-primary);
-      text-align: left;
-    }
+    .rp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--neo-sp-3); }
+    @media (max-width: 900px) { .rp-grid-2 { grid-template-columns: 1fr; } }
 
-    /* Table toolbar */
-    .rep-toolbar {
-      display: flex;
-      gap: var(--neo-sp-2);
-      margin-bottom: var(--neo-sp-3);
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .rep-toolbar-spacer { flex: 1; }
-    .rep-count {
-      font-family: var(--neo-font-mono);
-      font-size: var(--neo-fs-xs);
-      color: var(--neo-fg-tertiary);
-    }
-
-    /* Integrity badge */
-    .rep-badge-integrity {
+    .rp-badge {
       display: inline-block;
-      padding: 1px 6px;
-      border-radius: 3px;
+      padding: 2px 8px;
+      border-radius: var(--neo-r-xs);
       font-size: 9px;
-      font-weight: var(--neo-fw-bold);
+      font-weight: var(--neo-fw-extrabold);
       font-family: var(--neo-font-mono);
-      margin-right: 6px;
+      text-transform: uppercase;
     }
-    .rep-badge-integrity.partial { background: var(--neo-warning-bg); color: var(--neo-warning); }
-    .rep-badge-integrity.partial_warn { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .rp-badge.A { background: var(--neo-success-bg); color: var(--neo-success); }
+    .rp-badge.B { background: var(--neo-info-bg); color: var(--neo-info-fg); }
+    .rp-badge.C { background: var(--neo-warning-bg); color: var(--neo-warning); }
+    .rp-badge.F { background: var(--neo-danger-bg); color: var(--neo-danger); }
+    .rp-badge.q { background: var(--neo-bg-elevated); color: var(--neo-fg-muted); }
 
-    /* Row hover for zones */
-    .rep-zone-row { cursor: pointer; transition: background var(--neo-dur-fast); }
-    .rep-zone-row:hover td { background: var(--neo-bg-elevated); }
+    .rp-ev-chip { display: inline-block; padding: 2px 6px; border-radius: var(--neo-r-xs); font-size: 9px; font-weight: var(--neo-fw-bold); margin: 1px; background: var(--neo-danger-bg); color: var(--neo-danger-fg); }
   </style>
 </head>
 <body>
 
-  <div class="rep-shell-skel" id="bootSkeleton">
-    <div class="spinner"></div>
-    <div>جاري تحميل التقارير…</div>
-  </div>
+  <div class="rp-shell-skel" id="bootSkeleton"><div class="spinner"></div><div>جاري التحميل…</div></div>
 
   <div id="neoAppRoot" style="display:none;">
     <main id="neoContent">
 
-      <div class="rep-header">
+      <div class="rp-header">
         <div>
-          <h1 class="rep-header-title">💰 التقارير الذكية</h1>
-          <div class="rep-header-sub" id="repSubtitle">تحليل كامل للربح والخسارة لكل زون</div>
-        </div>
-        <div class="rep-header-actions">
-          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="repExportBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            تصدير CSV
-          </button>
-          <button class="neo-btn neo-btn-secondary neo-btn-sm" id="repRefreshBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
-            تحديث
-          </button>
+          <h1 class="rp-header-title">🗺️ الخريطة والتقارير</h1>
+          <div class="rp-header-sub">تحليل جغرافي وتقني لجودة الترافيك</div>
         </div>
       </div>
 
-      <!-- Period + Compare controls -->
-      <div class="rep-controls">
-        <div class="rep-control-group" style="min-width: 140px;">
-          <label class="rep-control-label">من تاريخ</label>
-          <input type="date" id="repFrom" class="neo-input neo-input-sm">
+      <div class="rp-filters">
+        <div class="rp-filter-field">
+          <label class="rp-filter-label">من تاريخ</label>
+          <input type="date" id="rpFrom" class="neo-input neo-input-sm">
         </div>
-        <div class="rep-control-group" style="min-width: 140px;">
-          <label class="rep-control-label">إلى تاريخ</label>
-          <input type="date" id="repTo" class="neo-input neo-input-sm">
+        <div class="rp-filter-field">
+          <label class="rp-filter-label">إلى تاريخ</label>
+          <input type="date" id="rpTo" class="neo-input neo-input-sm">
         </div>
-        <div class="rep-control-group">
-          <label class="rep-control-label">فترات سريعة</label>
-          <div style="display:flex;gap:4px;">
-            <button class="neo-btn neo-btn-ghost neo-btn-sm" data-range="7">7 أيام</button>
-            <button class="neo-btn neo-btn-secondary neo-btn-sm" data-range="30">30 يوم</button>
-            <button class="neo-btn neo-btn-ghost neo-btn-sm" data-range="90">90 يوم</button>
-          </div>
+        <div style="display:flex;gap:4px;">
+          <button class="neo-btn neo-btn-primary neo-btn-sm" id="rpApplyBtn">تطبيق</button>
+          <button class="neo-btn neo-btn-ghost neo-btn-sm" id="rpClearBtn">مسح</button>
         </div>
-        <div style="flex:1;"></div>
-        <button class="neo-btn neo-btn-primary neo-btn-sm" id="repApplyBtn">تطبيق</button>
       </div>
 
-      <!-- Warnings -->
-      <div class="rep-warnings" id="repWarnings"></div>
+      <div class="rp-tabs">
+        <button class="rp-tab active" data-tab="map">🗺️ الخريطة الحية</button>
+        <button class="rp-tab" data-tab="countries">🌍 الدول</button>
+        <button class="rp-tab" data-tab="zones">📊 الزونات</button>
+        <button class="rp-tab" data-tab="tech">💻 التقنيات</button>
+      </div>
 
-      <!-- Hero + Funnel -->
-      <div class="rep-hero-grid">
-        <div class="rep-hero-main" id="repHero">
-          <div class="rep-hero-label">صافي الربح</div>
-          <div class="rep-hero-value" id="repHeroProfit">—</div>
-          <div class="rep-hero-roi pos" id="repHeroRoi">—</div>
-          <div class="rep-hero-stats">
-            <div>
-              <div class="rep-hero-stat-label">التكلفة</div>
-              <div class="rep-hero-stat-value" id="repHeroCost">$0.00</div>
-            </div>
-            <div>
-              <div class="rep-hero-stat-label">الإيراد</div>
-              <div class="rep-hero-stat-value" id="repHeroRev">$0.00</div>
-            </div>
-            <div>
-              <div class="rep-hero-stat-label">الزيارات</div>
-              <div class="rep-hero-stat-value" id="repHeroTotal">0</div>
-            </div>
+      <!-- Map -->
+      <div class="rp-panel active" data-panel="map">
+        <div id="rpMap"></div>
+        <div class="rp-map-stats" id="rpMapStats">—</div>
+      </div>
+
+      <!-- Countries -->
+      <div class="rp-panel" data-panel="countries">
+        <div class="rp-grid-2">
+          <div class="rp-card">
+            <h3 class="rp-card-title">أعلى 10 دول</h3>
+            <div class="rp-chart-wrap"><canvas id="rpCountryChart"></canvas></div>
           </div>
-        </div>
-
-        <div class="rep-funnel">
-          <h3 class="rep-funnel-title">📊 Funnel الزيارات</h3>
-          <div class="rep-funnel-steps" id="repFunnel">
-            <div class="neo-skeleton" style="height: 32px; margin-bottom: 8px;"></div>
-            <div class="neo-skeleton" style="height: 32px; margin-bottom: 8px;"></div>
-            <div class="neo-skeleton" style="height: 32px;"></div>
+          <div class="neo-table-wrap">
+            <table class="neo-table">
+              <thead>
+                <tr>
+                  <th>الدولة</th>
+                  <th class="neo-cell-center">Code</th>
+                  <th class="neo-cell-center">إجمالي</th>
+                  <th class="neo-cell-center" style="color:var(--neo-success);">Valid</th>
+                  <th class="neo-cell-center" style="color:var(--neo-danger);">Bot %</th>
+                </tr>
+              </thead>
+              <tbody id="rpCountriesBody">
+                <tr><td colspan="5" class="neo-table-empty">جاري التحميل…</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <!-- Toolbar -->
-      <div class="rep-toolbar">
-        <div style="display:inline-flex;background:var(--neo-bg-surface);border:1px solid var(--neo-border-default);border-radius:var(--neo-r-md);padding:2px;">
-          <button class="neo-btn neo-btn-ghost neo-btn-xs rep-view-tab active" data-view="table" style="padding: 5px 14px;">📊 جدول</button>
-          <button class="neo-btn neo-btn-ghost neo-btn-xs rep-view-tab" data-view="cards" style="padding: 5px 14px;">🎴 كروت</button>
+      <!-- Zones -->
+      <div class="rp-panel" data-panel="zones">
+        <div class="neo-table-wrap">
+          <table class="neo-table">
+            <thead>
+              <tr>
+                <th>Zone</th>
+                <th class="neo-cell-center">إجمالي</th>
+                <th class="neo-cell-center" style="color:var(--neo-success);">Valid</th>
+                <th class="neo-cell-center" style="color:var(--neo-warning);">Suspicious</th>
+                <th class="neo-cell-center" style="color:var(--neo-danger);">Invalid</th>
+                <th class="neo-cell-center">Bot %</th>
+                <th class="neo-cell-center">Grade</th>
+                <th>أشهر الإشارات</th>
+              </tr>
+            </thead>
+            <tbody id="rpZonesBody">
+              <tr><td colspan="8" class="neo-table-empty">جاري التحميل…</td></tr>
+            </tbody>
+          </table>
         </div>
-        <select id="repGradeFilter" class="neo-select neo-input-sm" style="width: 140px;">
-          <option value="">كل الدرجات</option>
-          <option value="S">S — ممتاز</option>
-          <option value="A">A — جيد جداً</option>
-          <option value="B">B — جيد</option>
-          <option value="C">C — متوسط</option>
-          <option value="D">D — ضعيف</option>
-          <option value="F">F — وحش</option>
-        </select>
-        <select id="repSort" class="neo-select neo-input-sm" style="width: 160px;">
-          <option value="profit_desc">الأعلى ربحاً</option>
-          <option value="profit_asc">الأقل ربحاً</option>
-          <option value="roi_desc">الأعلى ROI</option>
-          <option value="bot_desc">الأكثر بوتات</option>
-          <option value="volume_desc">الأكثر زيارات</option>
-        </select>
-        <div class="rep-toolbar-spacer"></div>
-        <span class="rep-count" id="repCount">— زون</span>
       </div>
 
-      <!-- Table view -->
-      <div id="repViewTable" class="neo-table-wrap">
-        <table class="neo-table">
-          <thead>
-            <tr>
-              <th>الزون</th>
-              <th>المصدر</th>
-              <th class="neo-cell-center">الزيارات</th>
-              <th class="neo-cell-center">Valid</th>
-              <th class="neo-cell-center">Bot %</th>
-              <th>التكلفة</th>
-              <th>الإيراد</th>
-              <th>الربح</th>
-              <th class="neo-cell-center">ROI</th>
-              <th class="neo-cell-center">Grade</th>
-              <th class="neo-cell-center">المرحلة</th>
-            </tr>
-          </thead>
-          <tbody id="repTableBody">
-            <tr><td colspan="11" class="neo-table-empty">جاري التحميل…</td></tr>
-          </tbody>
-        </table>
+      <!-- Tech -->
+      <div class="rp-panel" data-panel="tech">
+        <div class="rp-grid-2">
+          <div class="rp-card">
+            <h3 class="rp-card-title">الأجهزة</h3>
+            <div class="rp-chart-wrap"><canvas id="rpDeviceChart"></canvas></div>
+          </div>
+          <div class="rp-card">
+            <h3 class="rp-card-title">المتصفحات</h3>
+            <div class="rp-chart-wrap"><canvas id="rpBrowserChart"></canvas></div>
+          </div>
+        </div>
       </div>
-
-      <!-- Cards view -->
-      <div id="repViewCards" style="display:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--neo-sp-3);"></div>
 
     </main>
   </div>
 
-  <!-- Zone drawer -->
-  <div class="neo-drawer-wrap" id="repDrawer">
-    <div class="neo-drawer">
-      <div class="neo-drawer-head">
-        <div style="min-width:0;flex:1;">
-          <h3 class="neo-drawer-title" id="repDrawerZone">—</h3>
-          <p class="neo-drawer-subtitle" id="repDrawerMeta">—</p>
-        </div>
-        <button class="neo-modal-close" onclick="Neo.closeDrawer('repDrawer')">✕</button>
-      </div>
-      <div class="neo-drawer-body" id="repDrawerBody"></div>
-      <div class="neo-drawer-foot" id="repDrawerFoot"></div>
-    </div>
-  </div>
-
   <script src="/static/js/neo-shell.js"></script>
   <script>
-    const REP = {
-      filters: { from: '', to: '', grade: '', sort: 'profit_desc' },
-      data: null,
-      view: 'table',
+    const RP = {
+      filters: { from: '', to: '' },
+      map: null,
+      cluster: null,
+      charts: {},
     };
 
-    function fmtMoney(n) {
-      const v = Number(n || 0);
-      if (Math.abs(v) < 0.005) return '$0.00';
-      const sign = v > 0 ? '+' : (v < 0 ? '-' : '');
-      return sign + '$' + Math.abs(v).toFixed(2);
-    }
-    function fmtMoneyAbs(n) {
-      return '$' + Math.abs(Number(n || 0)).toFixed(2);
-    }
+    function esc(s) { return Neo.escape(s); }
     function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
-    function fmtPct(n) { return Number(n || 0).toFixed(1) + '%'; }
 
-    function localDate(d) {
-      const dt = d || new Date();
-      const y = dt.getFullYear();
-      const m = String(dt.getMonth() + 1).padStart(2, '0');
-      const day = String(dt.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
+    const EVIDENCE_LABELS = {
+      WEBDRIVER_FLAG: 'WebDriver', CDP_DETECTED: 'CDP',
+      WINDOWS_UA_LINUX: 'OS تضارب', FIREFOX_CHROME_OBJ: 'Firefox+Chrome',
+      BOT_UA: 'UA بوت', VPN_DATACENTER: 'VPN+DC',
+      WEBRTC_LEAK: 'WebRTC Leak', PLUGINS_ZERO: 'plugins=0',
+      CHROME_NO_OBJ: 'window.chrome', FINGERPRINT_REUSE_HIGH: 'بصمة متكررة',
+      ROBOTIC_LINEAR: 'ماوس خطي', DATACENTER_IP: 'Datacenter',
+      VPN_PROXY: 'VPN', CANVAS_MISSING: 'Canvas مفقود',
+      UTC_TZ: 'UTC', ZOMBIE: 'بدون تفاعل',
+    };
+    function evLabel(code) { return EVIDENCE_LABELS[code] || code; }
+
+    function buildQuery() {
+      const p = new URLSearchParams();
+      if (RP.filters.from) p.set('from_date', RP.filters.from);
+      if (RP.filters.to) p.set('to_date', RP.filters.to);
+      return p.toString();
     }
 
     // =========================================================
-    // WARNINGS
+    // MAP
     // =========================================================
-    function renderWarnings(warnings) {
-      const container = document.getElementById('repWarnings');
-      if (!warnings || !warnings.length) { container.innerHTML = ''; return; }
-
-      container.innerHTML = warnings.map(w => {
-        const cls = w.severity === 'high' ? 'neo-alert-danger'
-          : w.severity === 'medium' ? 'neo-alert-warning'
-          : 'neo-alert-info';
-        const icon = w.severity === 'high' ? '🚨' : w.severity === 'medium' ? '⚠️' : 'ℹ️';
-        return `
-          <div class="neo-alert ${cls}">
-            <span class="neo-alert-icon">${icon}</span>
-            <div class="neo-alert-body">
-              <div class="neo-alert-title">${Neo.escape(w.code || 'WARNING')}</div>
-              <div>${Neo.escape(w.message || '')}</div>
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    // =========================================================
-    // HERO
-    // =========================================================
-    function renderHero(summary) {
-      const pl = (summary && summary.pl) || {};
-      const hero = document.getElementById('repHero');
-      const profitEl = document.getElementById('repHeroProfit');
-      const roiEl = document.getElementById('repHeroRoi');
-      const costEl = document.getElementById('repHeroCost');
-      const revEl = document.getElementById('repHeroRev');
-      const totalEl = document.getElementById('repHeroTotal');
-
-      // No sell CPM
-      if (pl.error === 'no_sell_revenue') {
-        hero.classList.add('neg');
-        profitEl.classList.add('muted');
-        profitEl.textContent = '—';
-        roiEl.textContent = '⚙️ اضبط Sell CPM';
-        roiEl.className = 'rep-hero-roi muted';
-        costEl.textContent = fmtMoneyAbs(pl.cost);
-        revEl.textContent = '$0.00';
-        totalEl.textContent = fmtInt(summary.total);
-        return;
+    async function loadMap() {
+      if (!RP.map) {
+        RP.map = L.map('rpMap').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }).addTo(RP.map);
       }
 
-      const profit = Number(pl.profit || 0);
-      const isPos = profit >= 0;
-      hero.classList.toggle('neg', !isPos);
-      profitEl.classList.remove('muted');
+      if (RP.cluster) { RP.map.removeLayer(RP.cluster); RP.cluster = null; }
 
-      // Integrity asterisk
-      const integrity = summary.integrity || {};
-      const isExact = integrity.integrity === 'exact';
-      const suffix = isExact ? '' : ' *';
-
-      profitEl.textContent = fmtMoney(profit) + suffix;
-      roiEl.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`;
-      roiEl.className = 'rep-hero-roi ' + (isPos ? 'pos' : 'neg');
-      costEl.textContent = fmtMoneyAbs(pl.cost);
-      revEl.textContent = fmtMoneyAbs(pl.revenue);
-      totalEl.textContent = fmtInt(summary.total);
-
-      if (!isExact && integrity.bid_coverage_pct != null) {
-        hero.title = `الربح على ${integrity.bid_coverage_pct}% من الزيارات (${integrity.visits_without_bid} بدون BID)`;
-      } else {
-        hero.title = 'الربح الحقيقي من BID والإيراد';
-      }
-    }
-
-    // =========================================================
-    // FUNNEL
-    // =========================================================
-    function renderFunnel(summary) {
-      const container = document.getElementById('repFunnel');
-      if (!summary) return;
-
-      const total = Number(summary.total || 0);
-      const valid = Number(summary.valid || 0);
-      const invalid = Number(summary.invalid || 0);
-      const suspicious = Number(summary.suspicious || 0);
-      const pl = summary.pl || {};
-      const revenue = Number(pl.revenue || 0);
-      const cost = Number(pl.cost || 0);
-
-      if (total === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--neo-fg-muted);font-size:12px;">مفيش بيانات</div>';
-        return;
-      }
-
-      const steps = [
-        { label: 'إجمالي', value: total, pct: 100, cls: '' },
-        { label: 'صالحة', value: valid, pct: (valid / total) * 100, cls: 'valid' },
-        { label: 'مشبوهة', value: suspicious, pct: (suspicious / total) * 100, cls: '' },
-        { label: 'مرفوضة', value: invalid, pct: (invalid / total) * 100, cls: '' },
-        { label: 'الإيراد', value: fmtMoneyAbs(revenue), pct: Math.min(100, (revenue / Math.max(1, cost)) * 100), cls: 'revenue' },
-      ];
-
-      container.innerHTML = steps.map(s => `
-        <div class="rep-funnel-step">
-          <span class="rep-funnel-step-label">${Neo.escape(s.label)}</span>
-          <div class="rep-funnel-step-bar">
-            <div class="rep-funnel-step-fill ${s.cls}" style="width: ${Math.min(100, s.pct).toFixed(1)}%;">
-              <span class="rep-funnel-step-pct">${s.pct.toFixed(0)}%</span>
-            </div>
-          </div>
-          <span class="rep-funnel-step-value">${typeof s.value === 'number' ? fmtInt(s.value) : s.value}</span>
-        </div>
-      `).join('');
-    }
-
-    // =========================================================
-    // FILTER + SORT
-    // =========================================================
-    function getFilteredZones() {
-      if (!REP.data || !REP.data.zones) return [];
-      let zones = REP.data.zones.slice();
-
-      if (REP.filters.grade) {
-        zones = zones.filter(z => z.score.grade === REP.filters.grade);
-      }
-
-      const sorters = {
-        profit_desc: (a, b) => b.pl.profit - a.pl.profit,
-        profit_asc: (a, b) => a.pl.profit - b.pl.profit,
-        roi_desc: (a, b) => b.pl.roi - a.pl.roi,
-        bot_desc: (a, b) => b.bot_rate - a.bot_rate,
-        volume_desc: (a, b) => b.total - a.total,
-      };
-      zones.sort(sorters[REP.filters.sort] || sorters.profit_desc);
-      return zones;
-    }
-
-    // =========================================================
-    // TABLE
-    // =========================================================
-    function renderTable(zones) {
-      const tbody = document.getElementById('repTableBody');
-      if (!zones.length) {
-        tbody.innerHTML = '<tr><td colspan="11" class="neo-table-empty">مفيش نتائج</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = zones.map(z => {
-        const isPos = z.pl.profit >= 0;
-        const isMuted = z.pl.error === 'no_sell_revenue';
-        const profitCls = isMuted ? '' : (isPos ? 'neo-fg-success' : 'neo-fg-danger');
-        const profitDisplay = isMuted ? '—' : fmtMoney(z.pl.profit);
-        const roiDisplay = isMuted ? '—' : `${z.pl.roi >= 0 ? '+' : ''}${z.pl.roi}%`;
-        const botColor = z.bot_rate > 30 ? 'var(--neo-danger)' : z.bot_rate > 15 ? 'var(--neo-warning)' : 'var(--neo-success)';
-        const gradeCls = z.score.grade === 'S' ? 'neo-badge-info' : z.score.grade === 'A' ? 'neo-badge-success' : z.score.grade === 'B' ? 'neo-badge-info' : z.score.grade === 'C' ? 'neo-badge-warning' : 'neo-badge-danger';
-
-        // Integrity badge
-        let integrityBadge = '';
-        if (z.integrity && z.integrity !== 'exact') {
-          const label = z.integrity === 'partial_warn' ? '⚠️ BID' : '~ BID';
-          integrityBadge = `<span class="rep-badge-integrity ${z.integrity}">${label}</span>`;
-        }
-
-        return `
-          <tr class="rep-zone-row" data-zone="${Neo.escape(z.zone)}">
-            <td class="neo-mono neo-fg-primary neo-font-bold">${Neo.escape(z.zone)}${integrityBadge}</td>
-            <td class="neo-mono neo-fg-tertiary neo-text-xs">${Neo.escape(z.source)}</td>
-            <td class="neo-cell-center neo-mono">${fmtInt(z.total)}</td>
-            <td class="neo-cell-center neo-mono neo-fg-success">${fmtInt(z.valid)}</td>
-            <td class="neo-cell-center neo-mono" style="color:${botColor};font-weight:700;">${z.bot_rate}%</td>
-            <td class="neo-cell-num neo-fg-danger">${fmtMoneyAbs(z.pl.cost)}</td>
-            <td class="neo-cell-num neo-fg-success">${fmtMoneyAbs(z.pl.revenue)}</td>
-            <td class="neo-cell-num ${profitCls}" style="font-weight:700;">${profitDisplay}</td>
-            <td class="neo-cell-center neo-mono ${profitCls}">${roiDisplay}</td>
-            <td class="neo-cell-center"><span class="neo-badge ${gradeCls}">${z.score.grade}</span></td>
-            <td class="neo-cell-center"><span class="neo-badge neo-badge-default">${Neo.escape(z.lifecycle)}</span></td>
-          </tr>
-        `;
-      }).join('');
-
-      tbody.querySelectorAll('.rep-zone-row').forEach(row => {
-        row.addEventListener('click', () => openZoneDrawer(row.dataset.zone));
+      RP.cluster = L.markerClusterGroup({
+        maxClusterRadius: 50,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
       });
-    }
 
-    // =========================================================
-    // CARDS
-    // =========================================================
-    function renderCards(zones) {
-      const container = document.getElementById('repViewCards');
-      if (!zones.length) {
-        container.innerHTML = '<div class="neo-empty" style="grid-column:1/-1;"><div class="neo-empty-icon">🔍</div><div class="neo-empty-msg">مفيش نتائج</div></div>';
-        return;
-      }
-
-      container.innerHTML = zones.map(z => {
-        const isPos = z.pl.profit >= 0;
-        const isMuted = z.pl.error === 'no_sell_revenue';
-        const profitCls = isMuted ? '' : (isPos ? 'neo-fg-success' : 'neo-fg-danger');
-        const profitDisplay = isMuted ? '—' : fmtMoney(z.pl.profit);
-        const roiDisplay = isMuted ? '' : `${z.pl.roi >= 0 ? '+' : ''}${z.pl.roi}%`;
-        const total = z.total || 1;
-        const pValid = Math.round((z.valid / total) * 100);
-        const pBot = Math.round((z.invalid / total) * 100);
-
-        const gradeColor = z.score.grade === 'S' ? '#A855F7' : z.score.grade === 'A' ? '#10B981' : z.score.grade === 'B' ? '#3B82F6' : z.score.grade === 'C' ? '#F59E0B' : '#EF4444';
-
-        return `
-          <div class="neo-card neo-card-interactive" data-zone="${Neo.escape(z.zone)}" style="position:relative;overflow:hidden;">
-            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${gradeColor};opacity:0.7;"></div>
-            <div class="neo-flex neo-justify-between neo-items-start neo-mb-3">
-              <div style="min-width:0;flex:1;">
-                <div class="neo-mono neo-font-bold neo-fg-primary" style="font-size:13px;">${Neo.escape(z.zone)}</div>
-                <div class="neo-fg-tertiary neo-text-xs neo-mono">${Neo.escape(z.source)} · ${Neo.escape(z.lifecycle)}</div>
-              </div>
-              <span class="neo-badge" style="background:${gradeColor}22;color:${gradeColor};border:1px solid ${gradeColor}55;">${z.score.grade}</span>
-            </div>
-            <div class="neo-flex neo-items-baseline neo-gap-2 neo-mb-3">
-              <span class="${profitCls}" style="font-family:var(--neo-font-mono);font-size:22px;font-weight:800;">${profitDisplay}</span>
-              <span class="${profitCls}" style="font-family:var(--neo-font-mono);font-size:10px;padding:2px 6px;border-radius:3px;background:${isPos ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'};">${roiDisplay}</span>
-            </div>
-            <div class="neo-flex neo-justify-between neo-text-xs neo-fg-tertiary neo-mono">
-              <span>${fmtInt(z.total)} زيارة</span>
-              <span class="neo-fg-success">${pValid}% valid</span>
-              <span style="color:${pBot > 20 ? 'var(--neo-danger)' : 'var(--neo-fg-tertiary)'};">${pBot}% bot</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      container.querySelectorAll('[data-zone]').forEach(card => {
-        card.addEventListener('click', () => openZoneDrawer(card.dataset.zone));
-      });
-    }
-
-    // =========================================================
-    // VIEW TOGGLE
-    // =========================================================
-    function renderView() {
-      const zones = getFilteredZones();
-      document.getElementById('repCount').textContent = zones.length + ' زون';
-
-      const tableView = document.getElementById('repViewTable');
-      const cardsView = document.getElementById('repViewCards');
-
-      if (REP.view === 'table') {
-        tableView.style.display = '';
-        cardsView.style.display = 'none';
-        renderTable(zones);
-      } else {
-        tableView.style.display = 'none';
-        cardsView.style.display = 'grid';
-        renderCards(zones);
-      }
-    }
-
-    // =========================================================
-    // ZONE DRAWER
-    // =========================================================
-    function openZoneDrawer(zoneId) {
-      const zone = REP.data.zones.find(z => z.zone === zoneId);
-      if (!zone) return;
-
-      document.getElementById('repDrawerZone').textContent = zone.zone;
-      document.getElementById('repDrawerMeta').textContent = `${zone.source} · ${zone.lifecycle} · ${fmtInt(zone.total)} زيارة`;
-
-      const total = zone.total || 1;
-      const pValid = Math.round((zone.valid / total) * 100);
-      const pBot = Math.round((zone.invalid / total) * 100);
-      const pSusp = Math.round((zone.suspicious / total) * 100);
-      const isMuted = zone.pl.error === 'no_sell_revenue';
-      const profit = Number(zone.pl.profit || 0);
-
-      document.getElementById('repDrawerBody').innerHTML = `
-        <!-- Stats grid -->
-        <div class="neo-grid-cols-2 neo-gap-2 neo-mb-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <div class="neo-card neo-card-sm">
-            <div class="neo-text-2xs neo-uppercase neo-fg-tertiary">Bot Rate</div>
-            <div class="neo-mono neo-font-extrabold" style="font-size:22px;color:${pBot > 20 ? 'var(--neo-danger)' : 'var(--neo-success)'};">${pBot}%</div>
-          </div>
-          <div class="neo-card neo-card-sm">
-            <div class="neo-text-2xs neo-uppercase neo-fg-tertiary">Valid %</div>
-            <div class="neo-mono neo-font-extrabold neo-fg-success" style="font-size:22px;">${pValid}%</div>
-          </div>
-          <div class="neo-card neo-card-sm">
-            <div class="neo-text-2xs neo-uppercase neo-fg-tertiary">Wasted %</div>
-            <div class="neo-mono neo-font-extrabold" style="font-size:22px;color:${zone.wasted_rate > 10 ? 'var(--neo-warning)' : 'var(--neo-success)'};">${zone.wasted_rate}%</div>
-          </div>
-          <div class="neo-card neo-card-sm">
-            <div class="neo-text-2xs neo-uppercase neo-fg-tertiary">Trust Score</div>
-            <div class="neo-mono neo-font-extrabold" style="font-size:22px;color:var(--neo-fg-primary);">${zone.score.composite}</div>
-          </div>
-        </div>
-
-        <!-- Composition -->
-        <div class="neo-mb-4">
-          <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mb-2">تكوين الزيارات</div>
-          <div style="height:8px;background:var(--neo-bg-elevated);border-radius:4px;overflow:hidden;display:flex;">
-            <div style="width:${pValid}%;background:#10B981;"></div>
-            <div style="width:${pSusp}%;background:#F59E0B;"></div>
-            <div style="width:${pBot}%;background:#EF4444;"></div>
-          </div>
-          <div class="neo-flex neo-justify-between neo-text-2xs neo-mono neo-mt-1">
-            <span style="color:#10B981;">Valid ${pValid}%</span>
-            <span style="color:#F59E0B;">Susp ${pSusp}%</span>
-            <span style="color:#EF4444;">Bot ${pBot}%</span>
-          </div>
-        </div>
-
-        <!-- P&L -->
-        <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mb-2">الربح والخسارة</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div class="neo-flex neo-justify-between neo-p-2" style="background:var(--neo-bg-elevated);border-radius:6px;">
-            <span class="neo-text-xs neo-fg-tertiary">التكلفة</span>
-            <span class="neo-mono neo-font-bold neo-fg-danger">${fmtMoneyAbs(zone.pl.cost)}</span>
-          </div>
-          <div class="neo-flex neo-justify-between neo-p-2" style="background:var(--neo-bg-elevated);border-radius:6px;">
-            <span class="neo-text-xs neo-fg-tertiary">الإيراد</span>
-            <span class="neo-mono neo-font-bold neo-fg-success">${fmtMoneyAbs(zone.pl.revenue)}</span>
-          </div>
-          <div class="neo-flex neo-justify-between neo-p-2" style="background:${profit >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)'};border:1px solid ${profit >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:6px;">
-            <span class="neo-text-xs neo-fg-secondary neo-font-bold">صافي الربح</span>
-            <span class="neo-mono neo-font-extrabold" style="font-size:16px;color:${isMuted ? 'var(--neo-fg-muted)' : profit >= 0 ? 'var(--neo-success)' : 'var(--neo-danger)'};">${isMuted ? '—' : fmtMoney(profit)}</span>
-          </div>
-          <div class="neo-flex neo-justify-between neo-p-2" style="background:var(--neo-bg-elevated);border-radius:6px;">
-            <span class="neo-text-xs neo-fg-tertiary">ROI</span>
-            <span class="neo-mono neo-font-bold" style="color:${isMuted ? 'var(--neo-fg-muted)' : profit >= 0 ? 'var(--neo-success)' : 'var(--neo-danger)'};">${isMuted ? '—' : `${zone.pl.roi >= 0 ? '+' : ''}${zone.pl.roi}%`}</span>
-          </div>
-        </div>
-
-        <!-- Trust score breakdown -->
-        <div class="neo-mt-4">
-          <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mb-2">تفصيل Trust Score (${zone.score.composite})</div>
-          ${renderScoreBar('الربح', zone.score.profit_score, '#22D3EE')}
-          ${renderScoreBar('الأمان', zone.score.safety_score, '#EF4444')}
-          ${renderScoreBar('الحجم', zone.score.volume_score, '#6366F1')}
-          ${renderScoreBar('الاستقرار', zone.score.stability_score, '#F59E0B')}
-        </div>
-      `;
-
-      const isBad = zone.score.grade === 'D' || zone.score.grade === 'F' || profit < 0;
-      const isGood = zone.score.grade === 'S' || zone.score.grade === 'A';
-
-      document.getElementById('repDrawerFoot').innerHTML = `
-        ${isBad ? `<button class="neo-btn neo-btn-danger-ghost" onclick="applyZoneAction('${Neo.escape(zone.zone)}', 'blacklist', 'repDrawer')">🚫 حظر</button>` : ''}
-        <button class="neo-btn neo-btn-secondary" onclick="applyZoneAction('${Neo.escape(zone.zone)}', 'pause', 'repDrawer')">⏸ Pause 24h</button>
-        ${isGood ? `<button class="neo-btn neo-btn-success" onclick="applyZoneAction('${Neo.escape(zone.zone)}', 'scale', 'repDrawer')">📈 Scale +30%</button>` : ''}
-        <a href="/visits?zone=${encodeURIComponent(zone.zone)}" class="neo-btn neo-btn-ghost" style="text-decoration:none;">👁 الزيارات</a>
-      `;
-
-      Neo.openDrawer('repDrawer');
-    }
-
-    function renderScoreBar(label, value, color) {
-      const v = Math.max(0, Math.min(100, Number(value || 0)));
-      return `
-        <div class="neo-flex neo-items-center neo-gap-2 neo-mb-2">
-          <span class="neo-text-xs neo-fg-secondary" style="min-width:80px;">${Neo.escape(label)}</span>
-          <div style="flex:1;height:6px;background:var(--neo-bg-elevated);border-radius:3px;overflow:hidden;">
-            <div style="width:${v}%;height:100%;background:${color};border-radius:3px;"></div>
-          </div>
-          <span class="neo-mono neo-text-xs neo-font-bold" style="color:${color};min-width:32px;text-align:left;">${v}</span>
-        </div>
-      `;
-    }
-
-    async function applyZoneAction(zoneId, action, drawerId) {
-      const labels = { blacklist: 'حظر', pause: 'Pause', scale: 'Scale +30%' };
       try {
-        const res = await Neo.api(`/api/zones/${encodeURIComponent(zoneId)}/action`, {
-          method: 'POST',
-          body: JSON.stringify({
-            action,
-            reason: 'Quick action from Reports V2',
-            metadata: action === 'scale' ? { percent: 30 } : action === 'pause' ? { hours: 24 } : {},
-          }),
+        const q = buildQuery();
+        const data = await Neo.api('/api/map/visits' + (q ? '?' + q : ''));
+
+        data.forEach(v => {
+          const color = v.verdict === 'valid' ? '#10B981' : v.verdict === 'invalid' ? '#EF4444' : '#F59E0B';
+          const marker = L.circleMarker([v.lat, v.lng], {
+            radius: 6, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.85,
+          });
+          marker.bindPopup(`<b>${esc(v.country)}</b><br>IP: ${esc(v.ip)}<br>Status: <b>${esc((v.verdict || '').toUpperCase())}</b>`);
+          RP.cluster.addLayer(marker);
         });
-        Neo.toast(`${labels[action]} — ${zoneId}`, 'success', 5000, {
-          undoLabel: 'تراجع',
-          onUndo: async () => {
-            try {
-              await Neo.api(`/api/zones/${encodeURIComponent(zoneId)}/action/${res.id}`, { method: 'DELETE' });
-              Neo.toast('تم التراجع', 'info');
-            } catch (e) {
-              Neo.toast('فشل التراجع', 'error');
-            }
+
+        RP.map.addLayer(RP.cluster);
+        document.getElementById('rpMapStats').textContent = `${fmtInt(data.length)} زيارة معروضة على الخريطة (بحد أقصى 1000)`;
+      } catch (e) {
+        document.getElementById('rpMapStats').textContent = 'فشل تحميل الزيارات: ' + e.message;
+      }
+    }
+
+    // =========================================================
+    // COUNTRIES
+    // =========================================================
+    async function loadCountries() {
+      try {
+        const q = buildQuery();
+        const data = await Neo.api('/api/reports/countries' + (q ? '?' + q : ''));
+
+        if (RP.charts.country) { try { RP.charts.country.destroy(); } catch (e) {} }
+
+        const top = data.slice(0, 10);
+        RP.charts.country = new Chart(document.getElementById('rpCountryChart').getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: top.map(d => d.code || d.name),
+            datasets: [
+              { label: 'صالح', data: top.map(d => d.valid), backgroundColor: '#10B981', stack: 'v', borderRadius: 3 },
+              { label: 'مشبوه', data: top.map(d => d.suspicious), backgroundColor: '#F59E0B', stack: 'v', borderRadius: 3 },
+              { label: 'بوتات', data: top.map(d => d.invalid), backgroundColor: '#EF4444', stack: 'v', borderRadius: 3 },
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#B0B8C4', font: { family: 'Inter' } } } },
+            scales: {
+              x: { stacked: true, ticks: { color: '#B0B8C4' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+              y: { stacked: true, ticks: { color: '#B0B8C4' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            },
           },
         });
-        if (action === 'blacklist' && drawerId) {
-          Neo.closeDrawer(drawerId);
+
+        const tbody = document.getElementById('rpCountriesBody');
+        if (!data.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="neo-table-empty">لا توجد بيانات</td></tr>';
+          return;
         }
-      } catch (err) {
-        Neo.toast('فشل: ' + err.message, 'error');
-      }
+        tbody.innerHTML = data.map(d => `
+          <tr>
+            <td style="font-weight: 700; color: var(--neo-fg-primary);">${esc(d.name)}</td>
+            <td class="neo-cell-center neo-mono neo-accent-hover" style="color: var(--neo-accent-hover);">${esc(d.code || '—')}</td>
+            <td class="neo-cell-center neo-mono">${fmtInt(d.total)}</td>
+            <td class="neo-cell-center neo-mono" style="color: var(--neo-success);">${fmtInt(d.valid)}</td>
+            <td class="neo-cell-center neo-mono" style="color: ${d.bot_rate > 30 ? 'var(--neo-danger)' : d.bot_rate > 15 ? 'var(--neo-warning)' : 'var(--neo-success)'}; font-weight: 800;">${d.bot_rate}%</td>
+          </tr>
+        `).join('');
+      } catch (e) { console.error('[RP] countries failed:', e); }
     }
 
     // =========================================================
-    // LOADER
+    // ZONES
     // =========================================================
-    async function loadReports() {
+    async function loadZones() {
       try {
-        const params = new URLSearchParams();
-        if (REP.filters.from) params.set('from_date', REP.filters.from);
-        if (REP.filters.to) params.set('to_date', REP.filters.to);
+        const q = buildQuery();
+        const data = await Neo.api('/api/reports/zones' + (q ? '?' + q : ''));
 
-        const url = '/api/reports/smart' + (params.toString() ? '?' + params.toString() : '');
-        const data = await Neo.api(url);
-        REP.data = data;
-
-        renderWarnings(data.warnings || []);
-
-        if (!data.zones || data.zones.length === 0) {
-          document.getElementById('repTableBody').innerHTML = '<tr><td colspan="11" class="neo-table-empty">مفيش بيانات في الفترة دي</td></tr>';
-          document.getElementById('repCount').textContent = '0 زون';
+        const tbody = document.getElementById('rpZonesBody');
+        if (!data.length) {
+          tbody.innerHTML = '<tr><td colspan="8" class="neo-table-empty">لا توجد بيانات</td></tr>';
           return;
         }
 
-        renderHero(data.summary);
-        renderFunnel(data.summary);
-        renderView();
+        tbody.innerHTML = data.map(z => {
+          const evChips = (z.top_evidence || []).slice(0, 3).map(e =>
+            `<span class="rp-ev-chip">${esc(evLabel(e.code))} ×${e.count}</span>`
+          ).join('') || '<span style="color: var(--neo-fg-muted); font-size: 10px;">—</span>';
 
-        // Update subtitle with period info
-        const from = REP.filters.from || '—';
-        const to = REP.filters.to || '—';
-        document.getElementById('repSubtitle').textContent =
-          `${fmtInt(data.summary.total)} زيارة · من ${from} إلى ${to}`;
+          return `
+            <tr>
+              <td class="neo-mono neo-fg-primary neo-font-bold">${esc(z.zone)}</td>
+              <td class="neo-cell-center neo-mono">${fmtInt(z.total)}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-success);">${fmtInt(z.valid)}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-warning);">${fmtInt(z.suspicious)}</td>
+              <td class="neo-cell-center neo-mono" style="color: var(--neo-danger); font-weight: 800;">${fmtInt(z.invalid)}</td>
+              <td class="neo-cell-center neo-mono" style="color: ${z.bot_rate > 30 ? 'var(--neo-danger)' : z.bot_rate > 15 ? 'var(--neo-warning)' : 'var(--neo-success)'}; font-weight: 800;">${z.bot_rate}%</td>
+              <td class="neo-cell-center"><span class="rp-badge ${z.grade === '?' ? 'q' : z.grade}">${z.grade}</span></td>
+              <td>${evChips}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) { console.error('[RP] zones failed:', e); }
+    }
 
-      } catch (e) {
-        console.error('[Reports] load failed:', e);
-        Neo.toast('فشل تحميل التقارير: ' + e.message, 'error');
-      }
+    // =========================================================
+    // TECH
+    // =========================================================
+    async function loadTech() {
+      try {
+        const q = buildQuery();
+        const data = await Neo.api('/api/reports/tech' + (q ? '?' + q : ''));
+
+        function mkChart(ctx, items) {
+          return new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: items.map(d => d.name),
+              datasets: [
+                { label: 'صالح', data: items.map(d => d.valid), backgroundColor: '#10B981', stack: 'v', borderRadius: 3 },
+                { label: 'مشبوه', data: items.map(d => d.suspicious), backgroundColor: '#F59E0B', stack: 'v', borderRadius: 3 },
+                { label: 'بوتات', data: items.map(d => d.invalid), backgroundColor: '#EF4444', stack: 'v', borderRadius: 3 },
+              ],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { labels: { color: '#B0B8C4', font: { family: 'Inter' } } } },
+              scales: {
+                x: { stacked: true, ticks: { color: '#B0B8C4' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { stacked: true, ticks: { color: '#B0B8C4' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+              },
+            },
+          });
+        }
+
+        if (RP.charts.device) { try { RP.charts.device.destroy(); } catch (e) {} }
+        if (RP.charts.browser) { try { RP.charts.browser.destroy(); } catch (e) {} }
+
+        RP.charts.device = mkChart(document.getElementById('rpDeviceChart').getContext('2d'), data.devices);
+        RP.charts.browser = mkChart(document.getElementById('rpBrowserChart').getContext('2d'), data.browsers);
+      } catch (e) { console.error('[RP] tech failed:', e); }
+    }
+
+    // =========================================================
+    // TABS
+    // =========================================================
+    function switchTab(tab) {
+      document.querySelectorAll('.rp-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.querySelectorAll('.rp-panel').forEach(p => {
+        p.classList.toggle('active', p.dataset.panel === tab);
+      });
+
+      if (tab === 'map') setTimeout(loadMap, 100);
+      else if (tab === 'countries') loadCountries();
+      else if (tab === 'zones') loadZones();
+      else if (tab === 'tech') loadTech();
     }
 
     // =========================================================
     // BIND
     // =========================================================
     function bindControls() {
-      // Apply
-      document.getElementById('repApplyBtn').addEventListener('click', () => {
-        REP.filters.from = document.getElementById('repFrom').value || '';
-        REP.filters.to = document.getElementById('repTo').value || '';
-        loadReports();
+      document.querySelectorAll('.rp-tab').forEach(t => {
+        t.addEventListener('click', () => switchTab(t.dataset.tab));
       });
 
-      // Quick ranges
-      document.querySelectorAll('[data-range]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const days = parseInt(btn.dataset.range, 10);
-          const to = new Date();
-          const from = new Date(to.getTime() - (days - 1) * 86400000);
-          REP.filters.from = localDate(from);
-          REP.filters.to = localDate(to);
-          document.getElementById('repFrom').value = REP.filters.from;
-          document.getElementById('repTo').value = REP.filters.to;
-          loadReports();
-        });
+      document.getElementById('rpApplyBtn').addEventListener('click', () => {
+        RP.filters.from = document.getElementById('rpFrom').value;
+        RP.filters.to = document.getElementById('rpTo').value;
+        const tab = document.querySelector('.rp-tab.active').dataset.tab;
+        switchTab(tab);
       });
 
-      // Grade filter
-      document.getElementById('repGradeFilter').addEventListener('change', (e) => {
-        REP.filters.grade = e.target.value;
-        renderView();
-      });
-
-      // Sort
-      document.getElementById('repSort').addEventListener('change', (e) => {
-        REP.filters.sort = e.target.value;
-        renderView();
-      });
-
-      // View toggle
-      document.querySelectorAll('.rep-view-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          REP.view = btn.dataset.view;
-          document.querySelectorAll('.rep-view-tab').forEach(b => {
-            b.classList.toggle('active', b.dataset.view === REP.view);
-            if (b.dataset.view === REP.view) {
-              b.classList.remove('neo-btn-ghost');
-              b.classList.add('neo-btn-secondary');
-            } else {
-              b.classList.add('neo-btn-ghost');
-              b.classList.remove('neo-btn-secondary');
-            }
-          });
-          renderView();
-        });
-      });
-
-      // Refresh
-      document.getElementById('repRefreshBtn').addEventListener('click', loadReports);
-
-      // Export
-      document.getElementById('repExportBtn').addEventListener('click', () => {
-        const zones = getFilteredZones();
-        if (!zones.length) { Neo.toast('مفيش بيانات للتصدير', 'warning'); return; }
-
-        const header = ['Zone', 'Source', 'Total', 'Valid', 'Bot%', 'Cost', 'Revenue', 'Profit', 'ROI', 'Grade', 'Lifecycle'];
-        const rows = zones.map(z => [
-          z.zone, z.source, z.total, z.valid, z.bot_rate,
-          Number(z.pl.cost).toFixed(4),
-          Number(z.pl.revenue).toFixed(4),
-          Number(z.pl.profit).toFixed(4),
-          z.pl.roi,
-          z.score.grade,
-          z.lifecycle,
-        ]);
-
-        const csv = [header, ...rows]
-          .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
-          .join('\n');
-
-        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ovg_zones_${localDate()}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        Neo.toast('تم التصدير', 'success');
+      document.getElementById('rpClearBtn').addEventListener('click', () => {
+        document.getElementById('rpFrom').value = '';
+        document.getElementById('rpTo').value = '';
+        RP.filters = { from: '', to: '' };
+        const tab = document.querySelector('.rp-tab.active').dataset.tab;
+        switchTab(tab);
       });
     }
 
-    // =========================================================
-    // BOOT
-    // =========================================================
     (async function boot() {
       try {
-        await Neo.mount({
-          active: 'smart',
-          lang: 'ar',
-          breadcrumb: [{ label: 'الحملات' }, { label: 'التقارير الذكية' }],
-        });
-
+        await Neo.mount({ active: 'reports', lang: 'ar', breadcrumb: [{ label: 'الخريطة والتقارير' }] });
         document.getElementById('bootSkeleton').style.display = 'none';
         document.getElementById('neoAppRoot').style.display = '';
 
-        // Default: last 7 days
-        const to = new Date();
-        const from = new Date(to.getTime() - 6 * 86400000);
-        REP.filters.from = localDate(from);
-        REP.filters.to = localDate(to);
-        document.getElementById('repFrom').value = REP.filters.from;
-        document.getElementById('repTo').value = REP.filters.to;
-
         bindControls();
-        await loadReports();
+        loadMap();
 
       } catch (e) {
-        console.error('[Reports Boot] failed:', e);
-        const skel = document.getElementById('bootSkeleton');
-        if (skel) {
-          skel.innerHTML = `
-            <div style="color: var(--neo-danger); font-weight: 700; margin-bottom: 8px;">فشل التحميل</div>
-            <div style="font-size: 12px; color: var(--neo-fg-tertiary); max-width: 340px; text-align: center; line-height: 1.6;">${Neo.escape ? Neo.escape(e.message || 'خطأ') : 'خطأ'}</div>
-            <button onclick="location.reload()" class="neo-btn neo-btn-primary" style="margin-top: 16px;">🔄 إعادة</button>
-          `;
-        }
+        console.error('[RP Boot] failed:', e);
+        document.getElementById('bootSkeleton').innerHTML = `<div style="color: var(--neo-danger);">فشل: ${Neo.escape(e.message)}</div>`;
       }
     })();
   </script>
