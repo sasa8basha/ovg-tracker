@@ -19,156 +19,201 @@
     .cat-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
     .risk-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 6px; }
     .risk-bar > div { height: 100%; border-radius: 3px; transition: width 600ms ease-out; }
+
+    /* Phase 1: dedicated error card */
+    .visit-error-card {
+      max-width: 520px;
+      margin: 80px auto;
+      padding: 32px 24px;
+      background: rgba(244,63,94,0.05);
+      border: 1px solid rgba(244,63,94,0.3);
+      border-radius: 20px;
+      text-align: center;
+    }
+    .visit-error-icon { font-size: 56px; margin-bottom: 16px; display: block; opacity: 0.85; }
+    .visit-error-title { font-size: 20px; font-weight: 800; color: #F1F5F9; margin: 0 0 8px; }
+    .visit-error-msg { font-size: 13px; color: #94A3B8; line-height: 1.6; margin: 0 0 20px; }
+    .visit-error-link {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #6366F1;
+      color: white;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 13px;
+      transition: background 120ms;
+    }
+    .visit-error-link:hover { background: #818CF8; }
   </style>
 </head>
 <body class="min-h-screen p-6">
-  <div class="max-w-6xl mx-auto" id="app" style="display: none;">
+  <div class="max-w-6xl mx-auto" id="app">
 
-    <div class="flex justify-between items-center mb-8">
-      <div class="flex items-center gap-4">
-        <button onclick="history.back()" class="text-slate-400 hover:text-white transition bg-white/5 p-2 rounded-lg">→</button>
-        <div>
-          <div class="flex items-center gap-3 flex-wrap">
-            <h1 class="text-2xl font-extrabold text-white font-mono">زيارة <span id="vId" class="text-indigo-400"></span></h1>
-            <span id="vBadge" class="px-3 py-1 rounded-full text-xs font-bold border"></span>
-            <span id="vConfidenceBadge" class="px-2 py-1 rounded-full text-[11px] font-bold bg-slate-700 text-slate-300 hidden"></span>
-          </div>
-          <p id="vTime" class="text-slate-400 text-sm mt-1"></p>
-        </div>
+    <div id="visitLoading" style="text-align:center;padding:80px 20px;color:#94A3B8;font-size:14px;">
+      <div style="display:inline-block;width:32px;height:32px;border:3px solid rgba(148,163,184,0.2);border-top-color:#6366F1;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:12px;"></div>
+      <div>جاري تحميل تفاصيل الزيارة…</div>
+    </div>
+
+    <div id="visitError" style="display:none;">
+      <div class="visit-error-card">
+        <span class="visit-error-icon">⚠️</span>
+        <h2 class="visit-error-title">فشل تحميل الزيارة</h2>
+        <p class="visit-error-msg" id="visitErrorMsg">الزيارة غير موجودة أو غير مصرح لك بعرضها.</p>
+        <a href="/visits" class="visit-error-link">→ رجوع لقائمة الزيارات</a>
       </div>
     </div>
 
-    <div class="glass-card p-5 mb-6">
-      <div class="flex flex-wrap items-center gap-4">
-        <div class="flex-1 min-w-[200px]">
-          <div class="text-xs font-bold text-slate-400 mb-1">🏷️ تصنيفك اليدوي (Ground Truth)</div>
-          <div id="gtStatus" class="text-sm text-slate-300">لم يتم التصنيف بعد</div>
-        </div>
-        <div class="flex gap-2">
-          <button id="gtHumanBtn" onclick="setGroundTruth('human')" class="px-4 py-2 rounded-lg font-bold text-sm border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition">✓ يوزر حقيقي</button>
-          <button id="gtBotBtn" onclick="setGroundTruth('bot')" class="px-4 py-2 rounded-lg font-bold text-sm border border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 transition">✗ بوت</button>
-          <button id="gtClearBtn" onclick="clearGroundTruth()" class="px-3 py-2 rounded-lg font-bold text-xs text-slate-400 hover:bg-white/5 transition hidden">مسح التصنيف</button>
-        </div>
-      </div>
-    </div>
+    <div id="visitContent" style="display:none;">
 
-    <div id="mismatchBanner" class="hidden mb-6"></div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-      <div class="lg:col-span-1 space-y-6">
-        <div class="glass-card p-6 flex flex-col items-center justify-center">
-          <div class="score-ring mb-4">
-            <svg viewBox="0 0 150 150">
-              <circle class="score-bg" cx="75" cy="75" r="65"></circle>
-              <circle id="scoreCircle" class="score-progress" cx="75" cy="75" r="65"></circle>
-            </svg>
-            <div class="text-center z-10">
-              <div id="vScore" class="text-4xl font-extrabold text-white font-mono">0</div>
-              <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk Score</div>
+      <div class="flex justify-between items-center mb-8">
+        <div class="flex items-center gap-4">
+          <button onclick="history.back()" class="text-slate-400 hover:text-white transition bg-white/5 p-2 rounded-lg">→</button>
+          <div>
+            <div class="flex items-center gap-3 flex-wrap">
+              <h1 class="text-2xl font-extrabold text-white font-mono">زيارة <span id="vId" class="text-indigo-400"></span></h1>
+              <span id="vBadge" class="px-3 py-1 rounded-full text-xs font-bold border"></span>
+              <span id="vConfidenceBadge" class="px-2 py-1 rounded-full text-[11px] font-bold bg-slate-700 text-slate-300 hidden"></span>
             </div>
-          </div>
-          <div id="vVerdictText" class="text-lg font-bold"></div>
-          <div id="vCategories" class="flex flex-wrap gap-1 mt-3 justify-center"></div>
-        </div>
-
-        <div class="glass-card p-6">
-          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💰</span> الأرباح المالية</h3>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">BID</div><div id="vBid" class="text-sm font-bold text-rose-400 font-mono">$0.00</div></div>
-            <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الإيراد</div><div id="vRevenue" class="text-sm font-bold text-emerald-400 font-mono">$0.00</div></div>
-            <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الربح</div><div id="vProfit" class="text-sm font-bold font-mono">$0.00</div></div>
-          </div>
-        </div>
-
-        <div class="glass-card p-6">
-          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧠</span> السلوك والتفاعل</h3>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">المكوث</div><div id="vTimeOnPage" class="text-lg font-bold text-blue-400 font-mono">0s</div></div>
-            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">نقرات</div><div id="vClicks" class="text-lg font-bold text-emerald-400 font-mono">0</div></div>
-            <div class="stat-box"><div class="text-xs text-slate-400 mb-1">سكرول</div><div id="vScrolls" class="text-lg font-bold text-amber-400 font-mono">0</div></div>
+            <p id="vTime" class="text-slate-400 text-sm mt-1"></p>
           </div>
         </div>
       </div>
 
-      <div class="lg:col-span-2 space-y-6">
-
-        <!-- IP Intelligence (NEW) -->
-        <div class="glass-card p-6" id="ipIntelCard">
-          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <span>🌐</span> IP Intelligence
-            </h3>
-            <span id="vClassification" class="px-3 py-1 rounded-full text-[10px] font-bold"></span>
+      <div class="glass-card p-5 mb-6">
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex-1 min-w-[200px]">
+            <div class="text-xs font-bold text-slate-400 mb-1">🏷️ تصنيفك اليدوي (Ground Truth)</div>
+            <div id="gtStatus" class="text-sm text-slate-300">لم يتم التصنيف بعد</div>
           </div>
-
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-            <div><div class="text-xs text-slate-500 mb-1">IP</div><div id="vIpIntelIp" class="font-mono text-white font-bold break-all text-xs"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">Country</div><div id="vIpIntelCountry" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">ISP</div><div id="vIpIntelIsp" class="text-slate-200 text-xs break-all"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vIpIntelAsn" class="font-mono text-slate-200 text-xs"></div></div>
+          <div class="flex gap-2">
+            <button id="gtHumanBtn" onclick="setGroundTruth('human')" class="px-4 py-2 rounded-lg font-bold text-sm border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition">✓ يوزر حقيقي</button>
+            <button id="gtBotBtn" onclick="setGroundTruth('bot')" class="px-4 py-2 rounded-lg font-bold text-sm border border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 transition">✗ بوت</button>
+            <button id="gtClearBtn" onclick="clearGroundTruth()" class="px-3 py-2 rounded-lg font-bold text-xs text-slate-400 hover:bg-white/5 transition hidden">مسح التصنيف</button>
           </div>
+        </div>
+      </div>
 
-          <div class="mb-3">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs text-slate-400 font-bold">Risk Score</span>
-              <span id="vIpRiskScore" class="font-mono text-sm font-bold">0</span>
+      <div id="mismatchBanner" class="hidden mb-6"></div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <div class="lg:col-span-1 space-y-6">
+          <div class="glass-card p-6 flex flex-col items-center justify-center">
+            <div class="score-ring mb-4">
+              <svg viewBox="0 0 150 150">
+                <circle class="score-bg" cx="75" cy="75" r="65"></circle>
+                <circle id="scoreCircle" class="score-progress" cx="75" cy="75" r="65"></circle>
+              </svg>
+              <div class="text-center z-10">
+                <div id="vScore" class="text-4xl font-extrabold text-white font-mono">0</div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk Score</div>
+              </div>
             </div>
-            <div class="risk-bar"><div id="vIpRiskBar" style="width:0%;background:#10B981;"></div></div>
+            <div id="vVerdictText" class="text-lg font-bold"></div>
+            <div id="vCategories" class="flex flex-wrap gap-1 mt-3 justify-center"></div>
           </div>
 
-          <div id="vIpReasons" class="mt-3"></div>
-        </div>
-
-        <!-- PopAds Macros -->
-        <div class="glass-card p-6">
-          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <span>📊</span> PopAds — كل الماكروز
-            </h3>
-            <button id="toggleRawBtn" class="text-[10px] px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white transition border border-white/10">
-              🔍 إظهار Raw JSON
-            </button>
+          <div class="glass-card p-6">
+            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💰</span> الأرباح المالية</h3>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">BID</div><div id="vBid" class="text-sm font-bold text-rose-400 font-mono">$0.00</div></div>
+              <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الإيراد</div><div id="vRevenue" class="text-sm font-bold text-emerald-400 font-mono">$0.00</div></div>
+              <div class="stat-box"><div class="text-[10px] text-slate-400 mb-1">الربح</div><div id="vProfit" class="text-sm font-bold font-mono">$0.00</div></div>
+            </div>
           </div>
 
-          <div id="popadsKnown" class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm"></div>
-
-          <div id="popadsRaw" class="hidden mt-4">
-            <div class="text-[10px] text-slate-500 mb-2 font-bold">Raw JSON (كل اللي جاي من PopAds):</div>
-            <pre id="popadsRawPre" class="text-[11px] bg-black/40 p-3 rounded-lg overflow-auto max-h-80 text-emerald-400 font-mono leading-relaxed" style="direction:ltr;text-align:left;"></pre>
+          <div class="glass-card p-6">
+            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🧠</span> السلوك والتفاعل</h3>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="stat-box"><div class="text-xs text-slate-400 mb-1">المكوث</div><div id="vTimeOnPage" class="text-lg font-bold text-blue-400 font-mono">0s</div></div>
+              <div class="stat-box"><div class="text-xs text-slate-400 mb-1">نقرات</div><div id="vClicks" class="text-lg font-bold text-emerald-400 font-mono">0</div></div>
+              <div class="stat-box"><div class="text-xs text-slate-400 mb-1">سكرول</div><div id="vScrolls" class="text-lg font-bold text-amber-400 font-mono">0</div></div>
+            </div>
           </div>
         </div>
 
-        <div class="glass-card p-6">
-          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🌐</span> الشبكة والاتصال</h3>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><div class="text-xs text-slate-500 mb-1">IP Address</div><div id="vIp" class="font-mono text-white font-bold bg-white/5 px-2 py-1 rounded break-all"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">Country (من إحنا)</div><div id="vCountry" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">Country (PopAds)</div><div id="vCountryPopads" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">ISP (من إحنا)</div><div id="vIsp" class="text-slate-200 text-xs break-all"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">ISP (PopAds)</div><div id="vIspPopads" class="text-slate-200 text-xs break-all"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vAsn" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">نوع الاتصال</div><div id="vConnType" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">VPN/Proxy</div><div id="vVpn"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">Timezone</div><div id="vTimezone" class="text-slate-200"></div></div>
-          </div>
-        </div>
+        <div class="lg:col-span-2 space-y-6">
 
-        <div class="glass-card p-6">
-          <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💻</span> الجهاز والبصمة</h3>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><div class="text-xs text-slate-500 mb-1">النظام (OS)</div><div id="vOs" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">المتصفح</div><div id="vBrowser" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">الجهاز</div><div id="vDevice" class="text-slate-200"></div></div>
-            <div><div class="text-xs text-slate-500 mb-1">الهاردوير</div><div id="vHardware" class="text-slate-200"></div></div>
-            <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Canvas Hash</div><div id="vCanvas" class="text-slate-200 font-mono text-xs bg-white/5 p-2 rounded break-all"></div></div>
-            <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Zone ID</div><div id="vZone" class="text-slate-200 font-mono"></div></div>
-          </div>
-        </div>
+          <div class="glass-card p-6" id="ipIntelCard">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <span>🌐</span> IP Intelligence
+              </h3>
+              <span id="vClassification" class="px-3 py-1 rounded-full text-[10px] font-bold"></span>
+            </div>
 
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+              <div><div class="text-xs text-slate-500 mb-1">IP</div><div id="vIpIntelIp" class="font-mono text-white font-bold break-all text-xs"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">Country</div><div id="vIpIntelCountry" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">ISP</div><div id="vIpIntelIsp" class="text-slate-200 text-xs break-all"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vIpIntelAsn" class="font-mono text-slate-200 text-xs"></div></div>
+            </div>
+
+            <div class="mb-3">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs text-slate-400 font-bold">Risk Score</span>
+                <span id="vIpRiskScore" class="font-mono text-sm font-bold">0</span>
+              </div>
+              <div class="risk-bar"><div id="vIpRiskBar" style="width:0%;background:#10B981;"></div></div>
+            </div>
+
+            <div id="vIpReasons" class="mt-3"></div>
+          </div>
+
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <span>📊</span> PopAds — كل الماكروز
+              </h3>
+              <button id="toggleRawBtn" class="text-[10px] px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white transition border border-white/10">
+                🔍 إظهار Raw JSON
+              </button>
+            </div>
+
+            <div id="popadsKnown" class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm"></div>
+
+            <div id="popadsRaw" class="hidden mt-4">
+              <div class="text-[10px] text-slate-500 mb-2 font-bold">Raw JSON (كل اللي جاي من PopAds):</div>
+              <pre id="popadsRawPre" class="text-[11px] bg-black/40 p-3 rounded-lg overflow-auto max-h-80 text-emerald-400 font-mono leading-relaxed" style="direction:ltr;text-align:left;"></pre>
+            </div>
+          </div>
+
+          <div class="glass-card p-6">
+            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>🌐</span> الشبكة والاتصال</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div><div class="text-xs text-slate-500 mb-1">IP Address</div><div id="vIp" class="font-mono text-white font-bold bg-white/5 px-2 py-1 rounded break-all"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">Country (من إحنا)</div><div id="vCountry" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">Country (PopAds)</div><div id="vCountryPopads" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">ISP (من إحنا)</div><div id="vIsp" class="text-slate-200 text-xs break-all"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">ISP (PopAds)</div><div id="vIspPopads" class="text-slate-200 text-xs break-all"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">ASN</div><div id="vAsn" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">نوع الاتصال</div><div id="vConnType" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">VPN/Proxy</div><div id="vVpn"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">Timezone</div><div id="vTimezone" class="text-slate-200"></div></div>
+            </div>
+          </div>
+
+          <div class="glass-card p-6">
+            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span>💻</span> الجهاز والبصمة</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div><div class="text-xs text-slate-500 mb-1">النظام (OS)</div><div id="vOs" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">المتصفح</div><div id="vBrowser" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">الجهاز</div><div id="vDevice" class="text-slate-200"></div></div>
+              <div><div class="text-xs text-slate-500 mb-1">الهاردوير</div><div id="vHardware" class="text-slate-200"></div></div>
+              <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Canvas Hash</div><div id="vCanvas" class="text-slate-200 font-mono text-xs bg-white/5 p-2 rounded break-all"></div></div>
+              <div class="col-span-2"><div class="text-xs text-slate-500 mb-1">Zone ID</div><div id="vZone" class="text-slate-200 font-mono"></div></div>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   </div>
+
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 
   <script>
     const visitId = window.location.pathname.split('/').pop();
@@ -213,6 +258,14 @@
       suspicious:  { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: '⚠️ Suspicious' },
       unknown:     { bg: 'rgba(100,116,139,0.15)',color: '#94A3B8', label: '❓ Unknown' },
     };
+
+    // Phase 1: show dedicated error UI instead of destroying the page
+    function showError(msg) {
+      document.getElementById('visitLoading').style.display = 'none';
+      document.getElementById('visitContent').style.display = 'none';
+      document.getElementById('visitError').style.display = '';
+      document.getElementById('visitErrorMsg').textContent = msg || 'حدث خطأ غير متوقع.';
+    }
 
     function renderPopadsMacros(known, raw) {
       const container = document.getElementById('popadsKnown');
@@ -403,97 +456,108 @@
     }
 
     async function loadDetails() {
-      const r = await fetch('/api/visits/' + visitId);
-      if (!r.ok) {
-        document.body.innerHTML = "<h1 class='text-center mt-20 text-rose-500 text-2xl'>الزيارة غير موجودة أو غير مصرح لك</h1>";
-        return;
+      try {
+        const r = await fetch('/api/visits/' + visitId);
+
+        // Phase 1: proper error handling (no more destroying the page)
+        if (!r.ok) {
+          if (r.status === 404) showError('الزيارة غير موجودة أو غير مصرح لك بعرضها.');
+          else if (r.status === 401) showError('انتهت صلاحية الجلسة. رجاءً سجّل الدخول من جديد.');
+          else showError('فشل تحميل الزيارة (HTTP ' + r.status + ')');
+          return;
+        }
+
+        const d = await r.json();
+
+        document.getElementById('visitLoading').style.display = 'none';
+        document.getElementById('visitContent').style.display = '';
+
+        document.getElementById('vId').textContent = '#' + d.id;
+        document.getElementById('vTime').textContent = d.timestamp;
+        document.getElementById('vScore').textContent = d.score;
+        document.getElementById('vIp').textContent = d.ip;
+        document.getElementById('vCountry').textContent = d.country;
+        document.getElementById('vCountryPopads').textContent = (d.popads_known && d.popads_known.country) || '—';
+        document.getElementById('vIsp').textContent = d.isp;
+        document.getElementById('vIspPopads').textContent = (d.popads_known && (d.popads_known.ispname || d.popads_known.isp)) || '—';
+        document.getElementById('vAsn').textContent = d.asn;
+        document.getElementById('vConnType').textContent = d.connection_type;
+        document.getElementById('vTimezone').textContent = d.timezone;
+        document.getElementById('vOs').textContent = d.os;
+        document.getElementById('vBrowser').textContent = d.browser;
+        document.getElementById('vDevice').textContent = d.device;
+        document.getElementById('vHardware').textContent = d.hardware;
+        document.getElementById('vCanvas').textContent = d.canvas_hash;
+        document.getElementById('vZone').textContent = d.zone_id;
+
+        document.getElementById('vTimeOnPage').textContent = d.time_on_page + 's';
+        document.getElementById('vClicks').textContent = d.clicks;
+        document.getElementById('vScrolls').textContent = d.scrolls;
+
+        renderPopadsMacros(d.popads_known || {}, d.popads_data || {});
+        renderIpIntel(d.ip_intel);
+        renderMismatches(d.mismatches);
+
+        const bid = Number(d.bid || 0);
+        const rev = Number(d.revenue || 0);
+        const profit = rev - bid;
+        document.getElementById('vBid').textContent = '$' + bid.toFixed(6);
+        document.getElementById('vRevenue').textContent = '$' + rev.toFixed(6);
+        const profitEl = document.getElementById('vProfit');
+        profitEl.textContent = (profit >= 0 ? '+' : '') + '$' + profit.toFixed(6);
+        profitEl.style.color = profit >= 0 ? '#10B981' : '#F43F5E';
+
+        const badge = document.getElementById('vBadge');
+        const circle = document.getElementById('scoreCircle');
+        const verdictText = document.getElementById('vVerdictText');
+        let color = '';
+
+        if (d.verdict === 'valid') {
+          color = '#10B981';
+          badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
+          verdictText.className = 'text-lg font-bold text-emerald-400';
+          verdictText.textContent = 'زيارة سليمة';
+        } else if (d.verdict === 'invalid') {
+          color = '#F43F5E';
+          badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-rose-500/30 bg-rose-500/10 text-rose-400';
+          verdictText.className = 'text-lg font-bold text-rose-400';
+          verdictText.textContent = 'بوت / زيارة وهمية';
+        } else if (d.verdict === 'pending') {
+          color = '#6366F1';
+          badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/30 bg-indigo-500/10 text-indigo-400';
+          verdictText.className = 'text-lg font-bold text-indigo-400';
+          verdictText.textContent = 'قيد التحليل';
+        } else {
+          color = '#F59E0B';
+          badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-amber-500/30 bg-amber-500/10 text-amber-400';
+          verdictText.className = 'text-lg font-bold text-amber-400';
+          verdictText.textContent = 'زيارة مشبوهة';
+        }
+        badge.textContent = (d.verdict || 'UNKNOWN').toUpperCase();
+        circle.style.stroke = color;
+
+        renderCategories(document.getElementById('vCategories'), d.categories);
+
+        const vpnEl = document.getElementById('vVpn');
+        if (d.is_vpn) {
+          vpnEl.className = 'text-rose-400 font-bold';
+          vpnEl.textContent = 'YES';
+        } else {
+          vpnEl.className = 'text-emerald-400';
+          vpnEl.textContent = 'NO';
+        }
+
+        renderGroundTruth(d.ground_truth, d.ground_truth_at, d.ground_truth_by);
+
+        // Phase 1 FIX: score is 0-100 (not 0-150)
+        setTimeout(function () {
+          const percentage = Math.min(Number(d.score || 0) / 100, 1);
+          const offset = 408 - (percentage * 408);
+          circle.style.strokeDashoffset = offset;
+        }, 100);
+      } catch (e) {
+        showError('فشل الاتصال بالسيرفر: ' + (e.message || 'خطأ غير متوقع'));
       }
-      const d = await r.json();
-
-      document.getElementById('app').style.display = 'block';
-
-      document.getElementById('vId').textContent = '#' + d.id;
-      document.getElementById('vTime').textContent = d.timestamp;
-      document.getElementById('vScore').textContent = d.score;
-      document.getElementById('vIp').textContent = d.ip;
-      document.getElementById('vCountry').textContent = d.country;
-      document.getElementById('vCountryPopads').textContent = (d.popads_known && d.popads_known.country) || '—';
-      document.getElementById('vIsp').textContent = d.isp;
-      document.getElementById('vIspPopads').textContent = (d.popads_known && (d.popads_known.ispname || d.popads_known.isp)) || '—';
-      document.getElementById('vAsn').textContent = d.asn;
-      document.getElementById('vConnType').textContent = d.connection_type;
-      document.getElementById('vTimezone').textContent = d.timezone;
-      document.getElementById('vOs').textContent = d.os;
-      document.getElementById('vBrowser').textContent = d.browser;
-      document.getElementById('vDevice').textContent = d.device;
-      document.getElementById('vHardware').textContent = d.hardware;
-      document.getElementById('vCanvas').textContent = d.canvas_hash;
-      document.getElementById('vZone').textContent = d.zone_id;
-
-      document.getElementById('vTimeOnPage').textContent = d.time_on_page + 's';
-      document.getElementById('vClicks').textContent = d.clicks;
-      document.getElementById('vScrolls').textContent = d.scrolls;
-
-      renderPopadsMacros(d.popads_known || {}, d.popads_data || {});
-      renderIpIntel(d.ip_intel);
-      renderMismatches(d.mismatches);
-
-      const bid = Number(d.bid || 0);
-      const rev = Number(d.revenue || 0);
-      const profit = rev - bid;
-      document.getElementById('vBid').textContent = '$' + bid.toFixed(6);
-      document.getElementById('vRevenue').textContent = '$' + rev.toFixed(6);
-      const profitEl = document.getElementById('vProfit');
-      profitEl.textContent = (profit >= 0 ? '+' : '') + '$' + profit.toFixed(6);
-      profitEl.style.color = profit >= 0 ? '#10B981' : '#F43F5E';
-
-      const badge = document.getElementById('vBadge');
-      const circle = document.getElementById('scoreCircle');
-      const verdictText = document.getElementById('vVerdictText');
-      let color = '';
-
-      if (d.verdict === 'valid') {
-        color = '#10B981';
-        badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
-        verdictText.className = 'text-lg font-bold text-emerald-400';
-        verdictText.textContent = 'زيارة سليمة';
-      } else if (d.verdict === 'invalid') {
-        color = '#F43F5E';
-        badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-rose-500/30 bg-rose-500/10 text-rose-400';
-        verdictText.className = 'text-lg font-bold text-rose-400';
-        verdictText.textContent = 'بوت / زيارة وهمية';
-      } else if (d.verdict === 'pending') {
-        color = '#6366F1';
-        badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/30 bg-indigo-500/10 text-indigo-400';
-        verdictText.className = 'text-lg font-bold text-indigo-400';
-        verdictText.textContent = 'قيد التحليل';
-      } else {
-        color = '#F59E0B';
-        badge.className = 'px-3 py-1 rounded-full text-xs font-bold border border-amber-500/30 bg-amber-500/10 text-amber-400';
-        verdictText.className = 'text-lg font-bold text-amber-400';
-        verdictText.textContent = 'زيارة مشبوهة';
-      }
-      badge.textContent = (d.verdict || 'UNKNOWN').toUpperCase();
-      circle.style.stroke = color;
-
-      renderCategories(document.getElementById('vCategories'), d.categories);
-
-      const vpnEl = document.getElementById('vVpn');
-      if (d.is_vpn) {
-        vpnEl.className = 'text-rose-400 font-bold';
-        vpnEl.textContent = 'YES';
-      } else {
-        vpnEl.className = 'text-emerald-400';
-        vpnEl.textContent = 'NO';
-      }
-
-      renderGroundTruth(d.ground_truth, d.ground_truth_at, d.ground_truth_by);
-
-      setTimeout(function () {
-        const percentage = Math.min(d.score / 150, 1);
-        const offset = 408 - (percentage * 408);
-        circle.style.strokeDashoffset = offset;
-      }, 100);
     }
 
     loadDetails();

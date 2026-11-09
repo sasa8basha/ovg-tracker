@@ -27,6 +27,17 @@
     .sr-input { width: 100%; height: 32px; padding: 0 10px; background: #08090D; border: 1px solid #232734; border-radius: 6px; color: #F8FAFC; font-family: inherit; font-size: 12px; outline: none; transition: border-color 120ms; }
     .sr-input:focus { border-color: #7C5CFF; box-shadow: 0 0 0 3px rgba(124,92,255,0.12); }
 
+    /* Warnings banner (Phase 1) */
+    .sr-warnings { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .sr-warn-item { display: flex; gap: 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid; align-items: flex-start; }
+    .sr-warn-item.sev-high { background: rgba(244,63,94,0.08); border-color: rgba(244,63,94,0.35); color: #FDA4AF; }
+    .sr-warn-item.sev-medium { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.35); color: #FCD34D; }
+    .sr-warn-item.sev-low { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.35); color: #93C5FD; }
+    .sr-warn-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+    .sr-warn-body { flex: 1; min-width: 0; }
+    .sr-warn-code { font-size: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 800; opacity: 0.75; margin-bottom: 2px; letter-spacing: 0.03em; }
+    .sr-warn-msg { font-size: 12px; line-height: 1.55; }
+
     .sr-hero { background: linear-gradient(135deg, #0F1117 0%, #161822 100%); border: 1px solid #232734; border-radius: 16px; padding: 20px 24px; margin-bottom: 12px; display: grid; grid-template-columns: 1fr auto; gap: 24px; position: relative; overflow: hidden; }
     @media (max-width: 700px) { .sr-hero { grid-template-columns: 1fr; gap: 16px; } }
     .sr-hero::before { content: ''; position: absolute; top: -50%; right: -30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(34,211,238,0.20) 0%, transparent 70%); pointer-events: none; transition: background 400ms; }
@@ -35,9 +46,11 @@
     .sr-hero-label { font-size: 10px; font-weight: 700; color: #7B8496; text-transform: uppercase; letter-spacing: 0.1em; }
     .sr-hero-value { font-family: 'JetBrains Mono', monospace; font-size: 44px; font-weight: 900; line-height: 1; margin-top: 8px; letter-spacing: -0.03em; color: #22D3EE; text-shadow: 0 0 32px rgba(34,211,238,0.35); font-feature-settings: "tnum"; }
     .sr-hero.negative .sr-hero-value { color: #F43F5E; text-shadow: 0 0 32px rgba(244,63,94,0.35); }
+    .sr-hero-value.muted { color: #4A5263; text-shadow: none; font-size: 32px; }
     .sr-hero-roi { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
     .sr-hero-roi.pos { background: rgba(34,211,238,0.12); color: #22D3EE; }
     .sr-hero-roi.neg { background: rgba(244,63,94,0.12); color: #F43F5E; }
+    .sr-hero-roi.muted { background: rgba(148,163,184,0.12); color: #94A3B8; }
     .sr-hero-stats { display: grid; grid-template-columns: repeat(3, auto); gap: 20px; position: relative; align-items: end; }
     @media (max-width: 500px) { .sr-hero-stats { grid-template-columns: 1fr 1fr; gap: 12px; } }
     .sr-hero-stat-label { font-size: 9px; color: #4A5263; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
@@ -45,6 +58,7 @@
 
     .sr-breakeven { background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.25); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; font-size: 12px; color: #FDA4AF; line-height: 1.6; }
     .sr-breakeven.ok { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); color: #6EE7B7; }
+    .sr-breakeven.muted { background: rgba(124,92,255,0.08); border-color: rgba(124,92,255,0.25); color: #C4B5FD; }
     .sr-breakeven-icon { font-size: 22px; flex-shrink: 0; }
     .sr-breakeven b { color: #F8FAFC; }
 
@@ -71,6 +85,12 @@
     .sr-card-zone-wrap { min-width: 0; flex: 1; }
     .sr-card-zone { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; color: #F8FAFC; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sr-card-source { font-size: 10px; color: #4A5263; font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+
+    /* Integrity badge per zone (Phase 1) */
+    .sr-integrity-badge { display: inline-block; font-size: 9px; font-family: 'JetBrains Mono', monospace; font-weight: 800; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+    .sr-integrity-badge.partial { background: rgba(245,158,11,0.15); color: #F59E0B; }
+    .sr-integrity-badge.partial_warn { background: rgba(244,63,94,0.15); color: #F43F5E; }
+
     .sr-trust-gauge { width: 44px; height: 44px; flex-shrink: 0; position: relative; }
     .sr-trust-gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
     .sr-trust-gauge .bg { fill: none; stroke: #232734; stroke-width: 3.5; }
@@ -80,9 +100,11 @@
     .sr-card-profit { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
     .sr-card-profit.pos { color: #10B981; }
     .sr-card-profit.neg { color: #F43F5E; }
+    .sr-card-profit.muted { color: #4A5263; }
     .sr-card-roi { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
     .sr-card-roi.pos { background: rgba(16,185,129,0.12); color: #10B981; }
     .sr-card-roi.neg { background: rgba(244,63,94,0.12); color: #F43F5E; }
+    .sr-card-roi.muted { background: rgba(148,163,184,0.12); color: #94A3B8; }
     .sr-card-comp { display: flex; height: 4px; background: #232734; border-radius: 2px; overflow: hidden; }
     .sr-card-comp > div { height: 100%; transition: width 600ms cubic-bezier(0.16,1,0.3,1); }
     .sr-card-comp .c-valid { background: #10B981; }
@@ -106,6 +128,7 @@
     .sr-profit-cell { font-family: 'JetBrains Mono', monospace; font-weight: 800; text-align: center; }
     .sr-profit-cell.pos { color: #10B981; }
     .sr-profit-cell.neg { color: #F43F5E; }
+    .sr-profit-cell.muted { color: #4A5263; }
 
     .sr-grade-pill { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 900; }
     .sr-grade-S { background: rgba(168,85,247,0.15); color: #A855F7; border: 1px solid rgba(168,85,247,0.35); }
@@ -256,6 +279,9 @@
       </div>
 
       <div id="srContent" style="display:none;">
+        <!-- Phase 1: warnings banner (truncated, bid coverage, no sell cpm) -->
+        <div class="sr-warnings" id="srWarnings" style="display:none;"></div>
+
         <div class="sr-hero" id="srHero">
           <div class="sr-hero-main">
             <div class="sr-hero-label">صافي الربح</div>
@@ -447,24 +473,141 @@
       });
     }
 
-    function renderHero(summary) {
-      const pl = summary.pl;
-      const hero = document.getElementById('srHero');
-      document.getElementById('heroProfit').textContent = fmtMoney(pl.profit);
-      const isPos = pl.profit >= 0;
-      hero.classList.toggle('negative', !isPos);
-      const roiEl = document.getElementById('heroRoi');
-      roiEl.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${pl.roi}%`;
-      roiEl.className = 'sr-hero-roi ' + (isPos ? 'pos' : 'neg');
-      document.getElementById('heroCost').textContent = '$' + Number(pl.cost || 0).toFixed(2);
-      document.getElementById('heroRev').textContent = '$' + Number(pl.revenue || 0).toFixed(2);
-      document.getElementById('heroTotal').textContent = fmtNum(summary.total);
+    // =========================================================
+    // Phase 1: Warnings banner
+    // =========================================================
+    function renderWarnings(warnings) {
+      const container = document.getElementById('srWarnings');
+      if (!container) return;
 
+      if (!warnings || !warnings.length) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+      }
+
+      container.style.display = 'flex';
+      container.innerHTML = warnings.map(w => {
+        const sev = w.severity === 'high' ? 'sev-high' : w.severity === 'medium' ? 'sev-medium' : 'sev-low';
+        const icon = w.severity === 'high' ? '🚨' : (w.severity === 'medium' ? '⚠️' : 'ℹ️');
+        return `
+          <div class="sr-warn-item ${sev}">
+            <span class="sr-warn-icon">${icon}</span>
+            <div class="sr-warn-body">
+              <div class="sr-warn-code">${esc(w.code || 'WARNING')}</div>
+              <div class="sr-warn-msg">${esc(w.message || '')}</div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // =========================================================
+    // Phase 1: Hero (respects pl.error and pl.source)
+    // =========================================================
+    function renderHero(summary) {
+      const pl = summary.pl || {};
+      const hero = document.getElementById('srHero');
+      const profitEl = document.getElementById('heroProfit');
+      const roiEl = document.getElementById('heroRoi');
+      const costEl = document.getElementById('heroCost');
+      const revEl = document.getElementById('heroRev');
+      const totalEl = document.getElementById('heroTotal');
+
+      // Case A — no sell CPM configured
+      if (pl.error === 'no_sell_revenue') {
+        hero.classList.add('negative');
+        profitEl.classList.add('muted');
+        profitEl.textContent = '—';
+        roiEl.textContent = '⚙️ ضبط Sell CPM';
+        roiEl.className = 'sr-hero-roi muted';
+        costEl.textContent = '$' + Number(pl.cost || 0).toFixed(2);
+        revEl.textContent = '$0.00';
+        totalEl.textContent = fmtNum(summary.total || 0);
+        return;
+      }
+
+      const profit = Number(pl.profit || 0);
+      const isPos = profit >= 0;
+
+      hero.classList.remove('negative');
+      hero.classList.toggle('negative', !isPos);
+      profitEl.classList.remove('muted');
+
+      // Add asterisk when cost source isn't exact
+      const integrity = summary.integrity || {};
+      const isExact = integrity.integrity === 'exact';
+      const suffix = isExact ? '' : ' *';
+
+      profitEl.textContent = fmtMoney(profit) + suffix;
+      roiEl.textContent = `ROI ${pl.roi >= 0 ? '+' : ''}${Number(pl.roi || 0).toFixed(1)}%`;
+      roiEl.className = 'sr-hero-roi ' + (isPos ? 'pos' : 'neg');
+      costEl.textContent = '$' + Number(pl.cost || 0).toFixed(2);
+      revEl.textContent = '$' + Number(pl.revenue || 0).toFixed(2);
+      totalEl.textContent = fmtNum(summary.total || 0);
+
+      // Tooltip explanation
+      if (!isExact && integrity.bid_coverage_pct != null) {
+        hero.title = `الربح محسوب على ${integrity.bid_coverage_pct}% من الزيارات (${integrity.visits_without_bid} زيارة بدون BID)`;
+      } else {
+        hero.title = 'الربح محسوب من BID الحقيقي والإيراد الحقيقي';
+      }
+    }
+
+    // =========================================================
+    // Phase 1: Breakeven banner (real logic, not always-green)
+    // =========================================================
+    function renderBreakeven(summary) {
+      const pl = summary.pl || {};
       const banner = document.getElementById('srBreakeven');
       const icon = document.getElementById('breakevenIcon');
       const text = document.getElementById('breakevenText');
+
+      // Case A — no sell CPM
+      if (pl.error === 'no_sell_revenue') {
+        banner.classList.remove('ok');
+        banner.classList.add('muted');
+        icon.textContent = '⚙️';
+        text.innerHTML = `مفيش إيراد متوقع — ضبط <b>sell_cpm</b> من الإعدادات عشان نقدر نحسب الربح.`;
+        banner.style.display = '';
+        return;
+      }
+
+      // Case B — exact or exact_partial (real BID data)
+      if (pl.source === 'exact' || pl.source === 'exact_partial' || pl.source === 'partial') {
+        const integrity = summary.integrity || {};
+        const isFull = integrity.integrity === 'exact';
+        const suffix = isFull ? '' : ` — محسوب على ${integrity.bid_coverage_pct || 0}% من الزيارات`;
+        const profit = Number(pl.profit || 0);
+
+        banner.classList.toggle('ok', profit >= 0);
+        banner.classList.remove('muted');
+
+        if (profit >= 0) {
+          icon.textContent = '✅';
+          text.innerHTML = `ربح صافي <b>${fmtMoney(profit)}</b> (ROI ${pl.roi >= 0 ? '+' : ''}${pl.roi}%)${suffix}`;
+        } else {
+          icon.textContent = '🚨';
+          text.innerHTML = `خسارة صافية <b>${fmtMoney(profit)}</b> (ROI ${pl.roi}%)${suffix}`;
+        }
+        banner.style.display = '';
+        return;
+      }
+
+      // Case C — CPM estimation (need effective/needed)
       const eff = pl.effective_ratio;
       const need = pl.needed_ratio;
+
+      if (eff == null || need == null) {
+        banner.classList.remove('ok');
+        banner.classList.add('muted');
+        icon.textContent = '❓';
+        text.innerHTML = `مفيش بيانات كافية لحساب نقطة التعادل.`;
+        banner.style.display = '';
+        return;
+      }
+
+      banner.classList.remove('muted');
+
       if (eff < need) {
         banner.classList.remove('ok');
         icon.textContent = '🚨';
@@ -516,6 +659,13 @@
       return zones;
     }
 
+    function integrityBadge(z) {
+      const integrity = z.integrity || 'exact';
+      if (integrity === 'exact') return '';
+      const label = integrity === 'partial_warn' ? '⚠️ BID' : '~ BID';
+      return `<span class="sr-integrity-badge ${integrity}" title="بيانات BID غير مكتملة لهذا الزون">${label}</span>`;
+    }
+
     function renderCards(zones) {
       const container = document.getElementById('viewCards');
       if (!zones.length) {
@@ -524,23 +674,28 @@
       }
       container.innerHTML = zones.map(z => {
         const isPos = z.pl.profit >= 0;
+        const isMuted = z.pl.error === 'no_sell_revenue';
         const total = z.total || 1;
         const pValid = Math.round((z.valid / total) * 100);
         const pSusp = Math.round((z.suspicious / total) * 100);
         const pBot = Math.round((z.invalid / total) * 100);
         const pWaste = Math.max(0, 100 - pValid - pSusp - pBot);
+        const profitClass = isMuted ? 'muted' : (isPos ? 'pos' : 'neg');
+        const roiClass = isMuted ? 'muted' : (isPos ? 'pos' : 'neg');
+        const profitDisplay = isMuted ? '—' : fmtMoney(z.pl.profit);
+        const roiDisplay = isMuted ? 'مفيش revenue' : `${z.pl.roi >= 0 ? '+' : ''}${z.pl.roi}%`;
         return `
           <div class="sr-card grade-${z.score.grade}" data-zone="${esc(z.zone)}">
             <div class="sr-card-head">
               <div class="sr-card-zone-wrap">
-                <div class="sr-card-zone">${esc(z.zone)}</div>
+                <div class="sr-card-zone">${esc(z.zone)}${integrityBadge(z)}</div>
                 <div class="sr-card-source">${esc(z.source)} · ${esc(z.lifecycle)}</div>
               </div>
               ${renderTrustGauge(z.score.composite, z.score.grade)}
             </div>
             <div class="sr-card-pl">
-              <span class="sr-card-profit ${isPos ? 'pos' : 'neg'}">${fmtMoney(z.pl.profit)}</span>
-              <span class="sr-card-roi ${isPos ? 'pos' : 'neg'}">${z.pl.roi >= 0 ? '+' : ''}${z.pl.roi}%</span>
+              <span class="sr-card-profit ${profitClass}">${profitDisplay}</span>
+              <span class="sr-card-roi ${roiClass}">${roiDisplay}</span>
             </div>
             <div class="sr-card-comp">
               <div class="c-valid" style="width:${pValid}%"></div>
@@ -570,17 +725,19 @@
       }
       tbody.innerHTML = zones.map(z => {
         const isPos = z.pl.profit >= 0;
+        const isMuted = z.pl.error === 'no_sell_revenue';
+        const profitClass = isMuted ? 'muted' : (isPos ? 'pos' : 'neg');
         return `
           <tr data-zone="${esc(z.zone)}">
-            <td class="sr-zone-cell">${esc(z.zone)}</td>
+            <td class="sr-zone-cell">${esc(z.zone)}${integrityBadge(z)}</td>
             <td class="sr-source-cell">${esc(z.source)}</td>
             <td class="sr-num">${fmtNum(z.total)}</td>
             <td class="sr-num" style="color:#10B981">${fmtNum(z.valid)}</td>
             <td class="sr-num" style="color:${z.bot_rate > 20 ? '#F43F5E' : '#7B8496'}">${z.bot_rate}%</td>
             <td class="sr-num" style="color:#FDA4AF">$${z.pl.cost.toFixed(2)}</td>
             <td class="sr-num" style="color:#6EE7B7">$${z.pl.revenue.toFixed(2)}</td>
-            <td class="sr-profit-cell ${isPos ? 'pos' : 'neg'}">${fmtMoney(z.pl.profit)}</td>
-            <td class="sr-profit-cell ${isPos ? 'pos' : 'neg'}">${z.pl.roi >= 0 ? '+' : ''}${z.pl.roi}%</td>
+            <td class="sr-profit-cell ${profitClass}">${isMuted ? '—' : fmtMoney(z.pl.profit)}</td>
+            <td class="sr-profit-cell ${profitClass}">${isMuted ? '—' : `${z.pl.roi >= 0 ? '+' : ''}${z.pl.roi}%`}</td>
             <td style="text-align:center;"><span class="sr-grade-pill sr-grade-${z.score.grade}">${z.score.grade}</span></td>
             <td style="text-align:center;"><span class="sr-lifecycle-pill sr-lifecycle-${z.lifecycle}">${z.lifecycle}</span></td>
           </tr>`;
@@ -617,6 +774,8 @@
       const pBot = Math.round((zone.invalid / total) * 100);
       const pWaste = Math.max(0, 100 - pValid - pSusp - pBot);
       const isPos = zone.pl.profit >= 0;
+      const isMuted = zone.pl.error === 'no_sell_revenue';
+      const profitClass = isMuted ? '' : (isPos ? '' : 'neg');
 
       document.getElementById('drawerBody').innerHTML = `
         <div class="sr-section">
@@ -635,7 +794,7 @@
             </div>
             <div class="sr-stat-box">
               <div class="sr-stat-box-label">Effective</div>
-              <div class="sr-stat-box-value">${zone.pl.effective_ratio}%</div>
+              <div class="sr-stat-box-value">${zone.pl.effective_ratio != null ? zone.pl.effective_ratio + '%' : '—'}</div>
             </div>
           </div>
         </div>
@@ -661,11 +820,11 @@
           <div class="sr-pl-list">
             <div class="sr-pl-row"><span class="label">التكلفة</span><span class="value" style="color:#FDA4AF">$${zone.pl.cost.toFixed(2)}</span></div>
             <div class="sr-pl-row"><span class="label">الإيراد</span><span class="value" style="color:#6EE7B7">$${zone.pl.revenue.toFixed(2)}</span></div>
-            <div class="sr-pl-row highlight ${isPos ? '' : 'neg'}">
+            <div class="sr-pl-row highlight ${profitClass}">
               <span class="label">صافي الربح</span>
-              <span class="value">${fmtMoney(zone.pl.profit)}</span>
+              <span class="value">${isMuted ? '—' : fmtMoney(zone.pl.profit)}</span>
             </div>
-            <div class="sr-pl-row"><span class="label">ROI</span><span class="value" style="color:${isPos ? '#10B981' : '#F43F5E'}">${zone.pl.roi >= 0 ? '+' : ''}${zone.pl.roi}%</span></div>
+            <div class="sr-pl-row"><span class="label">ROI</span><span class="value" style="color:${isMuted ? '#94A3B8' : (isPos ? '#10B981' : '#F43F5E')}">${isMuted ? '—' : `${zone.pl.roi >= 0 ? '+' : ''}${zone.pl.roi}%`}</span></div>
           </div>
         </div>
 
@@ -692,7 +851,7 @@
         <button class="sr-action-btn pause" data-action="pause">⏸ Pause 24h</button>
         ${isGood ? `<button class="sr-action-btn scale" data-action="scale">📈 Scale +30%</button>` : ''}
         <button class="sr-action-btn ghost" data-action="simulate">🤔 ماذا لو؟</button>
-        <a href="/visits?site=${encodeURIComponent(SR.siteKey)}&zone=${encodeURIComponent(zone.zone)}" class="sr-action-btn ghost" style="text-decoration:none;">👁 الزيارات</a>
+        <a href="/visits?zone=${encodeURIComponent(zone.zone)}" class="sr-action-btn ghost" style="text-decoration:none;">👁 الزيارات</a>
       `;
 
       document.querySelectorAll('#drawerFoot [data-action]').forEach(btn => {
@@ -820,12 +979,16 @@
       document.getElementById('whatIfModal').classList.add('is-open');
     }
 
-    async function load(force) {
+    async function load() {
       setView('srLoading');
       try {
         const url = '/api/reports/smart' + (buildQuery() ? '?' + buildQuery() : '');
         const data = await Shell.api(url);
         SR.data = data;
+
+        // Phase 1: render warnings first (truncated, bid coverage, no sell cpm)
+        renderWarnings(data.warnings || []);
+
         if (!data.zones || !data.zones.length) {
           setView('srEmpty');
           return;
@@ -836,7 +999,9 @@
         sel.innerHTML = '<option value="">كل المصادر</option>' +
           sources.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
         sel.value = cur;
+
         renderHero(data.summary);
+        renderBreakeven(data.summary);
         renderAll();
         setView('srContent');
       } catch (err) {
