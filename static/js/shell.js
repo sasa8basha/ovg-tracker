@@ -69,13 +69,13 @@
     pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
     scale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
     eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
-    // Phase 2 — new icons
     shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
     map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
     refund: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
     award: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
     activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
     history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
+    palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="1.5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125 0-.921.77-1.688 1.688-1.688h1.781C18.719 16.375 22 13.281 22 9.5 22 5.359 17.5 2 12 2z"/></svg>',
   };
 
   const NAV = {
@@ -102,10 +102,11 @@
         { id: 'adsterra-report', label: 'شهادة Adsterra',   icon: 'award',  href: '/adsterra-report' },
       ]},
       { group: 'النظام', items: [
-        { id: 'system-health', label: 'حالة النظام',   icon: 'activity',  href: '/system-health' },
-        { id: 'audit-log',     label: 'سجل الإجراءات', icon: 'history',   href: '/audit-log' },
-        { id: 'dataquality',   label: 'جودة البيانات', icon: 'dataquality', href: '/data-quality' },
-        { id: 'settings',      label: 'الإعدادات',     icon: 'settings',    href: '/settings' },
+        { id: 'system-health', label: 'حالة النظام',        icon: 'activity',    href: '/system-health' },
+        { id: 'audit-log',     label: 'سجل الإجراءات',      icon: 'history',     href: '/audit-log' },
+        { id: 'dataquality',   label: 'جودة البيانات',      icon: 'dataquality', href: '/data-quality' },
+        { id: 'components',    label: 'مكتبة المكونات 🆕',  icon: 'palette',     href: '/v2/components' },
+        { id: 'settings',      label: 'الإعدادات',          icon: 'settings',    href: '/settings' },
       ]},
     ],
     en: [
@@ -131,10 +132,11 @@
         { id: 'adsterra-report', label: 'Adsterra Proof',  icon: 'award',  href: '/adsterra-report' },
       ]},
       { group: 'System', items: [
-        { id: 'system-health', label: 'System Health', icon: 'activity',  href: '/system-health' },
-        { id: 'audit-log',     label: 'Audit Log',     icon: 'history',   href: '/audit-log' },
-        { id: 'dataquality',   label: 'Data Quality',  icon: 'dataquality', href: '/data-quality' },
-        { id: 'settings',      label: 'Settings',      icon: 'settings',    href: '/settings' },
+        { id: 'system-health', label: 'System Health',    icon: 'activity',    href: '/system-health' },
+        { id: 'audit-log',     label: 'Audit Log',        icon: 'history',     href: '/audit-log' },
+        { id: 'dataquality',   label: 'Data Quality',     icon: 'dataquality', href: '/data-quality' },
+        { id: 'components',    label: 'Components 🆕',    icon: 'palette',     href: '/v2/components' },
+        { id: 'settings',      label: 'Settings',         icon: 'settings',    href: '/settings' },
       ]},
     ],
   };
