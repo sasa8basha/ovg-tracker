@@ -1,5 +1,5 @@
 """
-main.py — OVG Tracker entry point (v10.2-neo)
+main.py — OVG Tracker entry point (v10.5-neo)
 """
 import asyncio
 from fastapi import FastAPI, Request
@@ -41,7 +41,7 @@ Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="10.2-neo", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="10.5-neo", docs_url="/docs" if DEBUG else None)
 
 # GZip
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -95,12 +95,15 @@ async def startup_event():
     asyncio.create_task(reputation_loader_loop())
     asyncio.create_task(intelligence_worker_loop())
     print("=" * 60)
-    print(f"  OVG Tracker v10.2-neo — ENV={ENV}  DEBUG={DEBUG}")
+    print(f"  OVG Tracker v10.5-neo — ENV={ENV}  DEBUG={DEBUG}")
     print("  Adsterra Sync:       running (every 5 min)")
     print("  Stale Finalizer:     running (every 60s)")
     print("  Reputation Loader:   running (immediate + every 24h)")
     print("  IP Intel Worker:     running (every 30s)")
-    print("  Neo Pages:           /v2/components · /v2/dashboard · /v2/reports · /v2/visits")
+    print("  Neo Pages (10):      /v2/components  /v2/dashboard  /v2/reports")
+    print("                       /v2/visits      /v2/campaigns  /v2/campaigns/{id}")
+    print("                       /v2/live        /v2/radar      /v2/ip-lists")
+    print("                       /v2/sessions")
     print("=" * 60)
 
 
