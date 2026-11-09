@@ -1,6 +1,6 @@
 """
-routers/pages.py — HTML pages (v11.0)
-Neo V2 pages live at /v2/*. Old URLs 301-redirect to V2.
+routers/pages.py — HTML pages (v12.0 — 100% Neo)
+All content pages now use Neo templates. Old pages kept only for auth flow.
 """
 import os
 from fastapi import APIRouter, Depends, Request
@@ -21,7 +21,7 @@ def read_template(name):
 
 
 # =========================================================
-# AUTH PAGES (unchanged — old templates, no V2 yet)
+# AUTH PAGES (only legacy pages remaining)
 # =========================================================
 @router.get("/", response_class=HTMLResponse)
 def root(request: Request, db: Session = Depends(get_db)):
@@ -60,11 +60,10 @@ def verify_email_page(token: str = "", db: Session = Depends(get_db)):
 
 
 # =========================================================
-# 301 REDIRECTS — Old URLs → V2 URLs
+# 301 REDIRECTS
 # =========================================================
 @router.get("/dashboard", response_class=RedirectResponse)
 def dashboard_redirect(request: Request, key: str = None, db: Session = Depends(get_db)):
-    # Keep dashboard key login working
     if key and DASHBOARD_KEY and key == DASHBOARD_KEY:
         first = db.query(UserModel).first()
         if first:
@@ -75,196 +74,202 @@ def dashboard_redirect(request: Request, key: str = None, db: Session = Depends(
 
 
 @router.get("/campaigns", response_class=RedirectResponse)
-def campaigns_redirect():
-    return RedirectResponse("/v2/campaigns", status_code=301)
+def campaigns_redirect(): return RedirectResponse("/v2/campaigns", status_code=301)
 
 
 @router.get("/campaigns/{campaign_id}", response_class=RedirectResponse)
-def campaign_detail_redirect(campaign_id: int):
-    return RedirectResponse(f"/v2/campaigns/{campaign_id}", status_code=301)
+def campaign_detail_redirect(campaign_id: int): return RedirectResponse(f"/v2/campaigns/{campaign_id}", status_code=301)
 
 
 @router.get("/sessions", response_class=RedirectResponse)
-def sessions_redirect():
-    return RedirectResponse("/v2/sessions", status_code=301)
+def sessions_redirect(): return RedirectResponse("/v2/sessions", status_code=301)
+
+
+@router.get("/sessions/{session_id}", response_class=RedirectResponse)
+def session_detail_redirect(session_id: str): return RedirectResponse(f"/v2/sessions/{session_id}", status_code=301)
 
 
 @router.get("/visits", response_class=RedirectResponse)
-def visits_redirect():
-    return RedirectResponse("/v2/visits", status_code=301)
+def visits_redirect(): return RedirectResponse("/v2/visits", status_code=301)
+
+
+@router.get("/visits/{visit_id}", response_class=RedirectResponse)
+def visit_detail_redirect(visit_id: int): return RedirectResponse(f"/v2/visits/{visit_id}", status_code=301)
 
 
 @router.get("/ip-lists", response_class=RedirectResponse)
-def ip_lists_redirect():
-    return RedirectResponse("/v2/ip-lists", status_code=301)
+def ip_lists_redirect(): return RedirectResponse("/v2/ip-lists", status_code=301)
 
 
 @router.get("/smart-reports", response_class=RedirectResponse)
-def smart_reports_redirect():
-    return RedirectResponse("/v2/reports", status_code=301)
+def smart_reports_redirect(): return RedirectResponse("/v2/reports", status_code=301)
 
 
 @router.get("/live", response_class=RedirectResponse)
-def live_redirect():
-    return RedirectResponse("/v2/live", status_code=301)
+def live_redirect(): return RedirectResponse("/v2/live", status_code=301)
 
 
 @router.get("/radar", response_class=RedirectResponse)
-def radar_redirect():
-    return RedirectResponse("/v2/radar", status_code=301)
+def radar_redirect(): return RedirectResponse("/v2/radar", status_code=301)
+
+
+@router.get("/labeling", response_class=RedirectResponse)
+def labeling_redirect(): return RedirectResponse("/v2/labeling", status_code=301)
+
+
+@router.get("/data-quality", response_class=RedirectResponse)
+def data_quality_redirect(): return RedirectResponse("/v2/data-quality", status_code=301)
+
+
+@router.get("/zone-analytics", response_class=RedirectResponse)
+def zone_analytics_redirect(): return RedirectResponse("/v2/zone-analytics", status_code=301)
+
+
+@router.get("/audit-log", response_class=RedirectResponse)
+def audit_log_redirect(): return RedirectResponse("/v2/audit-log", status_code=301)
+
+
+@router.get("/system-health", response_class=RedirectResponse)
+def system_health_redirect(): return RedirectResponse("/v2/system-health", status_code=301)
+
+
+@router.get("/tracker", response_class=RedirectResponse)
+def tracker_redirect(): return RedirectResponse("/v2/tracker", status_code=301)
+
+
+@router.get("/reports", response_class=RedirectResponse)
+def reports_redirect(): return RedirectResponse("/v2/reports", status_code=301)
+
+
+@router.get("/popads-report", response_class=RedirectResponse)
+def popads_report_redirect(): return RedirectResponse("/v2/popads-report", status_code=301)
+
+
+@router.get("/adsterra-report", response_class=RedirectResponse)
+def adsterra_report_redirect(): return RedirectResponse("/v2/adsterra-report", status_code=301)
 
 
 # =========================================================
-# OLD PAGES WITHOUT V2 YET (unchanged)
-# =========================================================
-@router.get("/sessions/{session_id}", response_class=HTMLResponse)
-def session_detail_page(request: Request, session_id: str, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("session_detail.html"))
-
-
-@router.get("/visits/{visit_id}", response_class=HTMLResponse)
-def visit_detail_page(request: Request, visit_id: int, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("visit_detail.html"))
-
-
-@router.get("/reports", response_class=HTMLResponse)
-def reports_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("reports.html"))
-
-
-@router.get("/popads-report", response_class=HTMLResponse)
-def popads_report_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("popads_report.html"))
-
-
-@router.get("/adsterra-report", response_class=HTMLResponse)
-def adsterra_report_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("adsterra_report.html"))
-
-
-@router.get("/labeling", response_class=HTMLResponse)
-def labeling_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("labeling.html"))
-
-
-@router.get("/data-quality", response_class=HTMLResponse)
-def data_quality_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("data_quality.html"))
-
-
-@router.get("/zone-analytics", response_class=HTMLResponse)
-def zone_analytics_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("zone_analytics.html"))
-
-
-@router.get("/tracker", response_class=HTMLResponse)
-def tracker_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("tracker.html"))
-
-
-@router.get("/audit-log", response_class=HTMLResponse)
-def audit_log_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("audit_log.html"))
-
-
-@router.get("/system-health", response_class=HTMLResponse)
-def system_health_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
-    return HTMLResponse(read_template("system_health.html"))
-
-
-# =========================================================
-# NEO V2 PAGES (final URLs)
+# NEO V2 PAGES (all 21 pages)
 # =========================================================
 @router.get("/v2/components", response_class=HTMLResponse)
 def components_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/components.html"))
 
 
 @router.get("/v2/dashboard", response_class=HTMLResponse)
 def dashboard_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/dashboard.html"))
 
 
 @router.get("/v2/reports", response_class=HTMLResponse)
 def reports_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/reports.html"))
 
 
 @router.get("/v2/visits", response_class=HTMLResponse)
 def visits_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/visits.html"))
+
+
+@router.get("/v2/visits/{visit_id}", response_class=HTMLResponse)
+def visit_detail_v2_page(request: Request, visit_id: int, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/visit_detail.html"))
 
 
 @router.get("/v2/campaigns", response_class=HTMLResponse)
 def campaigns_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/campaigns.html"))
 
 
 @router.get("/v2/campaigns/{campaign_id}", response_class=HTMLResponse)
 def campaign_detail_v2_page(request: Request, campaign_id: int, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/campaign_detail.html"))
 
 
 @router.get("/v2/live", response_class=HTMLResponse)
 def live_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/live.html"))
 
 
 @router.get("/v2/radar", response_class=HTMLResponse)
 def radar_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/radar.html"))
 
 
 @router.get("/v2/ip-lists", response_class=HTMLResponse)
 def ip_lists_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/ip-lists.html"))
 
 
 @router.get("/v2/sessions", response_class=HTMLResponse)
 def sessions_v2_page(request: Request, db: Session = Depends(get_db)):
-    if not _optional_user(request, db):
-        return RedirectResponse("/", status_code=302)
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
     return HTMLResponse(read_template("v2/sessions.html"))
+
+
+@router.get("/v2/sessions/{session_id}", response_class=HTMLResponse)
+def session_detail_v2_page(request: Request, session_id: str, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/session_detail.html"))
+
+
+@router.get("/v2/labeling", response_class=HTMLResponse)
+def labeling_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/labeling.html"))
+
+
+@router.get("/v2/data-quality", response_class=HTMLResponse)
+def data_quality_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/data-quality.html"))
+
+
+@router.get("/v2/zone-analytics", response_class=HTMLResponse)
+def zone_analytics_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/zone-analytics.html"))
+
+
+@router.get("/v2/audit-log", response_class=HTMLResponse)
+def audit_log_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/audit-log.html"))
+
+
+@router.get("/v2/system-health", response_class=HTMLResponse)
+def system_health_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/system-health.html"))
+
+
+@router.get("/v2/tracker", response_class=HTMLResponse)
+def tracker_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/tracker.html"))
+
+
+@router.get("/v2/popads-report", response_class=HTMLResponse)
+def popads_report_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/popads-report.html"))
+
+
+@router.get("/v2/adsterra-report", response_class=HTMLResponse)
+def adsterra_report_v2_page(request: Request, db: Session = Depends(get_db)):
+    if not _optional_user(request, db): return RedirectResponse("/", status_code=302)
+    return HTMLResponse(read_template("v2/adsterra-report.html"))
 
 
 # =========================================================
@@ -278,4 +283,4 @@ def page_404():
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "version": "11.0"}
+    return {"status": "ok", "version": "12.0-neo"}
