@@ -1,5 +1,10 @@
 """
-analysis.py — OVG Tracker — The Brain (v3.2 Precision)
+analysis.py — OVG Tracker — The Brain (v3.3 Precision)
+
+v3.3 FIX (2025-11):
+  - `_check_os_mismatch` now detects Linux UA + Win32/Mac platform.
+    Previously only Windows and macOS mismatches were caught. Bots that
+    use Linux UAs with spoofed Win32 platforms went undetected.
 """
 import re
 import ipaddress
@@ -391,7 +396,8 @@ CODE_TO_SOURCE = {
     "MOBILE_PIXEL_RATIO": "hardware", "LOW_COLOR_DEPTH": "hardware", "HEADLESS_VIEWPORT": "screen",
     "VIEWPORT_ZERO": "screen", "MOBILE_WIDE_SCREEN": "screen", "TABLET_WIDE_SCREEN": "screen",
     "SCREEN_TINY": "screen", "INNER_WIDER_THAN_SCREEN": "screen", "INNER_TALLER_THAN_SCREEN": "screen",
-    "OS_MISMATCH_WIN": "os", "OS_MISMATCH_MAC": "os", "TOUCH_UA_MISMATCH": "contradictions",
+    "OS_MISMATCH_WIN": "os", "OS_MISMATCH_MAC": "os", "OS_MISMATCH_LINUX": "os",
+    "TOUCH_UA_MISMATCH": "contradictions",
     "FIRST_LANG_MISMATCH": "contradictions", "INTL_LOCALE_MISMATCH": "contradictions",
     "WEBGL_VENDOR_RENDERER_MISMATCH": "contradictions", "UA_CHROME_OLD": "contradictions",
     "UA_CHROME_FUTURE": "contradictions", "CLIENT_HINTS_MISMATCH": "contradictions",
@@ -584,12 +590,20 @@ def _check_screen(screen_dict, is_mobile_phone, is_tablet, is_desktop_chrome, is
 
 
 def _check_os_mismatch(ua, platform):
+    """
+    v3.3 FIX: Added Linux UA + Win32/Mac platform detection.
+    Bots that use Linux UAs with spoofed Win32 platforms are now caught.
+    """
     items = []
     if not platform: return items
+
     if "windows nt" in ua and "win" not in platform and "linux" not in platform and "x11" not in platform:
         items.append(("OS_MISMATCH_WIN", "medium", 50, f"Windows UA + platform {_safe_str(platform, 30)}"))
     if ("mac os" in ua or "macintosh" in ua) and "mac" not in platform:
         items.append(("OS_MISMATCH_MAC", "medium", 50, f"macOS UA + platform {_safe_str(platform, 30)}"))
+    # ✅ v3.3: Linux UA + Win32/Mac platform
+    if "linux" in ua and "linux" not in platform and "x11" not in platform and "ubuntu" not in platform:
+        items.append(("OS_MISMATCH_LINUX", "medium", 45, f"Linux UA + platform {_safe_str(platform, 30)}"))
     return items
 
 
@@ -678,7 +692,6 @@ def _check_behavior(behavior, events):
     touchstart = safe_int(events.get("touchstart"), 0)
     t_on_page = _duration_ms(behavior)
     
-    # 1. Mouse
     mouse_analysis = _safe_dict(behavior.get("mouse_analysis"))
     has_mouse = not mouse_analysis.get("too_few", True) and "total_points" in mouse_analysis
     has_v3_mouse = "mouse_velocity_variance" in behavior and _mouse_points_count(behavior) >= 20
@@ -696,10 +709,8 @@ def _check_behavior(behavior, events):
         dc = safe_int(behavior.get("mouse_direction_changes"), 0)
         if tp > 20 and dv < 0.01 and dc < 2: items.append(("ROBOTIC_LINEAR", "high", 60, f"Linear ({dc} turns)"))
 
-    # 2. Interaction
     has_any = (mousemove > 5 or touchstart > 0 or scrolls > 0 or clicks > 0)
     
-    # 3. Zombie (جلسة طويلة بدون أي تفاعل)
     if t_on_page > 8000 and not has_any:
         items.append(("ZOMBIE", "high", 60, f"No interaction after {t_on_page}ms"))
         
