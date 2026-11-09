@@ -28,15 +28,17 @@ from routers import (
     ip_intel as ip_intel_router,
 )
 
-# Phase 1 — new endpoint (single-call Money Pulse)
+# Phase 1 — single-call Money Pulse
 from routers import pulse as pulse_router
+# Phase 2 — System Health dashboard
+from routers import system_health as system_health_router
 
 apply_safe_migrations()
 Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="9.6", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="9.7", docs_url="/docs" if DEBUG else None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -73,7 +75,7 @@ async def startup_event():
     asyncio.create_task(reputation_loader_loop())
     asyncio.create_task(intelligence_worker_loop())
     print("=" * 60)
-    print(f"  OVG Tracker v9.6 — ENV={ENV}  DEBUG={DEBUG}")
+    print(f"  OVG Tracker v9.7 — ENV={ENV}  DEBUG={DEBUG}")
     print("  Adsterra Sync:       running (every 5 min)")
     print("  Stale Finalizer:     running (every 60s)")
     print("  Reputation Loader:   running (immediate + every 24h)")
@@ -91,7 +93,8 @@ app.include_router(collector_v3_router.router, prefix="/api", tags=["collector-v
 app.include_router(interstitial_router.router, tags=["interstitial"])
 app.include_router(tracker_router.router, prefix="/api", tags=["tracker"])
 app.include_router(stats_router.router, prefix="/api", tags=["stats"])
-app.include_router(pulse_router.router, prefix="/api", tags=["pulse"])  # Phase 1
+app.include_router(pulse_router.router, prefix="/api", tags=["pulse"])
+app.include_router(system_health_router.router, prefix="/api", tags=["system-health"])
 app.include_router(reports_router.router, prefix="/api", tags=["reports"])
 app.include_router(labeling_router.router, prefix="/api", tags=["labeling"])
 app.include_router(data_quality_router.router, prefix="/api", tags=["data-quality"])
