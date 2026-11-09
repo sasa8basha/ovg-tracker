@@ -1,5 +1,12 @@
 """
 routers/interstitial.py — Interstitial precheck for Direct Links.
+
+v3.2 FIX (2025-11):
+  - PASS_COOKIE_TTL_SECONDS: 7 days → 24 hours
+    A stolen pass cookie (XSS/MITM) previously granted 7 days of free
+    access. Now the risk is bounded to 24 hours, and campaigns.py
+    revoke_campaign_pass_tokens() is called on rotate-key to
+    invalidate all passes for a campaign immediately.
 """
 import hashlib
 import secrets
@@ -32,7 +39,8 @@ router = APIRouter()
 
 
 PASS_COOKIE_NAME = "ovg_pass"
-PASS_COOKIE_TTL_SECONDS = 7 * 86400
+# v3.2: shortened from 7 days to 24 hours
+PASS_COOKIE_TTL_SECONDS = 24 * 3600
 CHALLENGE_CACHE_TTL = 600
 CHALLENGE_DIFFICULTY = 4
 CHALLENGE_DIFFICULTY_EASY = 3
@@ -75,6 +83,34 @@ def _read_pass_token(token: str):
     if not token:
         return None
     return _pass_token_cache.get(token)
+
+
+def revoke_campaign_pass_tokens(campaign_key: str) -> int:
+    """
+    v3.2: Called on campaign key rotation.
+    Invalidates all outstanding pass tokens for the given campaign.
+    Returns the number of tokens revoked.
+
+    Note: TTLCache is OrderedDict-based, so iterating ._data directly is
+    safe here since we're in a single-process FastAPI worker. If you
+    scale to multiple workers with Redis, this must change.
+    """
+    if not campaign_key:
+        return 0
+    revoked = 0
+    try:
+        # Access internal dict directly to preserve (value, timestamp) tuples
+        for key in list(_pass_token_cache._data.keys()):
+            entry = _pass_token_cache._data.get(key)
+            if not entry:
+                continue
+            val = entry[0] if isinstance(entry, tuple) else None
+            if isinstance(val, dict) and val.get("campaign_key") == campaign_key:
+                _pass_token_cache.invalidate(key)
+                revoked += 1
+    except Exception as e:
+        print(f"[Interstitial] revoke failed for {campaign_key}: {e}")
+    return revoked
 
 
 def _extract_zone(payload_url: str, tracking_params: dict, campaign) -> tuple:
@@ -139,7 +175,6 @@ async def serve_interstitial(campaign_key: str, request: Request, db: Session = 
     pass_token = request.cookies.get(PASS_COOKIE_NAME)
     entry = _read_pass_token(pass_token) if pass_token else None
     if entry and entry.get("campaign_key") == campaign_key:
-        # Skip challenge, redirect with sub_id
         sep = "&" if "?" in c.destination_url else "?"
         param = c.adsterra_tracking_param or "sub_id"
         target = f"{c.destination_url}{sep}{param}={entry['session_id']}"
@@ -297,7 +332,6 @@ async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: S
             stats_cache.invalidate(f"stats:user:{c.user_id}:all")
             stats_cache.invalidate(f"stats:campaign:{c.id}")
 
-    # Build redirect URL with correct sub_id param
     sep = "&" if "?" in c.destination_url else "?"
     param = c.adsterra_tracking_param or "sub_id"
     redirect_url = f"{c.destination_url}{sep}{param}={payload.session_id}"

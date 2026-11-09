@@ -1,5 +1,10 @@
 """
 routers/campaigns.py — Campaign CRUD + tracking URL generation.
+
+v2.1 FIX (2025-11):
+  - rotate_campaign_key now revokes all outstanding pass tokens for
+    the campaign via `revoke_campaign_pass_tokens()`. This prevents
+    stolen pass cookies from continuing to work after a key rotation.
 """
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -295,7 +300,24 @@ def rotate_campaign_key(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    """
+    Rotate the campaign key.
+
+    v2.1: Also revokes all outstanding interstitial pass tokens for this
+    campaign. A stolen pass cookie will stop working immediately after
+    the key is rotated, instead of waiting up to 24 hours.
+    """
     c = _resolve_campaign(campaign_id, user, db)
+    old_key = c.campaign_key
     c.campaign_key = _new_campaign_key()
     db.commit()
-    return {"campaign_key": c.campaign_key}
+
+    # v2.1: revoke outstanding pass tokens for the OLD key
+    revoked = 0
+    try:
+        from routers.interstitial import revoke_campaign_pass_tokens
+        revoked = revoke_campaign_pass_tokens(old_key)
+    except Exception as e:
+        print(f"[Campaigns] pass token revocation failed: {e}")
+
+    return {"campaign_key": c.campaign_key, "revoked_pass_tokens": revoked}

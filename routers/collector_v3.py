@@ -1,15 +1,34 @@
 """
-routers/collector_v3.py — Collector v3 API (v4.2.1 — full audit fixes)
+routers/collector_v3.py — Collector v3 API (v4.2.2 — high-severity fixes)
 
-Fixes over v4.0:
+Fixes over v4.2.1:
+    - `_compute_fp_hash(fp, nav)` — now uses nav.language and nav.platform
+      instead of fp.get("language") which was always None. This makes
+      fingerprint hashes more diverse and prevents bots with same canvas
+      but different languages from being grouped.
+
+    - `_check_flood(ip, campaign_id, db)` — now filters by campaign.
+      CGNAT / shared ISP IPs could trigger rate limits across campaigns.
+      Filtering by campaign makes the limit per-campaign.
+
+    - Cross-visit counters now filtered by campaign_id:
+        same_ip_last_minute, same_canvas_ip_count, same_ip_canvas_count.
+      Prevents shared-IP false positives when a single IP hits multiple
+      campaigns with different visitors.
+
+    - `_finalize_stale_session` passes `None` (not `{}`) for headers.
+      Combined with the orchestrator fix, this prevents the
+      MISSING_SEC_CH_UA false positive on stale sessions.
+
+    - canvas_hash stored at 32 chars instead of 15+"..." for better
+      cross-visit matching accuracy.
+
+Previous (v4.2.1):
     - Zone extraction: helpers → analysis → tracking_params → campaign default
     - ip_info is persisted in session.meta at handshake time
     - final processor reads ip_info from session.meta (no asyncio.run in threads)
     - _fetch_ip_info_sync() for safe fallback
     - stale_session_finalizer_loop() — converts stuck PENDING sessions
-    - Confidence / bot_probability / mode / reason / data_quality_report
-      stored as indexed columns on VisitModel + SessionModel
-    - [FIX] data_quality keyword duplicate in VisitModel for dead stale sessions
 """
 import json
 import asyncio
@@ -238,12 +257,25 @@ def _resolve_campaign(campaign_key: str, db: Session):
     return db.query(CampaignModel).filter(CampaignModel.campaign_key == campaign_key).first()
 
 
-def _compute_fp_hash(fp: dict) -> str:
+# =========================================================
+# FINGERPRINT HASH (v4.2.2 — uses nav.language + nav.platform)
+# =========================================================
+def _compute_fp_hash(fp: dict, nav: dict) -> str:
+    """
+    v4.2.2 FIX:
+      - Previously used fp.get("language") which was always None
+        (language lives on `nav`, not `fp`).
+      - Now includes nav.language AND nav.platform for proper diversity.
+      - Result: bots with same canvas but different languages are no
+        longer grouped together, and real users with distinct
+        language/platform combos get distinct hashes.
+    """
     import hashlib
     parts = [
         str(fp.get("canvas_hash") or ""),
         str(fp.get("timezone") or ""),
-        str(fp.get("language") or ""),
+        str(nav.get("language") or ""),
+        str(nav.get("platform") or ""),
         str(fp.get("hardwareConcurrency") or ""),
         str(fp.get("deviceMemory") or ""),
         str((fp.get("webgl") or {}).get("renderer") or ""),
@@ -251,10 +283,21 @@ def _compute_fp_hash(fp: dict) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
 
 
-def _check_flood(ip: str, db: Session):
+# =========================================================
+# FLOOD CHECK (v4.2.2 — filtered by campaign)
+# =========================================================
+def _check_flood(ip: str, campaign_id: int, db: Session):
+    """
+    v4.2.2 FIX: Filter by campaign_id.
+      Previously this was global per-IP, which triggered on CGNAT /
+      shared ISP networks (e.g. university, hotel WiFi) where dozens of
+      legit users hit different campaigns from the same IP.
+      Now the limit is per-campaign, per-IP.
+    """
     cutoff = datetime.utcnow() - timedelta(hours=1)
     if db.query(SessionModel).filter(
         SessionModel.ip == ip,
+        SessionModel.campaign_id == campaign_id,
         SessionModel.started_at >= cutoff,
     ).count() >= MAX_SESSIONS_PER_IP_HOUR:
         raise HTTPException(429, "محاولات كتير")
@@ -298,7 +341,8 @@ async def collect_handshake(
     if not campaign:
         raise HTTPException(400, "invalid_campaign_key")
 
-    _check_flood(client_ip, db)
+    # v4.2.2: pass campaign.id for per-campaign flood check
+    _check_flood(client_ip, campaign.id, db)
 
     try:
         threshold = int(campaign.bot_block_threshold or 100)
@@ -326,6 +370,9 @@ async def collect_handshake(
     verdict = "invalid" if blocked else "pending"
     score = precheck["score"] if blocked else 0
 
+    # v4.2.2: pass nav for proper fp_hash computation
+    fp_hash = _compute_fp_hash(payload.fp or {}, payload.nav or {})
+
     session = SessionModel(
         session_id=session_id,
         user_id=campaign.user_id,
@@ -340,7 +387,7 @@ async def collect_handshake(
         score=score,
         clock_drift_ms=0,
         consent_state=str(payload.consent_state or "unknown")[:20],
-        visitor_fp_hash=_compute_fp_hash(payload.fp or {}),
+        visitor_fp_hash=fp_hash,
         meta={
             "precheck": {
                 "score": precheck["score"],
@@ -434,7 +481,7 @@ def _process_final_background(
     session_id: str,
     payload_dict: dict,
     client_ip: str,
-    headers_dict: dict,
+    headers_dict: dict | None,
     http_version: str,
 ):
     db = SessionLocal()
@@ -477,6 +524,10 @@ def _process_final_background(
         if "country_code" not in ip_info:
             ip_info["country_code"] = session.country_code or ""
 
+        # =========================================================
+        # v4.2.2 FIX: Cross-visit counters now filtered by campaign_id.
+        # Prevents CGNAT / shared-IP false positives.
+        # =========================================================
         recent_fp_count = 0
         same_ip_last_minute = 0
         same_canvas_ip_count = 0
@@ -484,23 +535,29 @@ def _process_final_background(
         try:
             cutoff_1m = datetime.utcnow() - timedelta(minutes=1)
             cutoff_1h = datetime.utcnow() - timedelta(hours=1)
+
             same_ip_last_minute = db.query(VisitModel).filter(
+                VisitModel.campaign_id == session.campaign_id,
                 VisitModel.ip == client_ip,
                 VisitModel.timestamp > cutoff_1m,
             ).count()
 
             canvas_raw = str((payload.fingerprint or {}).get("canvas_hash") or "")
             if len(canvas_raw) >= 15 and canvas_raw not in ("blocked", "Unknown"):
-                canvas_key = canvas_raw[:15] + "..."
+                # Match against first 32 chars (v4.2.2 storage format)
+                canvas_key = canvas_raw[:32]
                 recent_fp_count = db.query(VisitModel).filter(
+                    VisitModel.campaign_id == session.campaign_id,
                     VisitModel.canvas_hash == canvas_key,
                     VisitModel.timestamp > cutoff_1m,
                 ).count()
                 same_canvas_ip_count = int(db.query(func.count(distinct(VisitModel.ip))).filter(
+                    VisitModel.campaign_id == session.campaign_id,
                     VisitModel.canvas_hash == canvas_key,
                     VisitModel.timestamp > cutoff_1h,
                 ).scalar() or 0)
                 same_ip_canvas_count = int(db.query(func.count(distinct(VisitModel.canvas_hash))).filter(
+                    VisitModel.campaign_id == session.campaign_id,
                     VisitModel.ip == client_ip,
                     VisitModel.timestamp > cutoff_1h,
                 ).scalar() or 0)
@@ -516,6 +573,7 @@ def _process_final_background(
                 "seq": hb.seq, "t_ms": hb.t_ms,
                 "clicks": hb.clicks, "scrolls": hb.scrolls,
                 "mousemoves": hb.mousemoves, "keydowns": hb.keydowns,
+                "is_visible": bool(hb.is_visible),
             }
             for hb in heartbeats
         ]
@@ -570,7 +628,7 @@ def _process_final_background(
         visit_click_id = (payload.click_id or "").strip() or None
 
         full_payload = {
-            "engine_version": "v4.2.1",
+            "engine_version": "v4.2.2",
             "verdict": result.get("verdict"),
             "score": result.get("score"),
             "confidence": result.get("confidence"),
@@ -638,6 +696,12 @@ def _process_final_background(
                 stats_cache.invalidate(f"stats:campaign:{session.campaign_id}")
             return
 
+        # =========================================================
+        # v4.2.2: canvas_hash stored at 32 chars (was 15+"...")
+        # =========================================================
+        canvas_full = str(fp.get("canvas_hash", "") or "")
+        canvas_stored = canvas_full[:32] if canvas_full and canvas_full not in ("blocked",) else "Unknown"
+
         visit = VisitModel(
             campaign_id=session.campaign_id,
             session_id=session_id,
@@ -671,7 +735,7 @@ def _process_final_background(
             asn=ip_info.get("asn", "Unknown"),
             is_vpn=bool(ip_info.get("security", {}).get("vpn")),
             timezone=str(fp.get("timezone", "Unknown"))[:50],
-            canvas_hash=(str(fp.get("canvas_hash", ""))[:15] + "...") if fp.get("canvas_hash") else "Unknown",
+            canvas_hash=canvas_stored,
             data_quality=result.get("data_quality", "partial"),
             time_on_page=time_ms,
             clicks=int(events.get("clicks", 0) or 0),
@@ -762,6 +826,12 @@ def _finalize_stale_session(session_id: str) -> bool:
     Two paths:
         A) Has heartbeats → feed them as synthetic final payload
         B) No heartbeats + aged 120s+ → treat as DEAD (verdict=invalid)
+
+    v4.2.2 FIX:
+        Path A now passes `None` for headers (not `{}`). Combined with
+        the orchestrator's _collect_headers fix, this prevents the
+        MISSING_SEC_CH_UA false positive that was marking all stale
+        sessions as "invalid".
     """
     db_check = SessionLocal()
     try:
@@ -828,7 +898,6 @@ def _finalize_stale_session(session_id: str) -> bool:
 
                     cc = str(ip_info.get("country_code") or "").upper().strip()
 
-                    # VisitModel: each kwarg appears EXACTLY once
                     visit = VisitModel(
                         campaign_id=s.campaign_id,
                         session_id=session_id,
@@ -842,7 +911,7 @@ def _finalize_stale_session(session_id: str) -> bool:
                         reason="stale_no_heartbeats",
                         data_quality="partial",
                         full_payload={
-                            "engine_version": "v4.2.1-stale",
+                            "engine_version": "v4.2.2-stale",
                             "verdict": "invalid",
                             "reason": "stale_no_heartbeats",
                             "reason_detail": f"No heartbeats and no final after {age_sec:.0f}s",
@@ -924,7 +993,8 @@ def _finalize_stale_session(session_id: str) -> bool:
         "tracking_params": meta_macros if isinstance(meta_macros, dict) else {},
     }
 
-    _process_final_background(session_id, payload_dict, client_ip, {}, "1.1")
+    # v4.2.2: pass None (not {}) — prevents MISSING_SEC_CH_UA false positive
+    _process_final_background(session_id, payload_dict, client_ip, None, "1.1")
     return True
 
 
