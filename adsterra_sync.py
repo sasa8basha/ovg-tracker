@@ -1,39 +1,98 @@
 """
-adsterra_sync.py — Background task to sync Adsterra stats.
+adsterra_sync.py — Background sync: update visit-level impressions/revenue.
 """
 import asyncio
 import httpx
 from datetime import datetime, timedelta
+
 from database import SessionLocal
 from models import CampaignModel, VisitModel
 
+
+API_BASE = "https://api3.adsterratools.com/publisher"
+SYNC_DAYS_BACK = 3
+
+
+def _sync_campaign_sync(campaign_id: int, api_key: str, db) -> dict:
+    now = datetime.utcnow()
+    fd = (now - timedelta(days=SYNC_DAYS_BACK)).strftime("%Y-%m-%d")
+    td = now.strftime("%Y-%m-%d")
+    url = (
+        f"{API_BASE}/stats?format=json"
+        f"&start_date={fd}&finish_date={td}&group_by[]=placement_sub_id"
+    )
+    try:
+        with httpx.Client(timeout=20) as client:
+            r = client.get(url, headers={"X-API-Key": api_key, "Accept": "application/json"})
+            if r.status_code != 200:
+                return {"error": f"HTTP {r.status_code}", "updated": 0, "skipped": 0}
+            data = r.json()
+    except Exception as e:
+        return {"error": str(e)[:150], "updated": 0, "skipped": 0}
+
+    items = data.get("items", []) or []
+    updated = 0
+    skipped = 0
+    for item in items:
+        sub_id = str(item.get("placement_sub_id") or item.get("sub_id") or "").strip()
+        if not sub_id:
+            skipped += 1
+            continue
+        impressions = int(item.get("impression", 0) or 0)
+        revenue = float(item.get("revenue", 0) or 0)
+        clicks = int(item.get("clicks", 0) or 0)
+        if impressions <= 0 and revenue <= 0:
+            continue
+        v = db.query(VisitModel).filter(
+            VisitModel.campaign_id == campaign_id,
+            (VisitModel.session_id == sub_id) | (VisitModel.click_id == sub_id),
+        ).first()
+        if not v:
+            skipped += 1
+            continue
+        v.impressions = impressions
+        v.revenue = round(revenue, 6)
+        if clicks > 0:
+            v.clicks = clicks
+        updated += 1
+
+    if updated > 0:
+        db.commit()
+
+    return {"updated": updated, "skipped": skipped, "error": None, "items": len(items)}
+
+
 async def sync_adsterra_loop():
     while True:
-        await asyncio.sleep(300) # كل 5 دقائق
+        await asyncio.sleep(300)
         db = SessionLocal()
         try:
-            campaigns = db.query(CampaignModel).filter(CampaignModel.adsterra_api_key.isnot(None)).all()
+            campaigns = (
+                db.query(CampaignModel)
+                .filter(CampaignModel.adsterra_api_key.isnot(None))
+                .filter(CampaignModel.status == "active")
+                .all()
+            )
+            if not campaigns:
+                continue
             for c in campaigns:
-                today = datetime.utcnow().strftime("%Y-%m-%d")
-                yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
-                url = f"https://api3.adsterratools.com/publisher/stats?start_date={yesterday}&finish_date={today}&group_by=placement_sub_id&format=json"
-                headers = {"X-API-Key": c.adsterra_api_key}
-                
-                async with httpx.AsyncClient() as client:
+                try:
+                    result = await asyncio.to_thread(
+                        _sync_campaign_sync, c.id, c.adsterra_api_key, db
+                    )
+                    if result.get("error"):
+                        print(f"[Adsterra Sync] campaign {c.id}: {result['error']}")
+                    elif result["updated"] > 0:
+                        print(
+                            f"[Adsterra Sync] campaign {c.id}: "
+                            f"updated={result['updated']} skipped={result['skipped']} items={result['items']}"
+                        )
+                except Exception as e:
+                    print(f"[Adsterra Sync] campaign {c.id} failed: {e}")
                     try:
-                        res = await client.get(url, headers=headers, timeout=10)
-                        if res.status_code == 200:
-                            items = res.json().get("items", [])
-                            for item in items:
-                                sub_id = item.get("placement_sub_id") or item.get("sub_id")
-                                if sub_id:
-                                    v = db.query(VisitModel).filter(VisitModel.click_id == sub_id).first()
-                                    if v:
-                                        v.impressions = item.get("impression", 0)
-                                        v.revenue = item.get("revenue", 0.0)
-                            db.commit()
-                    except Exception as e:
-                        print(f"[Adsterra Sync] Failed for campaign {c.id}: {e}")
+                        db.rollback()
+                    except Exception:
+                        pass
         except Exception as e:
             print(f"[Adsterra Sync] Loop error: {e}")
         finally:

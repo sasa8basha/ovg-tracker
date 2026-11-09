@@ -52,6 +52,7 @@ class CampaignCreateIn(BaseModel):
     destination_slug: str = Field(default="custom", max_length=50)
     destination_url: str = Field(default="", max_length=1000)
     destination_zone_id: str = Field(default="", max_length=100)
+    landing_url: str = Field(default="", max_length=1000)
     sell_cpm: float = Field(default=0.0, ge=0.0, le=100.0)
     redirect_delay_ms: int = Field(default=500, ge=100, le=2000)
     bot_block_threshold: int = Field(default=100, ge=0, le=100)
@@ -68,6 +69,7 @@ class CampaignUpdateIn(BaseModel):
     destination_slug: str = Field(default="", max_length=50)
     destination_url: str = Field(default="", max_length=1000)
     destination_zone_id: str = Field(default="", max_length=100)
+    landing_url: str = Field(default="", max_length=1000)
     sell_cpm: float = Field(default=-1.0, ge=-1.0, le=100.0)
     redirect_delay_ms: int = Field(default=0, ge=0, le=2000)
     bot_block_threshold: int = Field(default=-1, ge=-1, le=100)
@@ -155,9 +157,6 @@ class InterstitialLogPayload(BaseModel):
     t_ms: int = Field(default=0, ge=0)
     url: str = Field(default="", max_length=2000)
 
-# =========================================================
-# Anubis Proof-of-Work Challenge (v1.0)
-# =========================================================
 class ChallengeRequestPayload(BaseModel):
     session_id: str = Field(min_length=8, max_length=64)
     campaign_key: str = Field(min_length=1, max_length=100)

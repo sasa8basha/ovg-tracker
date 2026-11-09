@@ -52,6 +52,7 @@ class CampaignModel(Base):
     destination_slug = Column(String(50), default="custom", index=True)
     destination_url = Column(String(1000), default="")
     destination_zone_id = Column(String(100), default="")
+    landing_url = Column(String(1000), default="")
     sell_cpm = Column(Float, default=0.0, nullable=False)
 
     adsterra_api_key = Column(String(255), nullable=True)
@@ -92,8 +93,8 @@ class SessionModel(Base):
     visit_id = Column(Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True, index=True)
     verdict = Column(String(20), nullable=True, index=True)
     score = Column(Integer, nullable=True)
-    confidence = Column(Float, nullable=True)              # ← جديد
-    bot_probability = Column(Float, nullable=True)         # ← جديد
+    confidence = Column(Float, nullable=True)
+    bot_probability = Column(Float, nullable=True)
     data_quality = Column(String(20), default="pending", nullable=False, index=True)
     clock_drift_ms = Column(Integer, default=0)
     is_honeypot_triggered = Column(Boolean, default=False)
@@ -105,7 +106,7 @@ class SessionModel(Base):
         Index("ix_sessions_ip_started", "ip", "started_at"),
         Index("ix_sessions_campaign_started", "campaign_id", "started_at"),
         Index("ix_sessions_user_started", "user_id", "started_at"),
-        Index("ix_sessions_pending", "visit_id", "started_at"),   # ← جديد — للـ stale finalizer
+        Index("ix_sessions_pending", "visit_id", "started_at"),
     )
 
 
@@ -147,14 +148,12 @@ class VisitModel(Base):
     verdict = Column(String, index=True)
     evidence = Column(JSON)
 
-    # ============ NEW ENGINE FIELDS (indexed for fast queries) ============
-    confidence = Column(Float, nullable=True, index=True)        # ← 0..1
-    bot_probability = Column(Float, nullable=True, index=True)   # ← 0..1
-    mode = Column(String(20), nullable=True, index=True)         # strict/balanced/permissive
-    reason = Column(String(100), nullable=True, index=True)      # human-readable reason code
-    data_quality_report = Column(JSON, nullable=True)            # full DataQualityReport
-    full_payload = Column(JSON, nullable=True)                   # raw engine output
-    # =====================================================================
+    confidence = Column(Float, nullable=True, index=True)
+    bot_probability = Column(Float, nullable=True, index=True)
+    mode = Column(String(20), nullable=True, index=True)
+    reason = Column(String(100), nullable=True, index=True)
+    data_quality_report = Column(JSON, nullable=True)
+    full_payload = Column(JSON, nullable=True)
 
     impressions = Column(Integer, default=0)
     revenue = Column(Float, default=0.0)
@@ -209,7 +208,6 @@ class VisitModel(Base):
         Index("ix_visits_data_quality", "data_quality"),
         Index("ix_visits_counting_type", "counting_type"),
         Index("ix_visits_website_time", "popads_website_id", "timestamp"),
-        # Fast filter for high-confidence bot queries
         Index("ix_visits_bot_prob_ts", "bot_probability", "timestamp"),
         Index("ix_visits_confidence_ts", "confidence", "timestamp"),
     )
