@@ -1,5 +1,9 @@
 /**
  * shell.js — OVG Tracker v9 Shell (Campaign-Centric)
+ * v11.0: NAV updated to point to /v2/* pages.
+ * Kept for old pages: labeling, data_quality, zone_analytics, audit_log,
+ * system_health, tracker, popads_report, adsterra_report, reports,
+ * session_detail, visit_detail.
  */
 (function () {
   'use strict';
@@ -63,7 +67,6 @@
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
     logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
-    code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
     chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
     ban: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
@@ -78,23 +81,26 @@
     palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="1.5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125 0-.921.77-1.688 1.688-1.688h1.781C18.719 16.375 22 13.281 22 9.5 22 5.359 17.5 2 12 2z"/></svg>',
   };
 
+  // =========================================================
+  // NAV — v11.0: Points to V2 pages
+  // =========================================================
   const NAV = {
     ar: [
       { group: 'التحليل', items: [
-        { id: 'dashboard', label: 'لوحة التحكم', icon: 'dashboard', href: '/dashboard' },
-        { id: 'live',      label: 'Live Monitor', icon: 'live',      href: '/live' },
-        { id: 'radar',     label: 'Radar',        icon: 'radar',     href: '/radar' },
-        { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/visits' },
+        { id: 'dashboard', label: 'لوحة التحكم', icon: 'dashboard', href: '/v2/dashboard' },
+        { id: 'live',      label: 'Live Monitor', icon: 'live',      href: '/v2/live' },
+        { id: 'radar',     label: 'Radar',        icon: 'radar',     href: '/v2/radar' },
+        { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/v2/visits' },
         { id: 'labeling',  label: 'المراجعة',     icon: 'labeling',  href: '/labeling', badge: 'labeling' },
-        { id: 'sessions',  label: 'Sessions',     icon: 'sessions',  href: '/sessions' },
+        { id: 'sessions',  label: 'Sessions',     icon: 'sessions',  href: '/v2/sessions' },
       ]},
       { group: 'التحليل المتقدم', items: [
-        { id: 'ip-lists',  label: 'قوائم IP',         icon: 'shield',  href: '/ip-lists' },
+        { id: 'ip-lists',  label: 'قوائم IP',         icon: 'shield',  href: '/v2/ip-lists' },
         { id: 'reports',   label: 'الخريطة والتقارير', icon: 'map',     href: '/reports' },
       ]},
       { group: 'الحملات', items: [
-        { id: 'campaigns', label: 'كل الحملات',     icon: 'campaigns', href: '/campaigns' },
-        { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/smart-reports' },
+        { id: 'campaigns', label: 'كل الحملات',     icon: 'campaigns', href: '/v2/campaigns' },
+        { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/v2/reports' },
         { id: 'analytics', label: 'Zone Analytics',  icon: 'analytics', href: '/zone-analytics' },
       ]},
       { group: 'التقارير والإثباتات', items: [
@@ -105,45 +111,45 @@
         { id: 'system-health', label: 'حالة النظام',        icon: 'activity',    href: '/system-health' },
         { id: 'audit-log',     label: 'سجل الإجراءات',      icon: 'history',     href: '/audit-log' },
         { id: 'dataquality',   label: 'جودة البيانات',      icon: 'dataquality', href: '/data-quality' },
-        { id: 'components',    label: 'مكتبة المكونات 🆕',  icon: 'palette',     href: '/v2/components' },
+        { id: 'components',    label: 'مكتبة المكونات',     icon: 'palette',     href: '/v2/components' },
         { id: 'settings',      label: 'الإعدادات',          icon: 'settings',    href: '/settings' },
       ]},
     ],
     en: [
       { group: 'Analyze', items: [
-        { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
-        { id: 'live',      label: 'Live Monitor', icon: 'live', href: '/live' },
-        { id: 'radar',     label: 'Radar',     icon: 'radar',     href: '/radar' },
-        { id: 'visits',    label: 'Visits',    icon: 'visits',    href: '/visits' },
+        { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/v2/dashboard' },
+        { id: 'live',      label: 'Live Monitor', icon: 'live', href: '/v2/live' },
+        { id: 'radar',     label: 'Radar',     icon: 'radar',     href: '/v2/radar' },
+        { id: 'visits',    label: 'Visits',    icon: 'visits',    href: '/v2/visits' },
         { id: 'labeling',  label: 'Labeling',  icon: 'labeling',  href: '/labeling', badge: 'labeling' },
-        { id: 'sessions',  label: 'Sessions',  icon: 'sessions',  href: '/sessions' },
+        { id: 'sessions',  label: 'Sessions',  icon: 'sessions',  href: '/v2/sessions' },
       ]},
       { group: 'Deep Analysis', items: [
-        { id: 'ip-lists',  label: 'IP Lists',      icon: 'shield',  href: '/ip-lists' },
+        { id: 'ip-lists',  label: 'IP Lists',      icon: 'shield',  href: '/v2/ip-lists' },
         { id: 'reports',   label: 'Map & Reports', icon: 'map',     href: '/reports' },
       ]},
       { group: 'Campaigns', items: [
-        { id: 'campaigns', label: 'All Campaigns',  icon: 'campaigns', href: '/campaigns' },
-        { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/smart-reports' },
+        { id: 'campaigns', label: 'All Campaigns',  icon: 'campaigns', href: '/v2/campaigns' },
+        { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/v2/reports' },
         { id: 'analytics', label: 'Zone Analytics', icon: 'analytics', href: '/zone-analytics' },
       ]},
       { group: 'Reports & Proofs', items: [
-        { id: 'popads-report',   label: 'PopAds Refund',   icon: 'refund', href: '/popads-report' },
-        { id: 'adsterra-report', label: 'Adsterra Proof',  icon: 'award',  href: '/adsterra-report' },
+        { id: 'popads-report',   label: 'PopAds Refund',  icon: 'refund', href: '/popads-report' },
+        { id: 'adsterra-report', label: 'Adsterra Proof', icon: 'award',  href: '/adsterra-report' },
       ]},
       { group: 'System', items: [
-        { id: 'system-health', label: 'System Health',    icon: 'activity',    href: '/system-health' },
-        { id: 'audit-log',     label: 'Audit Log',        icon: 'history',     href: '/audit-log' },
-        { id: 'dataquality',   label: 'Data Quality',     icon: 'dataquality', href: '/data-quality' },
-        { id: 'components',    label: 'Components 🆕',    icon: 'palette',     href: '/v2/components' },
-        { id: 'settings',      label: 'Settings',         icon: 'settings',    href: '/settings' },
+        { id: 'system-health', label: 'System Health',   icon: 'activity',    href: '/system-health' },
+        { id: 'audit-log',     label: 'Audit Log',       icon: 'history',     href: '/audit-log' },
+        { id: 'dataquality',   label: 'Data Quality',    icon: 'dataquality', href: '/data-quality' },
+        { id: 'components',    label: 'Component Library', icon: 'palette',   href: '/v2/components' },
+        { id: 'settings',      label: 'Settings',        icon: 'settings',    href: '/settings' },
       ]},
     ],
   };
 
   const T = {
-    ar: { search: 'بحث سريع', searchPlaceholder: 'اكتب للبحث...', collapse: 'طوي القائمة', empty: 'لا توجد نتائج', nav: 'تنقّل', user: 'الحساب', logout: 'خروج', attnTooltip: 'محتاج انتباه' },
-    en: { search: 'Quick search', searchPlaceholder: 'Type to search...', collapse: 'Collapse', empty: 'No results', nav: 'Navigate', user: 'Account', logout: 'Logout', attnTooltip: 'Needs attention' },
+    ar: { search: 'بحث سريع', searchPlaceholder: 'اكتب للبحث...', collapse: 'طوي القائمة', empty: 'لا توجد نتائج', nav: 'تنقّل', user: 'الحساب', logout: 'خروج' },
+    en: { search: 'Quick search', searchPlaceholder: 'Type to search...', collapse: 'Collapse', empty: 'No results', nav: 'Navigate', user: 'Account', logout: 'Logout' },
   };
 
   function buildSidebar() {
@@ -160,7 +166,7 @@
     });
     const initial = (S.user && S.user.username ? S.user.username[0] : '?').toUpperCase();
     const username = S.user ? S.user.username : '—';
-    return `<aside class="sh-sidebar" id="shSidebar"><div class="sh-sidebar-head"><div class="sh-logo">O</div><div class="sh-logo-text"><div class="t1">OVG Tracker</div><div class="t2">v9 · PRO</div></div></div><nav class="sh-nav">${itemsHtml}</nav><div class="sh-sidebar-foot"><a href="/settings" class="sh-user"><div class="sh-avatar">${esc(initial)}</div><div class="sh-user-info"><div class="n">${esc(username)}</div><div class="r">${esc(L.user)}</div></div></a></div><button class="sh-collapse-btn" id="shCollapseBtn" aria-label="${esc(L.collapse)}" title="${esc(L.collapse)}">${ICON.chevron}</button></aside>`;
+    return `<aside class="sh-sidebar" id="shSidebar"><div class="sh-sidebar-head"><div class="sh-logo">O</div><div class="sh-logo-text"><div class="t1">OVG Tracker</div><div class="t2">v11 · PRO</div></div></div><nav class="sh-nav">${itemsHtml}</nav><div class="sh-sidebar-foot"><a href="/settings" class="sh-user"><div class="sh-avatar">${esc(initial)}</div><div class="sh-user-info"><div class="n">${esc(username)}</div><div class="r">${esc(L.user)}</div></div></a></div><button class="sh-collapse-btn" id="shCollapseBtn" aria-label="${esc(L.collapse)}" title="${esc(L.collapse)}">${ICON.chevron}</button></aside>`;
   }
 
   function buildTopbar() {
@@ -184,7 +190,7 @@
   function buildCommands() {
     const nav = (NAV[S.lang] || NAV.ar).flatMap(g => g.items); const cmds = [];
     nav.forEach(it => { cmds.push({ group: T[S.lang].nav, label: it.label, icon: it.icon, action: () => { window.location.href = it.href; } }); });
-    if (S.campaigns && S.campaigns.length) { S.campaigns.slice(0, 5).forEach(c => { cmds.push({ group: 'الحملات', label: c.name, desc: '🎯', action: () => { window.location.href = '/campaigns/' + c.id; } }); }); }
+    if (S.campaigns && S.campaigns.length) { S.campaigns.slice(0, 5).forEach(c => { cmds.push({ group: 'الحملات', label: c.name, desc: '🎯', action: () => { window.location.href = '/v2/campaigns/' + c.id; } }); }); }
     cmds.push({ group: T[S.lang].user, label: T[S.lang].logout, icon: 'logout', action: async () => { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); window.location.href = '/'; } });
     return cmds;
   }
@@ -253,7 +259,6 @@
     try {
       const pulse = await api('/api/stats/pulse');
       S.pulse = pulse;
-
       const today = pulse.today || {};
       const yest = pulse.yesterday || {};
       const todayProfit = Number(today.profit || 0);
@@ -261,8 +266,7 @@
       const source = today.source || 'unknown';
       const integrity = (today.integrity && today.integrity.integrity) || 'unknown';
 
-      let trendPct = 0;
-      let trendDir = 'flat';
+      let trendPct = 0; let trendDir = 'flat';
       if (Math.abs(yestProfit) > 0.01) {
         trendPct = ((todayProfit - yestProfit) / Math.abs(yestProfit)) * 100;
         if (trendPct > 5) trendDir = 'up';
@@ -274,19 +278,15 @@
       if (el) {
         const cls = todayProfit > 0.01 ? 'pos' : todayProfit < -0.01 ? 'neg' : 'zero';
         el.className = `sh-money-pulse ${cls}`;
-
         const estimated = (source === 'cpm' || source === 'unknown' || integrity !== 'exact');
         const indicator = estimated ? ' *' : '';
-
         const valEl = el.querySelector('.sh-mp-value');
         if (valEl) valEl.textContent = fmtMoney(todayProfit) + indicator;
-
         const trendEl = el.querySelector('.sh-mp-trend');
         if (trendEl) {
           if (trendDir === 'flat') { trendEl.textContent = '—'; trendEl.className = 'sh-mp-trend flat'; }
           else { const arrow = trendDir === 'up' ? '↑' : '↓'; trendEl.textContent = `${arrow}${Math.abs(trendPct).toFixed(0)}%`; trendEl.className = `sh-mp-trend ${trendDir}`; }
         }
-
         let title = `الربح اليوم: ${fmtMoney(todayProfit)}`;
         if (source === 'cpm') title += ' — تقدير بالـ CPM';
         else if (source === 'exact_partial') title += ' — محسوب من BID جزئي';
@@ -295,7 +295,6 @@
         if (integrity === 'partial_warn') title += ' (تحذير: تغطية BID منخفضة)';
         el.title = title;
       }
-
       const visitsEl = document.getElementById('shStatusVisits');
       if (visitsEl) visitsEl.textContent = fmtNum(today.visits || 0) + ' زيارة';
       const profitEl = document.getElementById('shStatusProfit');
@@ -348,7 +347,7 @@
   function hideQuickActions() { if (S.quickActionsEl) S.quickActionsEl.classList.remove('is-open'); S.quickActionsTarget = null; }
 
   async function applyZoneAction(targetEl, zoneId, action) {
-    if (action === 'details') { window.location.href = `/smart-reports?zone=${encodeURIComponent(zoneId)}`; return; }
+    if (action === 'details') { window.location.href = `/v2/reports?zone=${encodeURIComponent(zoneId)}`; return; }
     const prev = targetEl.style.opacity; targetEl.style.opacity = '0.5';
     try {
       const res = await api(`/api/zones/${encodeURIComponent(zoneId)}/action`, { method: 'POST', body: JSON.stringify({ action, reason: 'Quick Action', metadata: action === 'scale' ? { percent: 30 } : action === 'pause' ? { hours: 24 } : {} }) });
@@ -381,7 +380,7 @@
     const cmdWrapper = document.createElement('div'); cmdWrapper.innerHTML = buildCmdPalette(); document.body.appendChild(cmdWrapper.firstElementChild);
     ensureToastContainer(); initTheme(); initCollapse(); bindCmd(); initQuickActions();
     const searchBtn = document.getElementById('shSearchBtn'); if (searchBtn) searchBtn.addEventListener('click', openCmd);
-    const moneyPulse = document.getElementById('shMoneyPulse'); if (moneyPulse) { moneyPulse.addEventListener('click', () => { window.location.href = '/smart-reports'; }); }
+    const moneyPulse = document.getElementById('shMoneyPulse'); if (moneyPulse) { moneyPulse.addEventListener('click', () => { window.location.href = '/v2/reports'; }); }
     document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCmd(); } });
     setBreadcrumb(opts.breadcrumb || [{ label: T[S.lang].nav }]);
     refreshMoneyPulse(); refreshAttentionCount(); setInterval(refreshMoneyPulse, 30000); setInterval(refreshAttentionCount, 60000);
