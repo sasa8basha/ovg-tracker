@@ -1,9 +1,10 @@
 """
-main.py — OVG Tracker entry point.
+main.py — OVG Tracker entry point (v10.0-neo)
 """
 import asyncio
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
@@ -38,7 +39,11 @@ Base.metadata.create_all(bind=engine)
 run_data_seeding_and_backfills()
 bootstrap_admin()
 
-app = FastAPI(title="OVG Tracker", version="9.7", docs_url="/docs" if DEBUG else None)
+app = FastAPI(title="OVG Tracker", version="10.0-neo", docs_url="/docs" if DEBUG else None)
+
+# GZip
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -48,6 +53,19 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def cache_control_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=3600"
+    elif path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    else:
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @app.middleware("http")
@@ -75,11 +93,12 @@ async def startup_event():
     asyncio.create_task(reputation_loader_loop())
     asyncio.create_task(intelligence_worker_loop())
     print("=" * 60)
-    print(f"  OVG Tracker v9.7 — ENV={ENV}  DEBUG={DEBUG}")
+    print(f"  OVG Tracker v10.0-neo — ENV={ENV}  DEBUG={DEBUG}")
     print("  Adsterra Sync:       running (every 5 min)")
     print("  Stale Finalizer:     running (every 60s)")
     print("  Reputation Loader:   running (immediate + every 24h)")
     print("  IP Intel Worker:     running (every 30s)")
+    print("  Design System:       Neo v1.0 (available at /v2/components)")
     print("=" * 60)
 
 
