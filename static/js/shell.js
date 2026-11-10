@@ -88,11 +88,11 @@
     ar: [
       { group: 'التحليل', items: [
         { id: 'dashboard', label: 'لوحة التحكم', icon: 'dashboard', href: '/v2/dashboard' },
-        { id: 'live',      label: 'Live Monitor', icon: 'live',      href: '/v2/live' },
-        { id: 'radar',     label: 'Radar',        icon: 'radar',     href: '/v2/radar' },
+        { id: 'live',      label: 'المراقبة المباشرة', icon: 'live',      href: '/v2/live' },
+        { id: 'radar',     label: 'الرادار',        icon: 'radar',     href: '/v2/radar' },
         { id: 'visits',    label: 'الزيارات',     icon: 'visits',    href: '/v2/visits' },
         { id: 'labeling',  label: 'المراجعة',     icon: 'labeling',  href: '/labeling', badge: 'labeling' },
-        { id: 'sessions',  label: 'Sessions',     icon: 'sessions',  href: '/v2/sessions' },
+        { id: 'sessions',  label: 'الجلسات',     icon: 'sessions',  href: '/v2/sessions' },
       ]},
       { group: 'التحليل المتقدم', items: [
         { id: 'ip-lists',  label: 'قوائم IP',         icon: 'shield',  href: '/v2/ip-lists' },
@@ -101,7 +101,7 @@
       { group: 'الحملات', items: [
         { id: 'campaigns', label: 'كل الحملات',     icon: 'campaigns', href: '/v2/campaigns' },
         { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/v2/reports' },
-        { id: 'analytics', label: 'Zone Analytics',  icon: 'analytics', href: '/zone-analytics' },
+        { id: 'analytics', label: 'تحليل المناطق',  icon: 'analytics', href: '/zone-analytics' },
       ]},
       { group: 'التقارير والإثباتات', items: [
         { id: 'popads-report',   label: 'استرداد PopAds',  icon: 'refund', href: '/popads-report' },
@@ -329,8 +329,8 @@
   function buildQuickActionsHTML(zoneId, zoneInfo) {
     const actions = []; const grade = zoneInfo.grade || ''; const trust = zoneInfo.trust;
     if (grade === 'F' || grade === 'D' || (trust !== undefined && trust < 40)) { actions.push({ id: 'blacklist', icon: 'ban', label: 'حظر فوري', cls: 'danger', kbd: 'X' }); }
-    actions.push({ id: 'pause', icon: 'pause', label: 'Pause 24h', cls: 'warn', kbd: 'P' });
-    if (grade === 'S' || grade === 'A' || (trust !== undefined && trust > 70)) { actions.push({ id: 'scale', icon: 'scale', label: 'Scale +30%', cls: 'success', kbd: '+' }); }
+    actions.push({ id: 'pause', icon: 'pause', label: 'إيقاف 24 ساعة', cls: 'warn', kbd: 'P' });
+    if (grade === 'S' || grade === 'A' || (trust !== undefined && trust > 70)) { actions.push({ id: 'scale', icon: 'scale', label: 'زيادة 30%', cls: 'success', kbd: '+' }); }
     actions.push({ id: 'details', icon: 'eye', label: 'التفاصيل', cls: '', kbd: '↵' });
     return `<div class="sh-qactions-head">${esc(zoneId)}</div>${actions.map(a => `<button type="button" class="sh-qactions-item ${a.cls}" data-action="${a.id}">${ICON[a.icon] || ''}<span>${esc(a.label)}</span>${a.kbd ? `<span class="kbd">${esc(a.kbd)}</span>` : ''}</button>`).join('')}`;
   }
@@ -351,7 +351,7 @@
     const prev = targetEl.style.opacity; targetEl.style.opacity = '0.5';
     try {
       const res = await api(`/api/zones/${encodeURIComponent(zoneId)}/action`, { method: 'POST', body: JSON.stringify({ action, reason: 'Quick Action', metadata: action === 'scale' ? { percent: 30 } : action === 'pause' ? { hours: 24 } : {} }) });
-      const actionLabels = { blacklist: 'حظر', pause: 'Pause', scale: 'Scale +30%' };
+      const actionLabels = { blacklist: 'حظر', pause: 'إيقاف', scale: 'زيادة 30%' };
       targetEl.classList.add('sh-action-applied');
       toast(`${actionLabels[action] || action} — ${zoneId}`, 'success', 5000, { undoLabel: 'تراجع', onUndo: async () => { try { await api(`/api/zones/${encodeURIComponent(zoneId)}/action/${res.id}`, { method: 'DELETE' }); targetEl.classList.remove('sh-action-applied'); targetEl.style.opacity = prev; toast('تم التراجع', 'info'); } catch (e) { toast('فشل التراجع: ' + e.message, 'error'); } } });
     } catch (err) { targetEl.style.opacity = prev; toast('فشل: ' + err.message, 'error'); }
