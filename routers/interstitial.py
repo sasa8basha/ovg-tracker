@@ -117,11 +117,12 @@ def _extract_zone(payload_url: str, tracking_params: dict, campaign) -> tuple:
     try:
         tp = tracking_params or {}
         tp_lower = {str(k).lower().strip(): v for k, v in tp.items() if v}
-        for key in ("zoneid", "zone_id", "zone", "z", "zn", "zid"):
+        # ✅ إضافة websiteid
+        for key in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z", "zn", "zid"):
             if key in tp_lower and tp_lower[key]:
                 val = str(tp_lower[key]).strip()[:100]
-                if val:
-                    return val, "tracking_params"
+                if val and not val.startswith("["):
+                    return val, f"macro_{key}"
     except Exception:
         pass
     try:

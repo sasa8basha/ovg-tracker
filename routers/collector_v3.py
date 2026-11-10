@@ -143,7 +143,22 @@ def _extract_macros(tp: dict) -> dict:
 # =========================================================
 def _extract_zone_from_payload(url: str, tracking_params: dict, campaign) -> tuple:
     """Returns (zone_id, source)."""
-    # 1) helpers.extract_zone_id_from_url — handles zone/zoneid/z/path
+    
+    # 1) الأولوية القصوى: tracking_params (الماكروز اللي بوب ادس بيبعتها)
+    try:
+        tp = tracking_params or {}
+        tp_lower = {str(k).lower().strip(): v for k, v in tp.items() if v}
+        # بندور على websiteid الأول
+        for key in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z", "zn", "zid"):
+            if key in tp_lower and tp_lower[key]:
+                _val = str(tp_lower[key]).strip()[:100]
+                # تأكد إن الماكرو اتحول لرقم فعلاً ومش مجرد نص
+                if _val and not _val.startswith("["): 
+                    return _val, f"macro_{key}"
+    except Exception:
+        pass
+
+    # 2) الـ URL
     try:
         _z = extract_zone_id_from_url(url or "")
         if _z:
@@ -151,7 +166,7 @@ def _extract_zone_from_payload(url: str, tracking_params: dict, campaign) -> tup
     except Exception:
         pass
 
-    # 2) analysis.extract_zone_id — zoneid only
+    # 3) analysis.extract_zone_id
     try:
         _z = extract_zone_id(url or "")
         if _z and _z != "unknown":
@@ -159,19 +174,7 @@ def _extract_zone_from_payload(url: str, tracking_params: dict, campaign) -> tup
     except Exception:
         pass
 
-    # 3) tracking_params — any zone-like key
-    try:
-        tp = tracking_params or {}
-        tp_lower = {str(k).lower().strip(): v for k, v in tp.items() if v}
-        for key in ("zoneid", "zone_id", "zone", "z", "zn", "zid"):
-            if key in tp_lower and tp_lower[key]:
-                _val = str(tp_lower[key]).strip()[:100]
-                if _val:
-                    return _val, "tracking_params"
-    except Exception:
-        pass
-
-    # 4) campaign default — last resort
+    # 4) campaign default
     try:
         if campaign is not None and campaign.destination_zone_id:
             _val = str(campaign.destination_zone_id).strip()[:100]
