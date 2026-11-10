@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, VisitModel, CampaignModel
 from auth import current_user
-from helpers import _apply_date_filter, verify_campaign_access
+from helpers import _apply_date_filter
 
 router = APIRouter()
 
@@ -36,7 +36,6 @@ def _score_label(score):
 
 @router.get("/data-quality/overview")
 def data_quality_overview(campaign_id: int = Query(None), from_date: str = Query(None), to_date: str = Query(None), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
-    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel)
     if campaign_id: q = q.filter(VisitModel.campaign_id == campaign_id)
     else: q = q.join(CampaignModel).filter(CampaignModel.user_id == user.id)
@@ -60,7 +59,6 @@ def data_quality_overview(campaign_id: int = Query(None), from_date: str = Query
 
 @router.get("/data-quality/timeline")
 def data_quality_timeline(campaign_id: int = Query(None), days: int = Query(30, ge=1, le=90), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
-    verify_campaign_access(campaign_id, user, db)
     cutoff = datetime.utcnow() - timedelta(days=days); day_col = cast(VisitModel.timestamp, Date).label("day")
     canvas_ok_expr = case((VisitModel.canvas_hash.isnot(None) & VisitModel.canvas_hash.notin_(["", "Unknown", "Unknown...", "blocked", "blocked...", "Mock", "Mock..."]), 1), else_=0)
     asn_ok_expr = case((VisitModel.asn.isnot(None) & VisitModel.asn.notin_(["", "Unknown", "N/A"]), 1), else_=0)
@@ -74,7 +72,6 @@ def data_quality_timeline(campaign_id: int = Query(None), days: int = Query(30, 
 
 @router.get("/data-quality/collector-rate")
 def data_quality_collector_rate(campaign_id: int = Query(None), hours: int = Query(24, ge=1, le=168), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
-    verify_campaign_access(campaign_id, user, db)
     cutoff = datetime.utcnow() - timedelta(hours=hours); baseline_cutoff = datetime.utcnow() - timedelta(days=7)
     hour_col = func.concat(cast(VisitModel.timestamp, Date), " ", func.extract('hour', VisitModel.timestamp), ":00").label("hour")
     q = db.query(hour_col, func.count(VisitModel.id).label("count"))

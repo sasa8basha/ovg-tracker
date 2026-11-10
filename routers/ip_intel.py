@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, VisitModel, CampaignModel, IPIntelligence
 from auth import current_user
-from helpers import verify_campaign_access
 
 router = APIRouter()
 
@@ -19,25 +18,8 @@ WHITELIST_RISK_MAX = 20
 BLACKLIST_RISK_MIN = 60
 
 
-
-def _query_ips_chunked(db, ips, *extra_filters, chunk_size=500):
-    """Avoid SQLite/Postgres parameter limit on large IN lists (C-10)."""
-    ips = list(ips)
-    if not ips:
-        return []
-    rows = []
-    for i in range(0, len(ips), chunk_size):
-        chunk = ips[i:i + chunk_size]
-        q = db.query(IPIntelligence).filter(IPIntelligence.ip_address.in_(chunk))
-        for f in extra_filters:
-            q = q.filter(f)
-        rows.extend(q.all())
-    return rows
-
 def _ips_for_campaign(campaign_id, user, db):
     """Return set of IPs that hit visits for a campaign (or all user campaigns)."""
-    from helpers import verify_campaign_access
-    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel.ip).filter(VisitModel.ip.isnot(None))
     if campaign_id:
         q = q.filter(VisitModel.campaign_id == campaign_id)
@@ -57,11 +39,11 @@ def get_whitelist(
     if not ips:
         return {"count": 0, "items": []}
 
-    rows = _query_ips_chunked(
-        db, ips,
+    rows = db.query(IPIntelligence).filter(
+        IPIntelligence.ip_address.in_(ips),
         IPIntelligence.classification == "residential",
         IPIntelligence.risk_score < WHITELIST_RISK_MAX,
-    )[:limit]
+    ).limit(limit).all()
 
     return {
         "count": len(rows),
@@ -90,10 +72,10 @@ def get_blacklist(
     if not ips:
         return {"count": 0, "items": []}
 
-    rows = _query_ips_chunked(
-        db, ips,
+    rows = db.query(IPIntelligence).filter(
+        IPIntelligence.ip_address.in_(ips),
         IPIntelligence.risk_score >= BLACKLIST_RISK_MIN,
-    )[:limit]
+    ).limit(limit).all()
 
     return {
         "count": len(rows),
@@ -122,21 +104,12 @@ def ip_stats(
     if not ips:
         return {"total": 0, "residential": 0, "datacenter": 0, "vpn": 0, "proxy": 0, "tor": 0, "unknown": 0}
 
-    # C-10: chunk large IP sets for group_by
-    from collections import Counter
-    counts = Counter()
-    ips_list = list(ips)
-    for i in range(0, len(ips_list), 500):
-        chunk = ips_list[i:i+500]
-        rows_c = db.query(
-            IPIntelligence.classification,
-            func.count(IPIntelligence.id),
-        ).filter(
-            IPIntelligence.ip_address.in_(chunk)
-        ).group_by(IPIntelligence.classification).all()
-        for cls, cnt in rows_c:
-            counts[cls or "unknown"] += int(cnt)
-    rows = list(counts.items())
+    rows = db.query(
+        IPIntelligence.classification,
+        func.count(IPIntelligence.id),
+    ).filter(
+        IPIntelligence.ip_address.in_(ips)
+    ).group_by(IPIntelligence.classification).all()
 
     result = {"total": len(ips), "residential": 0, "datacenter": 0, "vpn": 0, "proxy": 0, "tor": 0, "unknown": 0, "suspicious": 0}
     for cls, cnt in rows:
@@ -156,11 +129,11 @@ def export_whitelist(
     ips = _ips_for_campaign(campaign_id, user, db)
     rows = []
     if ips:
-        rows = _query_ips_chunked(
-            db, ips,
+        rows = db.query(IPIntelligence).filter(
+            IPIntelligence.ip_address.in_(ips),
             IPIntelligence.classification == "residential",
             IPIntelligence.risk_score < WHITELIST_RISK_MAX,
-        )
+        ).all()
 
     def iter_txt():
         for r in rows:
@@ -186,10 +159,10 @@ def export_blacklist(
     ips = _ips_for_campaign(campaign_id, user, db)
     rows = []
     if ips:
-        rows = _query_ips_chunked(
-            db, ips,
+        rows = db.query(IPIntelligence).filter(
+            IPIntelligence.ip_address.in_(ips),
             IPIntelligence.risk_score >= BLACKLIST_RISK_MIN,
-        )
+        ).all()
 
     def iter_txt():
         for r in rows:

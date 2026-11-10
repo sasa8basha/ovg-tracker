@@ -56,7 +56,7 @@ async def _http_get(api_key: str, path: str, params: dict = None):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(502, f"Adsterra error: {str(e)[:500]}")  # M-32
+        raise HTTPException(502, f"Adsterra error: {str(e)[:200]}")
 
 
 @router.post("/verify")
@@ -83,7 +83,7 @@ async def verify(payload: dict, user: UserModel = Depends(current_user)):
                 return {"ok": False, "error": "API key غير صالح"}
             return {"ok": False, "error": f"HTTP {r.status_code}"}
     except Exception as e:
-        return {"ok": False, "error": str(e)[:500]}
+        return {"ok": False, "error": str(e)[:200]}
 
 
 @router.get("/{campaign_id}/domains")
@@ -201,17 +201,8 @@ async def get_stats(
     _require_key(c)
 
     now = datetime.utcnow()
-    # H-08 FIX: validate date format to prevent URL injection
-    def _safe_date(s, default):
-        if not s:
-            return default
-        try:
-            datetime.strptime(s, "%Y-%m-%d")
-            return s
-        except (ValueError, TypeError):
-            raise HTTPException(400, "تنسيق التاريخ غير صالح (YYYY-MM-DD)")
-    fd = _safe_date(from_date, (now - timedelta(days=7)).strftime("%Y-%m-%d"))
-    td = _safe_date(to_date, now.strftime("%Y-%m-%d"))
+    fd = from_date or (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    td = to_date or now.strftime("%Y-%m-%d")
 
     allowed = {"date", "country", "placement", "placement_sub_id", "domain"}
     groups = [g.strip() for g in group_by.split(",") if g.strip() in allowed]
@@ -242,7 +233,7 @@ async def get_stats(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(502, f"Adsterra error: {str(e)[:500]}")  # M-32
+        raise HTTPException(502, f"Adsterra error: {str(e)[:200]}")
 
     items = data.get("items", []) or []
     total_impressions = sum(int(i.get("impression", 0) or 0) for i in items)

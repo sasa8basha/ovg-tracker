@@ -3,7 +3,6 @@ routers/auth.py — Authentication routes.
 
 Covers: signup, login, logout, me, forgot-password, reset-password, resend-verification.
 """
-from sqlalchemy import func
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, BackgroundTasks
 from sqlalchemy.orm import Session
 
@@ -49,7 +48,7 @@ def signup(payload: AuthIn, request: Request, response: Response,
         raise HTTPException(400, reason)
     if not is_valid_email(email):
         raise HTTPException(400, "البريد الإلكتروني غير صالح")
-    if db.query(UserModel).filter(func.lower(UserModel.username) == username.lower()).first():  # H-25
+    if db.query(UserModel).filter(UserModel.username == username).first():
         raise HTTPException(400, "اسم المستخدم مستخدم بالفعل")
     if db.query(UserModel).filter(UserModel.email == email).first():
         raise HTTPException(400, "البريد الإلكتروني مستخدم بالفعل")

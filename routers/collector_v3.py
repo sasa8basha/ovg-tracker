@@ -38,15 +38,12 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 
 from config import COLLECTOR_V3_ENABLED, MAX_SESSIONS_PER_IP_HOUR, GEO_LOOKUP_TIMEOUT
 from database import get_db, SessionLocal
 from models import SessionModel, VisitHeartbeatModel, VisitModel, CampaignModel
 from schemas import HandshakePayload, HeartbeatPayload, FinalPayload
 from utils import (
-    # H-03: in-memory flood counter
-
     get_client_ip,
     handshake_limiter,
     heartbeat_limiter,
@@ -67,10 +64,8 @@ router = APIRouter()
 # =========================================================
 # PopAds Macros — full extraction
 # =========================================================
-# L-26/M-26: keep local for offline import safety; helpers.MACRO_ALIASES is canonical
 MACRO_ALIASES = {
     "bid":            ("bid",),
-    "sub_id":         ("sub_id", "subid", "clickid", "click_id"),  # H-19/M-26
     "impression_id":  ("impressionid", "impid", "impression_id"),
     "website_id":     ("websiteid", "website_id"),
     "category_id":    ("categoryid", "category_id"),
@@ -147,9 +142,7 @@ def _extract_macros(tp: dict) -> dict:
 # Zone extraction — try everything before falling back
 # =========================================================
 def _extract_zone_from_payload(url: str, tracking_params: dict, campaign) -> tuple:
-    """Returns (zone_id, source).
-    L-25 priority: url helpers → tracking_params → campaign default.
-    """
+    """Returns (zone_id, source)."""
     # 1) helpers.extract_zone_id_from_url — handles zone/zoneid/z/path
     try:
         _z = extract_zone_id_from_url(url or "")
@@ -293,37 +286,20 @@ def _compute_fp_hash(fp: dict, nav: dict) -> str:
 # =========================================================
 # FLOOD CHECK (v4.2.2 — filtered by campaign)
 # =========================================================
-# H-03: short-lived in-memory flood counters to avoid DB .count() on every handshake
-_flood_cache = {}  # key -> (count, expires_at)
-_FLOOD_TTL = 60
-
 def _check_flood(ip: str, campaign_id: int, db: Session):
     """
-    Per-campaign, per-IP flood check.
-    H-03 FIX: prefer in-memory counter (60s TTL); fall back to DB only on miss.
+    v4.2.2 FIX: Filter by campaign_id.
+      Previously this was global per-IP, which triggered on CGNAT /
+      shared ISP networks (e.g. university, hotel WiFi) where dozens of
+      legit users hit different campaigns from the same IP.
+      Now the limit is per-campaign, per-IP.
     """
-    key = f"{ip}:{campaign_id}"
-    now = datetime.utcnow().timestamp()
-    entry = _flood_cache.get(key)
-    if entry and entry[1] > now:
-        count = entry[0] + 1
-        _flood_cache[key] = (count, entry[1])
-        if count >= MAX_SESSIONS_PER_IP_HOUR:
-            raise HTTPException(429, "محاولات كتير")
-        return
     cutoff = datetime.utcnow() - timedelta(hours=1)
-    count = db.query(SessionModel).filter(
+    if db.query(SessionModel).filter(
         SessionModel.ip == ip,
         SessionModel.campaign_id == campaign_id,
         SessionModel.started_at >= cutoff,
-    ).count()
-    _flood_cache[key] = (count + 1, now + _FLOOD_TTL)
-    # prune occasionally
-    if len(_flood_cache) > 50000:
-        expired = [k for k, v in _flood_cache.items() if v[1] <= now]
-        for k in expired[:10000]:
-            _flood_cache.pop(k, None)
-    if count >= MAX_SESSIONS_PER_IP_HOUR:
+    ).count() >= MAX_SESSIONS_PER_IP_HOUR:
         raise HTTPException(429, "محاولات كتير")
 
 
@@ -603,11 +579,6 @@ def _process_final_background(
         ]
 
         time_ms = max(int(payload.t_ms or 0), session.total_time_ms or 0)
-        # M-25: do not let a single inflated client value dominate beyond 2x heartbeats estimate
-        if session.total_heartbeats and session.total_heartbeats > 2:
-            hb_est = int(session.total_heartbeats) * 5000
-            if time_ms > hb_est * 3:
-                time_ms = min(time_ms, hb_est * 3)
 
         data = {
             "nav": payload.nav or {},
@@ -634,16 +605,6 @@ def _process_final_background(
             "_click_id": payload.click_id or None,
         }
 
-        # C-12/M-01 FIX: merge precheck reasons so final analysis retains early signals
-        try:
-            if session.meta and isinstance(session.meta, dict):
-                pre = session.meta.get("precheck") or {}
-                reasons = pre.get("reasons") or []
-                if reasons:
-                    data["_precheck_signals"] = reasons
-        except Exception:
-            pass
-
         campaign_mode = _campaign_mode(campaign) if campaign else "balanced"
 
         try:
@@ -659,36 +620,6 @@ def _process_final_background(
                 "signals": [], "data_quality_report": {},
                 "contradiction_impossible": False, "fingerprint_strikes": 0,
             }
-
-        # C-09 FIX: enforce active zone actions (values: blacklist/pause/scale/resume)
-        try:
-            from models import ZoneActionModel
-            if zone_id and isinstance(result, dict):
-                action = db.query(ZoneActionModel).filter(
-                    ZoneActionModel.zone_id == zone_id,
-                    ZoneActionModel.reverted_at.is_(None),
-                    ZoneActionModel.action.in_(["blacklist", "pause"]),
-                ).order_by(ZoneActionModel.timestamp.desc()).first()
-                if action and action.action == "blacklist":
-                    result = dict(result)
-                    result["verdict"] = "invalid"
-                    result["score"] = max(int(result.get("score") or 0), 95)
-                    result["filter_reason"] = "ZONE_ACTION_BLACKLIST"
-                    result["reason"] = "zone_blacklisted"
-                    ev = list(result.get("evidence") or [])
-                    ev.append({"code": "ZONE_ACTION_BLACKLIST", "severity": "critical", "score": 95, "detail": f"Zone {zone_id} blacklisted"})
-                    result["evidence"] = ev
-                elif action and action.action == "pause":
-                    result = dict(result)
-                    result["verdict"] = "suspicious"
-                    result["score"] = max(int(result.get("score") or 0), 70)
-                    result["filter_reason"] = "ZONE_ACTION_PAUSE"
-                    result["reason"] = "zone_paused"
-                    ev = list(result.get("evidence") or [])
-                    ev.append({"code": "ZONE_ACTION_PAUSE", "severity": "high", "score": 70, "detail": f"Zone {zone_id} paused"})
-                    result["evidence"] = ev
-        except Exception as e:
-            print(f"[C-09] zone action check failed: {e}")
 
         macros = _extract_macros(payload.tracking_params or {})
         fp = payload.fingerprint or {}
@@ -763,13 +694,6 @@ def _process_final_background(
             if session.user_id:
                 stats_cache.invalidate(f"stats:user:{session.user_id}:all")
                 stats_cache.invalidate(f"stats:campaign:{session.campaign_id}")
-            return
-
-        # C-11 FIX: re-check for race between final and stale finalizer
-        existing_visit = db.query(VisitModel).filter(VisitModel.session_id == session_id).first()
-        if existing_visit:
-            session.visit_id = existing_visit.id
-            db.commit()
             return
 
         # =========================================================
@@ -954,7 +878,7 @@ def _finalize_stale_session(session_id: str) -> bool:
         db_check.close()
 
     # ---------- Path B: DEAD session (no heartbeats + aged 120s+) ----------
-    if not hb_data and age_sec >= 600:  # C-04: was 120s → too aggressive; now 10 min
+    if not hb_data and age_sec >= 120:
         try:
             db = SessionLocal()
             try:
@@ -981,23 +905,23 @@ def _finalize_stale_session(session_id: str) -> bool:
                         ip=client_ip,
                         user_agent=user_agent,
                         zone_id=zone_id,
-                        confidence=0.55,
-                        bot_probability=0.55,
+                        confidence=0.85,
+                        bot_probability=0.85,
                         mode="balanced",
                         reason="stale_no_heartbeats",
                         data_quality="partial",
                         full_payload={
                             "engine_version": "v4.2.2-stale",
-                            "verdict": "suspicious",
+                            "verdict": "invalid",
                             "reason": "stale_no_heartbeats",
                             "reason_detail": f"No heartbeats and no final after {age_sec:.0f}s",
                         },
-                        score=55,
-                        verdict="suspicious",
+                        score=85,
+                        verdict="invalid",
                         evidence=[{
                             "code": "STALE_NO_HEARTBEATS",
-                            "severity": "medium",
-                            "score": 55,
+                            "severity": "critical",
+                            "score": 85,
                             "detail": f"No heartbeat/final after {age_sec:.0f}s",
                         }],
                         country=ip_info.get("country", "Unknown"),
@@ -1085,7 +1009,7 @@ async def stale_session_finalizer_loop():
                 stale = db.query(SessionModel).filter(
                     SessionModel.visit_id.is_(None),
                     SessionModel.started_at < cutoff,
-                ).order_by(SessionModel.started_at.asc()).limit(100).all()  # M-24: was 50
+                ).order_by(SessionModel.started_at.asc()).limit(50).all()
                 session_ids = [s.session_id for s in stale]
             finally:
                 db.close()

@@ -40,7 +40,7 @@ def _safe_div(a, b, default=0.0):
 
 
 def _pct_change(current, previous):
-    """Percentage change from previous → current. Cap extreme swings (M-39)."""
+    """Percentage change from previous → current. Returns 0 if previous is 0."""
     try:
         c = float(current)
         p = float(previous)
@@ -48,11 +48,10 @@ def _pct_change(current, previous):
         return 0.0
     if abs(p) < 0.001:
         return 100.0 if abs(c) > 0.001 else 0.0
-    pct = ((c - p) / abs(p)) * 100
-    return round(max(-999.0, min(999.0, pct)), 2)
+    return round(((c - p) / abs(p)) * 100, 2)
 
 
-def _is_wasted_evidence(evidence):  # M-40/M-47: thin wrapper over shared _WASTED_CODES
+def _is_wasted_evidence(evidence):
     """Check evidence list for wasted codes."""
     if not isinstance(evidence, list):
         return False
@@ -143,8 +142,7 @@ def dashboard_overview(
     # 1) AGGREGATE VISITS (current + previous)
     # ---------------------------------------------------------
     def _fetch(start, end):
-        # H-04 FIX: stream via yield_per WITHOUT list() materialization
-        q = db.query(
+        rows = db.query(
             VisitModel.campaign_id,
             VisitModel.timestamp,
             VisitModel.verdict,
@@ -157,8 +155,8 @@ def dashboard_overview(
             VisitModel.campaign_id.in_(campaign_ids),
             VisitModel.timestamp >= start,
             VisitModel.timestamp < end,
-        ).execution_options(stream_results=True).yield_per(1000)
-        return q
+        ).all()
+        return rows
 
     current_rows = _fetch(period_start, now)
     previous_rows = _fetch(prev_period_start, prev_period_end)
@@ -181,7 +179,7 @@ def dashboard_overview(
         without_bid = 0
         daily = defaultdict(lambda: {"cost": 0.0, "revenue": 0.0, "profit": 0.0, "wasted": 0, "visits": 0, "valid": 0, "invalid": 0})
         by_zone = defaultdict(lambda: {"total": 0, "valid": 0, "invalid": 0, "suspicious": 0, "cost": 0.0, "revenue": 0.0, "visits_with_bid": 0, "visits_without_bid": 0})
-        by_campaign = defaultdict(lambda: {"total": 0, "valid": 0, "invalid": 0, "suspicious": 0, "cost": 0.0, "revenue": 0.0, "visits_with_bid": 0, "visits_without_bid": 0, "zones": {}})  # M-43
+        by_campaign = defaultdict(lambda: {"total": 0, "valid": 0, "invalid": 0, "suspicious": 0, "cost": 0.0, "revenue": 0.0, "visits_with_bid": 0, "visits_without_bid": 0})
 
         for r in rows:
             total += 1
@@ -243,11 +241,6 @@ def dashboard_overview(
             if verdict == "valid": c["valid"] += 1
             elif verdict == "invalid": c["invalid"] += 1
             elif verdict == "suspicious": c["suspicious"] += 1
-            # M-43: fill per-campaign zone breakdown
-            cz = c["zones"].setdefault(zid, {"total": 0, "invalid": 0})
-            cz["total"] += 1
-            if verdict == "invalid":
-                cz["invalid"] += 1
 
         return {
             "total": total,
@@ -480,7 +473,7 @@ def dashboard_overview(
     elif today_bot_pct >= 15 and today["total"] >= 20:
         alerts.append({
             "id": "bot_spike",
-            "severity": "warn",
+            "severity": "warning",
             "icon": "⚠️",
             "title": "ارتفاع في البوتات",
             "message": f"{today_bot_pct}% بوت اليوم",
@@ -492,7 +485,7 @@ def dashboard_overview(
     if cur_integrity["integrity"] == "partial_warn":
         alerts.append({
             "id": "low_bid_coverage",
-            "severity": "warn",
+            "severity": "warning",
             "icon": "💸",
             "title": "تغطية BID منخفضة",
             "message": f"فقط {cur_integrity['bid_coverage_pct']}% من الزيارات فيها BID — التكلفة والربح أقل من الحقيقة",
@@ -501,10 +494,9 @@ def dashboard_overview(
         })
 
     # Adsterra sync check
-    # M-42: revenue>0 alone misses campaigns with legit zero revenue; also check any revenue field set
     last_sync = db.query(func.max(VisitModel.timestamp)).filter(
         VisitModel.campaign_id.in_(campaign_ids),
-        VisitModel.revenue.isnot(None),
+        VisitModel.revenue > 0,
     ).scalar()
     if last_sync:
         sync_age_h = (now - last_sync).total_seconds() / 3600
@@ -518,23 +510,12 @@ def dashboard_overview(
                 "action_label": "راجع الإعدادات",
                 "action_href": "/system-health",
             })
-    elif campaign_ids:
-        # no revenue field ever set → likely never synced
-        alerts.append({
-            "id": "sync_never",
-            "severity": "warn",
-            "icon": "🔄",
-            "title": "لا توجد مزامنة Adsterra",
-            "message": "لم يُسجَّل revenue لأي زيارة — راجع الـ API key أو انتظر أول sync",
-            "action_label": "راجع الإعدادات",
-            "action_href": "/system-health",
-        })
 
     # Losing campaigns
     if losing and abs(losing[0]["profit"]) > 5:
         alerts.append({
             "id": "losing_campaign",
-            "severity": "warn",
+            "severity": "warning",
             "icon": "📉",
             "title": "حملة بتخسر",
             "message": f"{losing[0]['name']} — خسارة {abs(losing[0]['profit']):.2f}$",

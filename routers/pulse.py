@@ -26,7 +26,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, VisitModel, CampaignModel
 from auth import current_user
-from utils import pulse_cache
 from metrics import compute_cost_integrity
 
 router = APIRouter()
@@ -158,12 +157,13 @@ def stats_pulse(
 ):
     """
     Single-call endpoint for the Money Pulse widget.
-    H-05 FIX: cache response 60s per user to avoid 4 heavy queries every 30s poll.
+
+    Windows:
+        today       — [start_of_today, now)
+        yesterday   — [start_of_yesterday, start_of_today)
+        week        — [start_of_today - 7d, now)
+        week_prev   — [start_of_today - 14d, start_of_today - 7d)
     """
-    cache_key = f"pulse:user:{user.id}"
-    cached = pulse_cache.get(cache_key)
-    if cached is not None:
-        return cached
     now = datetime.utcnow()
     start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     start_yesterday = start_today - timedelta(days=1)
@@ -179,7 +179,7 @@ def stats_pulse(
     buy_cpm = float(user.cpm_buy or 1.0)
     sell_cpm = float(user.cpm_sell or 1.5)
 
-    result = {
+    return {
         "today": _window_aggregate(campaign_ids, start_today, now, db, buy_cpm, sell_cpm),
         "yesterday": _window_aggregate(campaign_ids, start_yesterday, start_today, db, buy_cpm, sell_cpm),
         "week": _window_aggregate(campaign_ids, start_week, now, db, buy_cpm, sell_cpm),
@@ -187,5 +187,3 @@ def stats_pulse(
         "computed_at": now.isoformat(),
         "cpm_config": {"buy": buy_cpm, "sell": sell_cpm},
     }
-    pulse_cache.set(cache_key, result)
-    return result
