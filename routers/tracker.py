@@ -33,12 +33,16 @@ def _build_tracker_code(campaign: CampaignModel, origin: str) -> str:
     """Build the full tracker code for a campaign."""
     js_inner = TRACKER_V3_JS \
         .replace("__OVG_CAMPAIGN_KEY__", campaign.campaign_key) \
-        .replace("__OVG_ENDPOINT_BASE__", origin)
+        .replace("__OVG_ENDPOINT_BASE__", json.dumps(origin)[1:-1])  # H-29: JS-safe escape
     return "<script>\n" + js_inner + "\n</script>"
 
 
 def _split_code(full_code: str) -> tuple:
-    """Split the code at a function boundary for easier copy."""
+    """Split the code at a safe boundary (H-28: prefer PART-BOUNDARY markers)."""
+    marker = "// PART-BOUNDARY"
+    if marker in full_code:
+        i = full_code.find(marker)
+        return full_code[:i].rstrip() + "\n", full_code[i:].lstrip()
     total = len(full_code)
     mid = total // 2
     search_start = max(0, mid - 4000)

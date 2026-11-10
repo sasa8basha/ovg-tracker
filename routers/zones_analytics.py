@@ -4,17 +4,18 @@ routers/zones_analytics.py — Zone Time-Series + Anomaly Detection.
 from datetime import datetime, timedelta
 from statistics import mean, pstdev
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, func
+from sqlalchemy import case, func, cast, Date
 from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, VisitModel, CampaignModel
 from auth import current_user
+from helpers import verify_campaign_access
 
 router = APIRouter()
 
 def _daily_series(db, campaign_id, zone_id, days=14):
     cutoff = datetime.utcnow() - timedelta(days=days)
-    day_col = func.date(VisitModel.timestamp).label("day")
+    day_col = cast(VisitModel.timestamp, Date).label("day")  # M-51
     q = db.query(day_col, func.count(VisitModel.id).label("total"), func.sum(case((VisitModel.verdict == "invalid", 1), else_=0)).label("invalid")).filter(VisitModel.timestamp >= cutoff)
     if campaign_id: q = q.filter(VisitModel.campaign_id == campaign_id)
     if zone_id: q = q.filter(VisitModel.zone_id == zone_id)
@@ -28,7 +29,7 @@ def _daily_series(db, campaign_id, zone_id, days=14):
         series.append({"day": str(r.day), "total": total, "invalid": invalid, "bot_rate": round(invalid / total * 100, 2)})
     return series
 
-def _compute_baseline(daily_series, exclude_last_days=1):
+def _compute_baseline(daily_series, exclude_last_days=1):  # L-05/M-50: exclude most recent day from baseline
     if not daily_series: return None
     usable = daily_series[:-exclude_last_days] if exclude_last_days > 0 else daily_series
     usable = [d for d in usable if d["total"] >= 5]
@@ -67,7 +68,17 @@ def _compute_anomaly(baseline, current):
     if std < 1.0: std = 1.0
     z = (current["bot_rate"] - baseline["mean"]) / std
     severity = None
-    if z >= 3.0: severity = "critical"
+    # M-48: require meaningful absolute bot_rate before z-score critical (7% of 30 visits ≠ attack)
+    cur_rate = float(current.get("bot_rate") or 0)
+    if z >= 3.0 and cur_rate >= 25:
+        # M-49: demote overnight thin traffic
+        hour = datetime.utcnow().hour
+        if hour < 5 and int(current.get("total") or 0) < 50:
+            severity = "high"
+        else:
+            severity = "critical"
+    elif z >= 3.0:
+        severity = "high"
     elif z >= 2.5: severity = "high"
     elif z >= 2.0: severity = "medium"
     elif z <= -3.0: severity = "critical_drop"
@@ -77,6 +88,7 @@ def _compute_anomaly(baseline, current):
 
 @router.get("/zones/analytics")
 def zones_analytics(campaign_id: int = Query(None), days: int = Query(14, ge=7, le=90), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    verify_campaign_access(campaign_id, user, db)
     cutoff = datetime.utcnow() - timedelta(days=days)
     q = db.query(VisitModel.zone_id, func.count(VisitModel.id).label("n"))
     if campaign_id: q = q.filter(VisitModel.campaign_id == campaign_id)
@@ -101,6 +113,7 @@ def zones_analytics(campaign_id: int = Query(None), days: int = Query(14, ge=7, 
 
 @router.get("/zones/{zone}/time-series")
 def zone_time_series(zone: str, campaign_id: int = Query(None), days: int = Query(14, ge=7, le=90), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    verify_campaign_access(campaign_id, user, db)
     if not campaign_id:
         c_check = db.query(CampaignModel).filter(CampaignModel.user_id == user.id).first()
         if not c_check: return {"zone": zone, "series": [], "baseline": None, "trend": None, "current": None, "anomaly": None}
@@ -109,5 +122,6 @@ def zone_time_series(zone: str, campaign_id: int = Query(None), days: int = Quer
 
 @router.get("/zones/anomalies")
 def zones_anomalies(campaign_id: int = Query(None), hours: int = Query(24, ge=1, le=168), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    verify_campaign_access(campaign_id, user, db)
     result = zones_analytics(campaign_id=campaign_id, days=14, user=user, db=db)
     return {"anomalies": result["anomalies"], "generated_at": result["generated_at"], "hours": hours}

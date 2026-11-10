@@ -3,7 +3,7 @@ routers/radar.py — Ban Risk Radar
 """
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import cast, String,  func
 from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, CampaignModel, VisitModel, BanRiskSnapshot
@@ -34,8 +34,8 @@ def _aggregate_window(campaign_ids, start, end, db: Session):
     invalid = base.with_entities(func.count(VisitModel.id)).filter(VisitModel.verdict == "invalid").scalar() or 0
     valid = base.with_entities(func.count(VisitModel.id)).filter(VisitModel.verdict == "valid").scalar() or 0
     suspicious = base.with_entities(func.count(VisitModel.id)).filter(VisitModel.verdict == "suspicious").scalar() or 0
-    wasted = base.with_entities(func.count(VisitModel.id)).filter(VisitModel.verdict == "valid", (VisitModel.evidence.like('%CPM_BRAVE%')) | (VisitModel.evidence.like('%CPM_ADBLOCK_BROWSER%'))).scalar() or 0
-    human = base.with_entities(func.count(VisitModel.id)).filter((VisitModel.evidence.like('%HUMAN_NATURAL_MOUSE%')) | (VisitModel.evidence.like('%HUMAN_RICH_INTERACTION%')) | (VisitModel.evidence.like('%HUMAN_LONG_ENGAGEMENT%'))).scalar() or 0
+    wasted = base.with_entities(func.count(VisitModel.id)).filter(VisitModel.verdict == "valid", (cast(VisitModel.evidence, String).like('%CPM_BRAVE%')) | (cast(VisitModel.evidence, String).like('%CPM_ADBLOCK_BROWSER%'))).scalar() or 0  # H-06
+    human = base.with_entities(func.count(VisitModel.id)).filter((cast(VisitModel.evidence, String).like('%HUMAN_NATURAL_MOUSE%')) | (cast(VisitModel.evidence, String).like('%HUMAN_RICH_INTERACTION%')) | (cast(VisitModel.evidence, String).like('%HUMAN_LONG_ENGAGEMENT%'))).scalar() or 0
     zone_rows = base.with_entities(VisitModel.zone_id).filter(VisitModel.zone_id.isnot(None), VisitModel.zone_id != "unknown").distinct().all()
     zone_ids = [r.zone_id for r in zone_rows if r.zone_id]
     source_set = set()

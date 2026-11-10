@@ -8,22 +8,26 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, VisitModel, CampaignModel
 from auth import current_user
+from helpers import verify_campaign_access
 
 router = APIRouter()
 
 @router.get("/live/feed")
 def live_feed(campaign_id: int = Query(None), since_id: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=50), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel)
     if campaign_id: q = q.filter(VisitModel.campaign_id == campaign_id)
     else: q = q.join(CampaignModel).filter(CampaignModel.user_id == user.id)
+    # C-08 FIX: ASC order so bursts are not dropped; UI advances from since_id.
     if since_id > 0: q = q.filter(VisitModel.id > since_id)
-    visits = q.order_by(VisitModel.id.desc()).limit(limit).all()
+    visits = q.order_by(VisitModel.id.asc()).limit(limit).all()
     items = [{"id": v.id, "time": v.timestamp.strftime("%H:%M:%S") if v.timestamp else "", "ip": v.ip, "zone": v.zone_id, "verdict": v.verdict, "score": v.score, "country": v.country, "country_code": v.country_code, "browser": v.browser, "device": v.device} for v in visits]
     latest_id = max([v.id for v in visits], default=since_id)
     return {"items": items, "latest_id": latest_id, "count": len(items)}
 
 @router.get("/live/stats")
 def live_stats(campaign_id: int = Query(None), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    verify_campaign_access(campaign_id, user, db)
     now = datetime.utcnow(); today_start = now.replace(hour=0, minute=0, second=0, microsecond=0); minute_ago = now - timedelta(minutes=1); hour_ago = now - timedelta(hours=1)
     def _base():
         q = db.query(VisitModel)

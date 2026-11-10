@@ -12,7 +12,7 @@ from database import get_db
 from models import UserModel, VisitModel, CampaignModel, IPIntelligence
 from auth import current_user
 from analysis import calc_confidence, count_categories, normalize_stored_evidence, build_explainability_trace
-from helpers import _apply_date_filter, _parse_date, _safe_filename, csv_safe
+from helpers import _apply_date_filter, _parse_date, _safe_filename, csv_safe, verify_campaign_access
 from utils import stats_cache
 from ip_intelligence import classify_ip
 
@@ -21,6 +21,7 @@ router = APIRouter()
 
 @router.get("/stats")
 def get_stats(campaign_id: int = Query(None), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    verify_campaign_access(campaign_id, user, db)
     cache_key = f"stats:campaign:{campaign_id}" if campaign_id else f"stats:user:{user.id}:all"
     cached = stats_cache.get(cache_key)
     if cached is not None:
@@ -85,6 +86,7 @@ def get_visits(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel)
     if campaign_id:
         q = q.filter(VisitModel.campaign_id == campaign_id)
@@ -317,6 +319,7 @@ def export_visits(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel)
     if campaign_id:
         q = q.filter(VisitModel.campaign_id == campaign_id)

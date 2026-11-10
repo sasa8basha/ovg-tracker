@@ -1,5 +1,6 @@
 """
 routers/zone_actions.py — Zone Actions
+# H-30/C-09: enforcement happens in collector_v3._process_final_background
 """
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -46,7 +47,7 @@ def apply_action(zone_id: str, payload: ZoneActionIn, user: UserModel = Depends(
 def undo_action(zone_id: str, action_id: int, user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
     row = db.query(ZoneActionModel).filter(ZoneActionModel.id == action_id, ZoneActionModel.user_id == user.id, ZoneActionModel.zone_id == zone_id, ZoneActionModel.reverted_at.is_(None)).first()
     if not row: raise HTTPException(404, "الإجراء غير موجود أو تم التراجع عنه")
-    if (datetime.utcnow() - row.timestamp) > timedelta(minutes=10): raise HTTPException(400, "انتهت مدة التراجع (10 دقائق)")
+    if (datetime.utcnow() - row.timestamp) > timedelta(minutes=30): raise HTTPException(400, "انتهت مدة التراجع (30 دقيقة)")  # M-52
     row.reverted_at = datetime.utcnow(); db.commit()
     return {"ok": True, "id": row.id, "reverted_at": row.reverted_at.isoformat()}
 

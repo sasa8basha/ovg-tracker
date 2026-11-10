@@ -9,11 +9,12 @@ from database import get_db
 from models import UserModel, VisitModel, CampaignModel
 from schemas import GroundTruthIn
 from auth import current_user
+from helpers import verify_campaign_access
 from analysis import CODE_TO_SOURCE
 from utils import stats_cache
 
 router = APIRouter()
-BULK_MAX = 200
+BULK_MAX = 200  # H-12: match UI expectation
 
 @router.post("/visits/{visit_id}/ground-truth")
 def set_ground_truth(visit_id: int, payload: GroundTruthIn, user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
@@ -67,11 +68,12 @@ def bulk_label(payload: dict, user: UserModel = Depends(current_user), db: Sessi
 
 @router.get("/labeling/queue")
 def get_labeling_queue(campaign_id: int = Query(None), limit: int = Query(20, ge=1, le=100), order: str = Query("uncertainty"), user: UserModel = Depends(current_user), db: Session = Depends(get_db)):
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel)
     if campaign_id: q = q.filter(VisitModel.campaign_id == campaign_id)
     else: q = q.join(CampaignModel).filter(CampaignModel.user_id == user.id)
     
-    q = q.filter(VisitModel.ground_truth.is_(None), VisitModel.score >= 40, VisitModel.score <= 80)
+    q = q.filter(VisitModel.ground_truth.is_(None), VisitModel.score >= 30, VisitModel.score <= 80)  # H-11
     if order == "uncertainty": q = q.order_by(func.abs(VisitModel.score - 60).asc(), VisitModel.id.desc())
     elif order == "oldest": q = q.order_by(VisitModel.id.asc())
     else: q = q.order_by(VisitModel.id.desc())
@@ -96,7 +98,7 @@ def get_labeling_stats(user: UserModel = Depends(current_user), db: Session = De
     total = base.count(); labeled = base.filter(VisitModel.ground_truth.isnot(None)).count()
     labeled_human = base.filter(VisitModel.ground_truth == "human").count(); labeled_bot = base.filter(VisitModel.ground_truth == "bot").count()
     unlabeled = total - labeled
-    pending_review = base.filter(VisitModel.ground_truth.is_(None), VisitModel.score >= 40, VisitModel.score <= 80).count()
+    pending_review = base.filter(VisitModel.ground_truth.is_(None), VisitModel.score >= 30, VisitModel.score <= 80).count()  # H-11
     
     tp = base.filter(VisitModel.verdict == "invalid", VisitModel.ground_truth == "bot").count()
     fp = base.filter(VisitModel.verdict == "invalid", VisitModel.ground_truth == "human").count()

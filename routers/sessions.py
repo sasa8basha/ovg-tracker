@@ -68,7 +68,7 @@ def get_session_detail(session_id: str, user: UserModel = Depends(current_user),
         if hb.t_ms: prev_t = hb.t_ms
     visit = None
     if s.visit_id:
-        v = db.query(VisitModel).get(s.visit_id)
+        v = db.query(VisitModel).filter(VisitModel.id == s.visit_id).first()  # M-55
         if v: visit = {"id": v.id, "verdict": v.verdict, "score": v.score, "time_on_page": v.time_on_page, "time_on_page_human": _human_duration(v.time_on_page), "clicks": v.clicks, "scrolls": v.scrolls, "country": v.country, "country_code": v.country_code, "os": v.os, "device": v.device, "browser": v.browser, "isp": v.isp, "asn": v.asn, "is_vpn": bool(v.is_vpn), "timezone": v.timezone, "canvas_hash": v.canvas_hash, "hardware": v.hardware, "behavioral": v.behavioral, "milestones": v.milestones, "first_30s": v.first_30s, "ad_events": v.ad_events, "evidence": v.evidence, "data_quality": v.data_quality, "is_honeypot_triggered": bool(v.is_honeypot_triggered), "clock_drift_ms": v.clock_drift_ms, "consent_state": v.consent_state}
     duration_ms = None
     if s.ended_at and s.started_at: duration_ms = int((s.ended_at - s.started_at).total_seconds() * 1000)
@@ -88,7 +88,7 @@ def compare_stats(user: UserModel = Depends(current_user), db: Session = Depends
         groups.append({"data_quality": dq, "count": n, "avg_time_ms": round(float(r.avg_time or 0)), "avg_time_human": _human_duration(float(r.avg_time or 0)), "min_time_ms": int(r.min_time or 0), "max_time_ms": int(r.max_time or 0)})
     v2_fixed_ratio = None
     if v2_count > 0:
-        exactly_2000 = db.query(func.count(VisitModel.id)).filter(VisitModel.campaign_id.in_(campaign_ids), VisitModel.data_quality == "legacy", VisitModel.time_on_page == 2000).scalar() or 0
+        exactly_2000 = db.query(func.count(VisitModel.id)).filter(VisitModel.campaign_id.in_(campaign_ids), VisitModel.data_quality == "legacy", VisitModel.time_on_page.between(1990, 2010)).scalar() or 0  # H-10
         v2_fixed_ratio = round(exactly_2000 / v2_count * 100, 1)
     diagnostic = "insufficient"; recommendation = ""
     if v3_count == 0 and v2_count == 0: diagnostic = "no_data"; recommendation = "مفيش زيارات لسه. ركّب الكود واختبر."

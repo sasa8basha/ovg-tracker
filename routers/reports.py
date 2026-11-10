@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, VisitModel, CampaignModel
 from auth import current_user
-from helpers import _apply_date_filter, _country_key
+from helpers import _apply_date_filter, _country_key, verify_campaign_access
 from metrics import (
     extract_source,
     compute_pl,
@@ -93,6 +93,7 @@ def smart_report(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    verify_campaign_access(campaign_id, user, db)
     buy_cpm = float(user.cpm_buy or 1.0)
     sell_cpm = float(user.cpm_sell or 1.5)
 
@@ -108,6 +109,8 @@ def smart_report(
     else:
         q = q.join(CampaignModel).filter(CampaignModel.user_id == user.id)
     q = _apply_date_filter(q, from_date, to_date)
+    # H-20: deterministic sample (newest first) when truncating
+    q = q.order_by(VisitModel.timestamp.desc())
 
     # ---- Fetch LIMIT+1 to detect overflow ----
     raw_rows = q.limit(SMART_REPORT_ROW_LIMIT + 1).all()
@@ -176,7 +179,8 @@ def smart_report(
             suspicious_all += 1
 
     # ---- Summary P&L ----
-    if total_cost > 0:
+    # C-07 FIX: only claim "exact" when every visit has a bid; otherwise partial.
+    if total_cost > 0 and visits_without_bid == 0:
         summary_pl = {
             "cost": round(total_cost, 4),
             "revenue": round(total_revenue, 4),
@@ -184,6 +188,15 @@ def smart_report(
             "roi": round((total_revenue - total_cost) / total_cost * 100, 2) if total_cost > 0 else 0,
             "is_profitable": total_revenue >= total_cost,
             "source": "exact",
+        }
+    elif total_cost > 0:
+        summary_pl = {
+            "cost": round(total_cost, 4),
+            "revenue": round(total_revenue, 4),
+            "profit": round(total_revenue - total_cost, 4),
+            "roi": round((total_revenue - total_cost) / total_cost * 100, 2) if total_cost > 0 else 0,
+            "is_profitable": total_revenue >= total_cost,
+            "source": "exact_partial",
         }
     else:
         summary_pl = compute_pl(total_all, valid_all, wasted_all, buy_cpm, sell_cpm)
@@ -217,7 +230,7 @@ def smart_report(
         bot_rate = round(z["invalid"] / total * 100.0, 2) if total > 0 else 0.0
         wasted_rate = round(z["wasted"] / total * 100.0, 2) if total > 0 else 0.0
 
-        if z["cost"] > 0:
+        if z["cost"] > 0 and z.get("visits_without_bid", 0) == 0:
             pl = {
                 "cost": round(z["cost"], 4),
                 "revenue": round(z["revenue"], 4),
@@ -225,6 +238,15 @@ def smart_report(
                 "roi": round((z["revenue"] - z["cost"]) / z["cost"] * 100, 2) if z["cost"] > 0 else 0,
                 "is_profitable": z["revenue"] >= z["cost"],
                 "source": "exact",
+            }
+        elif z["cost"] > 0:
+            pl = {
+                "cost": round(z["cost"], 4),
+                "revenue": round(z["revenue"], 4),
+                "profit": round(z["revenue"] - z["cost"], 4),
+                "roi": round((z["revenue"] - z["cost"]) / z["cost"] * 100, 2) if z["cost"] > 0 else 0,
+                "is_profitable": z["revenue"] >= z["cost"],
+                "source": "exact_partial",  # C-07 per-zone
             }
         else:
             pl = compute_pl(total, z["valid"], z["wasted"], buy_cpm, sell_cpm)
@@ -279,6 +301,7 @@ def popads_refund_report(
     db: Session = Depends(get_db),
 ):
     """Report of money spent on bots from PopAds — for refund requests."""
+    verify_campaign_access(campaign_id, user, db)  # M-36/C-01
     q = db.query(
         VisitModel.popads_website_id,
         func.count(VisitModel.id).label("total"),
@@ -355,10 +378,9 @@ def adsterra_proof_report(
 ):
     """
     Traffic-quality proof to show an Adsterra manager.
-
-    Buckets are MUTUALLY EXCLUSIVE and COVER 100% of visits:
-        valid + invalid + suspicious + unknown = total
+    M-35: pending/other bucket is labeled pending_or_other (not unknown).
     """
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel).select_from(VisitModel)
     if campaign_id:
         q = q.filter(VisitModel.campaign_id == campaign_id)
@@ -385,7 +407,8 @@ def adsterra_proof_report(
             "valid_visits": valid,
             "blocked_bots": invalid,
             "suspicious_visits": suspicious,
-            "unknown_visits": unknown,
+            "pending_or_other_visits": unknown,  # M-35
+            "unknown_visits": unknown,  # backward compat
             "human_traffic_rate": round(valid / total * 100, 2) if total > 0 else 0,
             "bot_block_rate": round(invalid / total * 100, 2) if total > 0 else 0,
             "unknown_rate": round(unknown / total * 100, 2) if total > 0 else 0,
@@ -407,6 +430,7 @@ def report_countries(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(
         VisitModel.country_code,
         VisitModel.country,
@@ -438,7 +462,7 @@ def report_countries(
     for c in result:
         c["bot_rate"] = round(c["invalid"] / c["total"] * 100, 1) if c["total"] else 0.0
     result.sort(key=lambda x: x["total"], reverse=True)
-    return result[:15]
+    return result[:30]  # M-38: was 15
 
 
 # =========================================================
@@ -488,6 +512,7 @@ def map_visits(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel)
     if campaign_id:
         q = q.filter(VisitModel.campaign_id == campaign_id)

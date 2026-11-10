@@ -1,9 +1,7 @@
 """
-routers/ip_intel.py — IP White/Black lists + CSV export.
+routers/ip_intel.py — IP White/Black lists + PopAds plain-text export.
 IPs are filtered to those that appeared in actual visits (per campaign).
 """
-import io
-import csv
 from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -13,6 +11,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import UserModel, VisitModel, CampaignModel, IPIntelligence
 from auth import current_user
+from helpers import verify_campaign_access
 
 router = APIRouter()
 
@@ -20,8 +19,25 @@ WHITELIST_RISK_MAX = 20
 BLACKLIST_RISK_MIN = 60
 
 
+
+def _query_ips_chunked(db, ips, *extra_filters, chunk_size=500):
+    """Avoid SQLite/Postgres parameter limit on large IN lists (C-10)."""
+    ips = list(ips)
+    if not ips:
+        return []
+    rows = []
+    for i in range(0, len(ips), chunk_size):
+        chunk = ips[i:i + chunk_size]
+        q = db.query(IPIntelligence).filter(IPIntelligence.ip_address.in_(chunk))
+        for f in extra_filters:
+            q = q.filter(f)
+        rows.extend(q.all())
+    return rows
+
 def _ips_for_campaign(campaign_id, user, db):
     """Return set of IPs that hit visits for a campaign (or all user campaigns)."""
+    from helpers import verify_campaign_access
+    verify_campaign_access(campaign_id, user, db)
     q = db.query(VisitModel.ip).filter(VisitModel.ip.isnot(None))
     if campaign_id:
         q = q.filter(VisitModel.campaign_id == campaign_id)
@@ -41,11 +57,11 @@ def get_whitelist(
     if not ips:
         return {"count": 0, "items": []}
 
-    rows = db.query(IPIntelligence).filter(
-        IPIntelligence.ip_address.in_(ips),
+    rows = _query_ips_chunked(
+        db, ips,
         IPIntelligence.classification == "residential",
         IPIntelligence.risk_score < WHITELIST_RISK_MAX,
-    ).limit(limit).all()
+    )[:limit]
 
     return {
         "count": len(rows),
@@ -74,10 +90,10 @@ def get_blacklist(
     if not ips:
         return {"count": 0, "items": []}
 
-    rows = db.query(IPIntelligence).filter(
-        IPIntelligence.ip_address.in_(ips),
+    rows = _query_ips_chunked(
+        db, ips,
         IPIntelligence.risk_score >= BLACKLIST_RISK_MIN,
-    ).limit(limit).all()
+    )[:limit]
 
     return {
         "count": len(rows),
@@ -106,12 +122,21 @@ def ip_stats(
     if not ips:
         return {"total": 0, "residential": 0, "datacenter": 0, "vpn": 0, "proxy": 0, "tor": 0, "unknown": 0}
 
-    rows = db.query(
-        IPIntelligence.classification,
-        func.count(IPIntelligence.id),
-    ).filter(
-        IPIntelligence.ip_address.in_(ips)
-    ).group_by(IPIntelligence.classification).all()
+    # C-10: chunk large IP sets for group_by
+    from collections import Counter
+    counts = Counter()
+    ips_list = list(ips)
+    for i in range(0, len(ips_list), 500):
+        chunk = ips_list[i:i+500]
+        rows_c = db.query(
+            IPIntelligence.classification,
+            func.count(IPIntelligence.id),
+        ).filter(
+            IPIntelligence.ip_address.in_(chunk)
+        ).group_by(IPIntelligence.classification).all()
+        for cls, cnt in rows_c:
+            counts[cls or "unknown"] += int(cnt)
+    rows = list(counts.items())
 
     result = {"total": len(ips), "residential": 0, "datacenter": 0, "vpn": 0, "proxy": 0, "tor": 0, "unknown": 0, "suspicious": 0}
     for cls, cnt in rows:
@@ -127,30 +152,26 @@ def export_whitelist(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    """Export whitelist as plain text — one IP per line (PopAds IP Targeting format)."""
     ips = _ips_for_campaign(campaign_id, user, db)
     rows = []
     if ips:
-        rows = db.query(IPIntelligence).filter(
-            IPIntelligence.ip_address.in_(ips),
+        rows = _query_ips_chunked(
+            db, ips,
             IPIntelligence.classification == "residential",
             IPIntelligence.risk_score < WHITELIST_RISK_MAX,
-        ).all()
+        )
 
-    def iter_csv():
-        out = io.StringIO()
-        w = csv.writer(out)
-        w.writerow(["ip_address"])
-        yield out.getvalue()
-        out.seek(0); out.truncate(0)
+    def iter_txt():
         for r in rows:
-            w.writerow([r.ip_address])
-            yield out.getvalue()
-            out.seek(0); out.truncate(0)
+            ip = (r.ip_address or "").strip()
+            if ip:
+                yield ip + "\n"
 
-    fn = f"ovg_whitelist_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.csv"
+    fn = f"ovg_whitelist_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.txt"
     return StreamingResponse(
-        iter_csv(),
-        media_type="text/csv",
+        iter_txt(),
+        media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{fn}"'},
     )
 
@@ -161,29 +182,24 @@ def export_blacklist(
     user: UserModel = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    """Export blacklist as plain text — one IP per line (PopAds IP Targeting format)."""
     ips = _ips_for_campaign(campaign_id, user, db)
     rows = []
     if ips:
-        rows = db.query(IPIntelligence).filter(
-            IPIntelligence.ip_address.in_(ips),
+        rows = _query_ips_chunked(
+            db, ips,
             IPIntelligence.risk_score >= BLACKLIST_RISK_MIN,
-        ).all()
+        )
 
-    def iter_csv():
-        out = io.StringIO()
-        w = csv.writer(out)
-        w.writerow(["ip_address", "classification", "risk_score", "country", "isp", "reasons"])
-        yield out.getvalue()
-        out.seek(0); out.truncate(0)
+    def iter_txt():
         for r in rows:
-            reasons_str = " | ".join(str(x.get("reason", "")) for x in (r.reasons or []))
-            w.writerow([r.ip_address, r.classification or "", r.risk_score or 0, r.country or "", r.isp or "", reasons_str])
-            yield out.getvalue()
-            out.seek(0); out.truncate(0)
+            ip = (r.ip_address or "").strip()
+            if ip:
+                yield ip + "\n"
 
-    fn = f"ovg_blacklist_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.csv"
+    fn = f"ovg_blacklist_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.txt"
     return StreamingResponse(
-        iter_csv(),
-        media_type="text/csv",
+        iter_txt(),
+        media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{fn}"'},
     )
