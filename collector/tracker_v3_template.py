@@ -32,7 +32,7 @@ TRACKER_V3_JS = r"""(function () {
 
   var CAMPAIGN_KEY  = '__OVG_CAMPAIGN_KEY__';
   var ENDPOINT      = '__OVG_ENDPOINT_BASE__';
-  var HANDSHAKE_DELAY_MS    = 1500  /* M-03 */;
+  var HANDSHAKE_DELAY_MS    = 500;
   var HEARTBEAT_INTERVAL_MS = 10000;
   // ✅ v8.5 FIX #6: raised from 2000 to 4000 to avoid HEARTBEAT_TOO_REGULAR
   var HEARTBEAT_JITTER_MS   = 4000;
@@ -44,13 +44,11 @@ TRACKER_V3_JS = r"""(function () {
   var clickId = null;
   var seq = 0;
   var handshakeDone = false;
-  var handshakeRetries = 0;
-  var MAX_HANDSHAKE_RETRIES = 3;  /* M-04 */
   var finalSent = false;
   var heartbeatTimer = null;
   var finalTimeoutTimer = null;
 
-  var counters = { mousemove: 0, clicks: 0, scrolls: 0, touchstart: 0, touchmove: 0, form_fill: 0, input: 0, keydown: 0, backspace: 0, wheel: 0 };
+  var counters = { mousemove: 0, clicks: 0, scrolls: 0, touchstart: 0, keydown: 0, backspace: 0, wheel: 0 };
 
   var mousePoints = [];
   var mouseDirectionChanges = 0;
@@ -131,8 +129,7 @@ TRACKER_V3_JS = r"""(function () {
       if (i === 8 || i === 12 || i === 16 || i === 20) r += '-';
       r += Math.floor(Math.random() * 16).toString(16);
     }
-    // H-24 FIX: standard UUID-ish 8-4-4-4-12
-    return d.substring(0, 8) + '-' + r.substring(0, 4) + '-' + r.substring(4, 8) + '-' + r.substring(8, 12) + '-' + r.substring(12, 24);
+    return d.substring(0, 8) + '-' + r.substring(0, 27);
   }
 
   function safeSend(url, body, useBeacon) {
@@ -1125,8 +1122,6 @@ TRACKER_V3_JS = r"""(function () {
       packageIntervalEvent(e);
     }, { passive: true });
 
-    document.addEventListener('touchmove', function(){ counters.touchmove = (counters.touchmove||0)+1; }, {passive:true});
-    document.addEventListener('input', function(){ counters.input=(counters.input||0)+1; counters.form_fill=(counters.form_fill||0)+1; }, {passive:true});
     document.addEventListener('touchstart', function (e) {
       counters.touchstart++;
       if (firstInteractionTime === null) firstInteractionTime = Date.now();
@@ -1292,8 +1287,7 @@ TRACKER_V3_JS = r"""(function () {
       webdriver: navigator.webdriver === true,
       language: String(navigator.language || ''),
       maxTouchPoints: Number(navigator.maxTouchPoints) || 0,
-      has_touch: ('ontouchstart' in window) || (Number(navigator.maxTouchPoints) > 0),
-      isElectron: !!(window.process && window.process.type) || /electron/i.test(navigator.userAgent || '')  /* H-02 */
+      has_touch: ('ontouchstart' in window) || (Number(navigator.maxTouchPoints) > 0)
     };
     try {
       if (navigator.userAgentData) {
@@ -1353,8 +1347,7 @@ TRACKER_V3_JS = r"""(function () {
       width: screen.width, height: screen.height,
       availWidth: screen.availWidth, availHeight: screen.availHeight,
       colorDepth: screen.colorDepth, pixelRatio: window.devicePixelRatio || 1,
-      innerWidth: window.innerWidth || 0, innerHeight: window.innerHeight || 0,
-      outerWidth: window.outerWidth || 0, outerHeight: window.outerHeight || 0  /* H-07 */
+      innerWidth: window.innerWidth || 0, innerHeight: window.innerHeight || 0
     };
   }
 
@@ -1403,7 +1396,6 @@ TRACKER_V3_JS = r"""(function () {
       longest_idle_ms: idlePeriods.length ? Math.max.apply(null, idlePeriods.map(function(p){return p.dur;})) : 0,
       events: {
         mousemove: counters.mousemove, touchstart: counters.touchstart,
-        touchmove: counters.touchmove || 0, form_fill: counters.form_fill || 0, input: counters.input || 0,
         clicks: counters.clicks, scrolls: counters.scrolls, keydown: counters.keydown
       },
       mouse_points: mousePoints.slice(-100),
@@ -1443,7 +1435,7 @@ TRACKER_V3_JS = r"""(function () {
       }
       startHeartbeatTimer();
     }).catch(function () {
-      if (handshakeRetries < MAX_HANDSHAKE_RETRIES) { handshakeRetries++; setTimeout(function () { handshakeDone = false; doHandshake(); }, 3000); }
+      setTimeout(function () { handshakeDone = false; doHandshake(); }, 3000);
     });
   }
 
@@ -1492,7 +1484,7 @@ TRACKER_V3_JS = r"""(function () {
       v: 3, session_id: sessionId, click_id: clickId,
       campaign_key: CAMPAIGN_KEY, seq: 999, t_ms: Math.round(now()),
       url: location.href, referrer: document.referrer || '',
-      webrtc_ip: null  /* M-02: was string 'None' */,
+      webrtc_ip: 'None',
       nav: navObj, fingerprint: fpObj, behavior: behavior, screen: screenObj,
       milestones: milestonesData, first_30s: first30s, ad_events: adEvents,
       honeypot_triggered: honeypotTriggered, clock_drift_ms: 0,

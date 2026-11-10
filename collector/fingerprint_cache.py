@@ -22,7 +22,7 @@ from collections import OrderedDict
 
 
 class FingerprintCache:
-    def __init__(self, maxsize=100000, ttl_seconds=86400 * 7):  # L-19: was 30 days
+    def __init__(self, maxsize=100000, ttl_seconds=86400 * 30):
         self._cache = OrderedDict()
         self._lock = threading.Lock()
         self.maxsize = maxsize

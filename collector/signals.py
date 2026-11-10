@@ -28,7 +28,7 @@ SIGNAL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # AUTOMATION FLAGS
     # =========================================================
     "WEBDRIVER_FLAG":            {"base": 0.99, "dir": "bot", "sev": "impossible", "cat": "automation"},
-    "CDP_DETECTED":              {"base": 0.85, "dir": "bot", "sev": "high",       "cat": "automation"},  # H-13: align with precheck,
+    "CDP_DETECTED":              {"base": 0.92, "dir": "bot", "sev": "critical",   "cat": "automation"},
     "PUPPETEER_DETECTED":        {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "PLAYWRIGHT_DETECTED":       {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},
     "SELENIUM_DETECTED":         {"base": 0.98, "dir": "bot", "sev": "impossible", "cat": "automation"},

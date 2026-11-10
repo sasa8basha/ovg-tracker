@@ -39,7 +39,7 @@ VALID_LEVELS = frozenset([
 # Even a perfect signal set MUST NOT report confidence above this ceiling.
 MAX_CONFIDENCE_BY_LEVEL = {
     LEVEL_FULL:    0.96,
-    LEVEL_GOOD:    0.92,  # M-29: was 0.87 impossible to reach with partial
+    LEVEL_GOOD:    0.87,
     LEVEL_PARTIAL: 0.71,
     LEVEL_POOR:    0.50,
     LEVEL_FAILED:  0.30,
@@ -175,7 +175,7 @@ def evaluate_data_quality(data: dict) -> DataQualityReport:
     has_nav = bool(nav.get("ua"))
     has_fp = bool(fp.get("canvas_hash") or fp.get("webgl") or fp.get("timezone"))
     has_screen = bool(screen.get("width") and screen.get("height"))
-    has_behavior = bool(behavior) and (_duration_ms(behavior) > 0 or _mouse_points_count(behavior) > 0 or bool(behavior.get('scroll_pattern')))  # M-28
+    has_behavior = bool(behavior)
 
     duration_ms = _duration_ms(behavior)
     mouse_points = _mouse_points_count(behavior)

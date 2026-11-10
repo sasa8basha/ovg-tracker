@@ -60,7 +60,7 @@ SEVERITY_FACTOR = {
     "high":       0.75,
     "medium":     0.50,
     "low":        0.25,
-    "human":      1.00,   # M-21: weight for HUMAN evidence path (not bot reduction)erridden by direction
+    "human":      1.00,   # overridden by direction
 }
 
 # Human signals carry severity="human"; their factor is uniform.
@@ -220,11 +220,8 @@ def fuse_signals(
     critical_count = sum(1 for s in bot_signals if s.get("severity") == "critical")
     high_count = sum(1 for s in bot_signals if s.get("severity") == "high")
 
-    # H-15 FIX: strong human evidence can still reduce multi-critical false positives
     if impossible:
         reduction_max = HUMAN_REDUCTION_WITH_IMPOSSIBLE
-    elif critical_count >= 2 and human_evidence > 0.95:
-        reduction_max = 0.70  # escape hatch
     elif critical_count >= 2:
         reduction_max = HUMAN_REDUCTION_WITH_MULTI_CRITICAL
     elif critical_count == 1:
