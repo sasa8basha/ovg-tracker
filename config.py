@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     )
 
     # ---------- Database ----------
+    TRUST_PROXY_HEADERS: bool = Field(default=True)
     DATABASE_URL: str = Field(
         default="sqlite:///./ovg.db",
         validation_alias=AliasChoices("DATABASE_URL", "OVG_DB_URL"),
@@ -274,6 +275,7 @@ DATA_QUALITY_UNKNOWN = "unknown"
 # BACKWARD-COMPAT EXPORTS
 # =========================================================
 DATABASE_URL = settings.DATABASE_URL
+TRUST_PROXY_HEADERS = getattr(settings, 'TRUST_PROXY_HEADERS', True)
 ENV = settings.ENV
 DEBUG = settings.DEBUG
 
@@ -323,3 +325,28 @@ INTERSTITIAL_MAX_WAIT_MS = settings.INTERSTITIAL_MAX_WAIT_MS
 BOT_RISK_THRESHOLD = settings.BOT_RISK_THRESHOLD
 REDIS_URL = settings.REDIS_URL
 CLICK_PARAM_WHITELIST = settings.CLICK_PARAM_WHITELIST
+
+
+# L-16: basic SECRET entropy guard (call at startup if desired)
+def _assert_secret_strength(secret: str) -> None:
+    s = secret or ""
+    if len(s) < 32:
+        print("[CONFIG] WARNING: SECRET is shorter than 32 chars — generate a stronger value")
+
+
+# L-17: warn on weak default admin password
+def _assert_admin_pass(pw: str) -> None:
+    if not pw or pw in ("admin", "password", "123456", "changeme") or len(pw) < 8:
+        print("[CONFIG] WARNING: ADMIN_PASS is weak or default — change it before production")
+
+
+def _assert_dashboard_key(key: str) -> None:
+    # L-21: warn on weak/default dashboard keys
+    if not key or key in ("dashboard", "secret", "changeme", "ovg") or len(key) < 16:
+        print("[CONFIG] WARNING: DASHBOARD_KEY looks weak — rotate before production")
+
+
+def _assert_database_url(url: str) -> None:
+    # L-18: sqlite is fine for dev; warn for production multi-user
+    if url.startswith("sqlite:"):
+        print("[CONFIG] NOTE: DATABASE_URL is SQLite — use Postgres for production concurrency")
