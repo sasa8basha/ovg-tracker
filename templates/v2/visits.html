@@ -210,7 +210,7 @@
           <input type="date" id="visTo" class="neo-input neo-input-sm">
         </div>
         <div class="vis-filter-field">
-          <label class="vis-filter-label">Zone</label>
+          <label class="vis-filter-label">المنطقة</label>
           <input type="text" id="visZone" class="neo-input neo-input-sm" placeholder="10245">
         </div>
         <div style="display:flex;gap:4px;">
@@ -241,8 +241,8 @@
               <th>الزون</th>
               <th>التكلفة</th>
               <th>الإيراد</th>
-              <th class="neo-cell-center">Score</th>
-              <th class="neo-cell-center">Verdict</th>
+              <th class="neo-cell-center">النقاط</th>
+              <th class="neo-cell-center">الحكم</th>
             </tr>
           </thead>
           <tbody id="visTableBody">
@@ -311,10 +311,10 @@
     function esc(s) { return Neo.escape(s); }
 
     function verdictBadge(v) {
-      if (v === 'valid') return '<span class="neo-badge neo-badge-success">Valid</span>';
-      if (v === 'invalid') return '<span class="neo-badge neo-badge-danger">Invalid</span>';
-      if (v === 'suspicious') return '<span class="neo-badge neo-badge-warning">Suspicious</span>';
-      return '<span class="neo-badge neo-badge-default">Unknown</span>';
+      if (v === 'valid') return '<span class="neo-badge neo-badge-success">صالح</span>';
+      if (v === 'invalid') return '<span class="neo-badge neo-badge-danger">غير صالح</span>';
+      if (v === 'suspicious') return '<span class="neo-badge neo-badge-warning">مشبوه</span>';
+      return '<span class="neo-badge neo-badge-default">غير معروف</span>';
     }
 
     function scoreColor(s) {
@@ -504,19 +504,19 @@
 
         <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mb-2">📋 تفاصيل</div>
         <div class="vis-preview-kv"><span class="k">IP</span><span class="v">${esc(v.ip)}</span></div>
-        <div class="vis-preview-kv"><span class="k">Country</span><span class="v">${esc(v.country || '—')}</span></div>
-        <div class="vis-preview-kv"><span class="k">Campaign</span><span class="v">${esc(campName)}</span></div>
-        <div class="vis-preview-kv"><span class="k">Zone</span><span class="v">${esc(v.zone || '—')}</span></div>
-        <div class="vis-preview-kv"><span class="k">Browser</span><span class="v">${esc(v.browser || '—')}</span></div>
-        <div class="vis-preview-kv"><span class="k">Device</span><span class="v">${esc(v.device || '—')}</span></div>
-        <div class="vis-preview-kv"><span class="k">Time on Page</span><span class="v">${v.time_on_page}s</span></div>
-        <div class="vis-preview-kv"><span class="k">Clicks</span><span class="v">${v.clicks}</span></div>
-        <div class="vis-preview-kv"><span class="k">Scrolls</span><span class="v">${v.scrolls}</span></div>
+        <div class="vis-preview-kv"><span class="k">الدولة</span><span class="v">${esc(v.country || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">الحملة</span><span class="v">${esc(campName)}</span></div>
+        <div class="vis-preview-kv"><span class="k">المنطقة</span><span class="v">${esc(v.zone || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">المتصفح</span><span class="v">${esc(v.browser || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">الجهاز</span><span class="v">${esc(v.device || '—')}</span></div>
+        <div class="vis-preview-kv"><span class="k">وقت الصفحة</span><span class="v">${v.time_on_page}s</span></div>
+        <div class="vis-preview-kv"><span class="k">النقرات</span><span class="v">${v.clicks}</span></div>
+        <div class="vis-preview-kv"><span class="k">التمرير</span><span class="v">${v.scrolls}</span></div>
 
         <div class="neo-text-2xs neo-uppercase neo-fg-tertiary neo-mt-4 neo-mb-2">💰 P&L</div>
-        <div class="vis-preview-kv"><span class="k">BID</span><span class="v" style="color: var(--neo-danger);">${fmtMoneyAbs(bid)}</span></div>
-        <div class="vis-preview-kv"><span class="k">Revenue</span><span class="v" style="color: var(--neo-success);">${fmtMoneyAbs(rev)}</span></div>
-        <div class="vis-preview-kv"><span class="k">Profit</span><span class="v" style="color: ${profit >= 0 ? 'var(--neo-success)' : 'var(--neo-danger)'}; font-weight: 700;">${fmtMoney(profit)}</span></div>
+        <div class="vis-preview-kv"><span class="k">العطاء</span><span class="v" style="color: var(--neo-danger);">${fmtMoneyAbs(bid)}</span></div>
+        <div class="vis-preview-kv"><span class="k">الإيرادات</span><span class="v" style="color: var(--neo-success);">${fmtMoneyAbs(rev)}</span></div>
+        <div class="vis-preview-kv"><span class="k">الربح</span><span class="v" style="color: ${profit >= 0 ? 'var(--neo-success)' : 'var(--neo-danger)'}; font-weight: 700;">${fmtMoney(profit)}</span></div>
 
         ${v.ground_truth ? `
           <div class="neo-alert neo-alert-info neo-mt-4">

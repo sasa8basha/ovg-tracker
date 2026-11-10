@@ -278,7 +278,7 @@
       <!-- KPIs -->
       <div class="ipl-kpis" id="iplKpis">
         <div class="ipl-kpi"><div class="ipl-kpi-label">إجمالي IPs</div><div class="ipl-kpi-value" id="kpiTotal">0</div></div>
-        <div class="ipl-kpi"><div class="ipl-kpi-label">Residential</div><div class="ipl-kpi-value green" id="kpiResidential">0</div></div>
+        <div class="ipl-kpi"><div class="ipl-kpi-label">سكني</div><div class="ipl-kpi-value green" id="kpiResidential">0</div></div>
         <div class="ipl-kpi"><div class="ipl-kpi-label">Datacenter</div><div class="ipl-kpi-value red" id="kpiDatacenter">0</div></div>
         <div class="ipl-kpi"><div class="ipl-kpi-label">VPN</div><div class="ipl-kpi-value red" id="kpiVpn">0</div></div>
         <div class="ipl-kpi"><div class="ipl-kpi-label">Proxy</div><div class="ipl-kpi-value amber" id="kpiProxy">0</div></div>
@@ -318,7 +318,7 @@
         <div class="ipl-table-header">
           <div class="ipl-count" id="wlCount">— IP</div>
           <button class="neo-btn neo-btn-success neo-btn-sm" id="wlExportBtn">
-            ⬇ تصدير CSV (للـ PopAds whitelist)
+            ⬇ تصدير TXT (صيغة PopAds)
           </button>
         </div>
         <div class="neo-table-wrap">
@@ -327,9 +327,9 @@
               <tr>
                 <th>IP</th>
                 <th>الدولة</th>
-                <th>ISP</th>
-                <th>ASN</th>
-                <th class="neo-cell-center">Risk Score</th>
+                <th>مزود الخدمة</th>
+                <th>رقم الشبكة</th>
+                <th class="neo-cell-center">نقاط الخطر</th>
               </tr>
             </thead>
             <tbody id="wlBody">
@@ -344,7 +344,7 @@
         <div class="ipl-table-header">
           <div class="ipl-count" id="blCount">— IP</div>
           <button class="neo-btn neo-btn-danger neo-btn-sm" id="blExportBtn">
-            ⬇ تصدير CSV (للحظر في PopAds)
+            ⬇ تصدير TXT (صيغة PopAds)
           </button>
         </div>
         <div class="neo-table-wrap">
@@ -354,8 +354,8 @@
                 <th>IP</th>
                 <th class="neo-cell-center">التصنيف</th>
                 <th>الدولة</th>
-                <th>ISP</th>
-                <th class="neo-cell-center">Risk</th>
+                <th>مزود الخدمة</th>
+                <th class="neo-cell-center">الخطر</th>
                 <th>الأسباب</th>
               </tr>
             </thead>
@@ -585,7 +585,7 @@
       try {
         const res = await fetch(url, { credentials: 'same-origin' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        let fn = `ovg_${kind}.csv`;
+        let fn = `ovg_${kind}.txt`;
         const disp = res.headers.get('Content-Disposition');
         if (disp) {
           const m = disp.match(/filename="?([^";]+)"?/);

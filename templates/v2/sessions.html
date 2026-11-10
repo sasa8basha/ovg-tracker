@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OVG · Sessions</title>
+  <title>OVG · الجلسات</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@
 
   <div class="sess-shell-skel" id="bootSkeleton">
     <div class="spinner"></div>
-    <div>جاري تحميل Sessions…</div>
+    <div>جاري تحميل الجلسات…</div>
   </div>
 
   <div id="neoAppRoot" style="display:none;">
@@ -296,7 +296,7 @@
 
       <div class="sess-header">
         <div>
-          <h1 class="sess-header-title">📊 Sessions</h1>
+          <h1 class="sess-header-title">📊 الجلسات</h1>
           <div class="sess-header-sub" id="sessSubtitle">عرض وتحليل الجلسات المسجلة</div>
         </div>
         <button class="neo-btn neo-btn-secondary neo-btn-sm" id="sessRefreshBtn">
@@ -318,7 +318,7 @@
       <!-- Filters -->
       <div class="sess-filters">
         <div class="sess-filter-field">
-          <label class="sess-filter-label">Data Quality</label>
+          <label class="sess-filter-label">جودة البيانات</label>
           <select id="sessDq" class="neo-select neo-input-sm">
             <option value="">الكل</option>
             <option value="full">Full (v3)</option>
@@ -353,13 +353,13 @@
         <table class="neo-table">
           <thead>
             <tr>
-              <th>Session ID</th>
+              <th>رقم الجلسة</th>
               <th>الوقت</th>
               <th class="neo-cell-center">المدة</th>
               <th class="neo-cell-center">Heartbeats</th>
-              <th class="neo-cell-center">Data Quality</th>
-              <th class="neo-cell-center">Verdict</th>
-              <th>Country</th>
+              <th class="neo-cell-center">جودة البيانات</th>
+              <th class="neo-cell-center">الحكم</th>
+              <th>الدولة</th>
             </tr>
           </thead>
           <tbody id="sessBody"></tbody>
@@ -612,9 +612,9 @@
 
       let html = `<div style="overflow-x:auto;"><table class="sess-hb-table">
         <thead><tr>
-          <th class="center">#</th><th>الوقت</th><th class="center">Gap</th>
-          <th class="center">Clicks</th><th class="center">Scrolls</th><th class="center">Moves</th>
-          <th class="center">Keys</th><th class="center">Visible</th><th class="center">Focused</th>
+          <th class="center">#</th><th>الوقت</th><th class="center">فجوة</th>
+          <th class="center">النقرات</th><th class="center">التمرير</th><th class="center">حركات</th>
+          <th class="center">مفاتيح</th><th class="center">مرئي</th><th class="center">مركز</th>
         </tr></thead><tbody>`;
 
       for (const hb of hbs) {
@@ -665,12 +665,12 @@
 
           <div class="sess-meta-section">
             <div class="sess-meta-title">📋 معلومات الجلسة</div>
-            <div class="sess-meta-row"><span class="k">Session ID</span><span class="v" style="font-size:10px;">${esc(d.session_id)}</span></div>
-            <div class="sess-meta-row"><span class="k">Started</span><span class="v">${esc(started)}</span></div>
+            <div class="sess-meta-row"><span class="k">رقم الجلسة</span><span class="v" style="font-size:10px;">${esc(d.session_id)}</span></div>
+            <div class="sess-meta-row"><span class="k">بدأ</span><span class="v">${esc(started)}</span></div>
             <div class="sess-meta-row"><span class="k">Ended</span><span class="v">${d.ended_at ? new Date(d.ended_at).toLocaleString('en-GB') : '—'}</span></div>
             <div class="sess-meta-row"><span class="k">IP</span><span class="v">${esc(d.ip || '—')}</span></div>
-            <div class="sess-meta-row"><span class="k">Country</span><span class="v">${esc(d.country_code || '—')}</span></div>
-            <div class="sess-meta-row"><span class="k">Total Heartbeats</span><span class="v">${d.total_heartbeats}</span></div>
+            <div class="sess-meta-row"><span class="k">الدولة</span><span class="v">${esc(d.country_code || '—')}</span></div>
+            <div class="sess-meta-row"><span class="k">إجمالي النبضات</span><span class="v">${d.total_heartbeats}</span></div>
             <div class="sess-meta-row"><span class="k">Duration</span><span class="v">${esc(d.duration_human || '—')}</span></div>
             ${d.url ? `<div class="sess-meta-row"><span class="k">URL</span><span class="v" style="font-size:10px;direction:ltr;text-align:left;">${esc(d.url.substring(0, 60))}</span></div>` : ''}
           </div>
@@ -685,9 +685,9 @@
           ${d.visit ? `
             <div class="sess-meta-section">
               <div class="sess-meta-title">🎯 Visit Data</div>
-              <div class="sess-meta-row"><span class="k">Verdict</span><span class="v" style="color:${d.visit.verdict === 'valid' ? 'var(--neo-success)' : 'var(--neo-danger)'};">${esc((d.visit.verdict || '').toUpperCase())}</span></div>
-              <div class="sess-meta-row"><span class="k">Score</span><span class="v">${d.visit.score}</span></div>
-              <div class="sess-meta-row"><span class="k">Time on Page</span><span class="v">${esc(d.visit.time_on_page_human || '—')}</span></div>
+              <div class="sess-meta-row"><span class="k">الحكم</span><span class="v" style="color:${d.visit.verdict === 'valid' ? 'var(--neo-success)' : 'var(--neo-danger)'};">${esc((d.visit.verdict || '').toUpperCase())}</span></div>
+              <div class="sess-meta-row"><span class="k">النقاط</span><span class="v">${d.visit.score}</span></div>
+              <div class="sess-meta-row"><span class="k">وقت الصفحة</span><span class="v">${esc(d.visit.time_on_page_human || '—')}</span></div>
               <div class="sess-meta-row"><span class="k">Browser / Device</span><span class="v">${esc(d.visit.browser || '—')} · ${esc(d.visit.device || '—')}</span></div>
               <div style="text-align:center;margin-top:var(--neo-sp-3);">
                 <a href="/visits/${d.visit.id}" class="neo-btn neo-btn-primary neo-btn-sm" style="text-decoration:none;">🔍 افتح صفحة الزيارة</a>
@@ -754,7 +754,7 @@
         await Neo.mount({
           active: 'sessions',
           lang: 'ar',
-          breadcrumb: [{ label: 'Sessions' }],
+          breadcrumb: [{ label: 'الجلسات' }],
         });
 
         document.getElementById('bootSkeleton').style.display = 'none';
