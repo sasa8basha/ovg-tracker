@@ -248,29 +248,12 @@ def extract_zone_id_from_url(url: str) -> str:
     try:
         for k, v in parse_qs(parsed.query or "").items():
             kl = (k or "").lower().strip()
-            if kl in ("zoneid", "zone_id", "zone", "z"):
+            # websiteid is the primary key returned by PopAds for the zone
+            if kl in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z"):
                 if v and v[0]:
                     val = str(v[0]).strip()
-                    if val and len(val) <= 100:
+                    if val and len(val) <= 100 and val.lower() != "unknown":
                         return val
-    except Exception:
-        pass
-    try:
-        parts = [p for p in (parsed.path or "").split("/") if p]
-        for i, p in enumerate(parts):
-            pl = (p or "").lower().strip()
-            if pl in ("zone", "z", "zoneid") and i + 1 < len(parts):
-                nxt = parts[i + 1]
-                if nxt and len(nxt) <= 100:
-                    return nxt
-    except Exception:
-        pass
-    try:
-        parts = [p for p in (parsed.path or "").split("/") if p]
-        if parts:
-            first = parts[0]
-            if first.isdigit() and 4 <= len(first) <= 10:
-                return first
     except Exception:
         pass
     return ""

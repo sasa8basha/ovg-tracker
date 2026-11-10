@@ -6,6 +6,7 @@ import ipaddress
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
+from sqlalchemy import select
 
 from database import SessionLocal
 from models import IPIntelligence, VisitModel, IPReputationCache
@@ -378,7 +379,7 @@ async def intelligence_worker_loop():
             await asyncio.sleep(30)
             db = SessionLocal()
             try:
-                subq = db.query(IPIntelligence.ip_address).subquery()
+                subq = select(IPIntelligence.ip_address)
                 rows = db.query(VisitModel.ip).filter(
                     VisitModel.ip.isnot(None),
                     VisitModel.ip.notin_(subq),

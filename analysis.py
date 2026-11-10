@@ -249,8 +249,11 @@ def extract_zone_id(url: str) -> str:
     try:
         parsed = urlparse(url or "")
         for k, v in parse_qs(parsed.query).items():
-            if k.lower() == "zoneid" and v: return v[0]
-    except Exception: pass
+            kl = (k or "").lower().strip()
+            if kl in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z") and v:
+                return v[0]
+    except Exception: 
+        pass
     return "unknown"
 
 

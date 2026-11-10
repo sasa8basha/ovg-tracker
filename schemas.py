@@ -123,7 +123,7 @@ class FinalPayload(BaseModel):
     seq: int = Field(default=999, ge=0, le=10000)
     t_ms: int = Field(default=0, ge=0)
     url: str = Field(default="", max_length=2000)
-    webrtc_ip: str = Field(default="None", max_length=100)
+    webrtc_ip: Optional[str] = Field(default=None, max_length=100)
     nav: Dict[str, Any] = Field(default_factory=dict)
     fingerprint: Dict[str, Any] = Field(default_factory=dict)
     behavior: Dict[str, Any] = Field(default_factory=dict)
