@@ -30,7 +30,9 @@ def _pick_filter_reason(result: dict) -> str | None:
     # Filter only positive scores (bot indicators)
     risks = [e for e in evidence if isinstance(e, dict) and e.get("score", 0) > 0]
     if risks:
-        risks.sort(key=lambda x: x.get("score", 0), reverse=True)
+        # M-20: prefer severity rank then score
+        sev_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1, "human": 0}
+        risks.sort(key=lambda x: (sev_rank.get(str(x.get("severity", "")).lower(), 0), x.get("score", 0)), reverse=True)
         return risks[0].get("code")
 
     # Fallback to explicit decision reason

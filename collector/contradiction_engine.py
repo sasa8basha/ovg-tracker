@@ -171,7 +171,14 @@ def rule_ios_user_agent_data(ctx):
     ua = (_get(ctx, "ua") or "").lower()
     ua_data = _get(ctx, "nav.ua_data")
     is_ios_safari = ("iphone" in ua or "ipad" in ua) and "safari" in ua and "crios" not in ua
-    if is_ios_safari and ua_data:
+    # M-11: Stage Manager / desktop-class iPad may expose ua_data; only flag when mobile=true mismatch
+    if is_ios_safari and ua_data and isinstance(ua_data, dict):
+        mobile_flag = ua_data.get("mobile")
+        if mobile_flag is True or (mobile_flag is None and "ipad" not in ua):
+            return {"severity": "impossible", "score": 100,
+                    "detail": "iOS Safari + navigator.userAgentData (Chrome-only API)",
+                    "category": "browser"}
+    elif is_ios_safari and ua_data:
         return {"severity": "impossible", "score": 100,
                 "detail": "iOS Safari + navigator.userAgentData (Chrome-only API)",
                 "category": "browser"}
@@ -194,7 +201,7 @@ def rule_mobile_no_touch(ctx):
 def rule_sec_ch_ua_platform_mismatch(ctx):
     headers = _safe_dict(ctx.get("headers"))
     platform = (_get(ctx, "nav.platform") or "").lower()
-    sec_platform_raw = headers.get("sec-ch-ua-platform", "")
+    sec_platform_raw = headers.get("sec-ch-ua-platform", "").strip().strip('"').lower()  # M-18
     if not sec_platform_raw or not platform:
         return None
 
@@ -266,7 +273,7 @@ def rule_iphone_wide_screen(ctx):
                 "category": "screen"}
 
     # Secondary check: both dimensions > 932 = impossible
-    if screen_w > 932 and screen_h > 932:
+    if screen_w >= 940 and screen_h >= 940:  # M-17: margin above 932 Pro Max edge
         return {"severity": "impossible", "score": 100,
                 "detail": f"iPhone UA + screen {screen_w}x{screen_h} (both > 932)",
                 "category": "screen"}
@@ -451,12 +458,7 @@ def rule_headless_no_chrome(ctx):
 
 
 def rule_active_text_os_spoof(ctx):
-    """Chrome claims Windows but ActiveText is pure red (Linux/macOS palette)."""
-    rb = _safe_dict(ctx.get("fp.rebrowser"))
-    if rb.get("activeTextMismatch") == 0.5:
-        return {"severity": "medium", "score": 50,
-                "detail": "Claims Windows but ActiveText renders Linux/macOS colour",
-                "category": "os"}
+    """M-19: ActiveText heuristic obsolete on Chrome 120+; disabled."""
     return None
 
 
@@ -699,9 +701,10 @@ def rule_desktop_no_mouse_no_touch_long(ctx):
     is_desktop = ("windows nt" in ua or "mac os" in ua or "linux" in ua)
     is_mobile = ("mobile" in ua or "android" in ua)
 
-    if is_desktop and not is_mobile and duration > 15000:
+    # M-16: 15s was too aggressive for slow readers; require 30s and high not critical
+    if is_desktop and not is_mobile and duration > 30000:
         if mm == 0 and ts == 0 and kd == 0:
-            return {"severity": "critical", "score": 85,
+            return {"severity": "high", "score": 70,
                     "detail": f"Desktop {duration/1000:.0f}s: zero input events",
                     "category": "behavior"}
     return None

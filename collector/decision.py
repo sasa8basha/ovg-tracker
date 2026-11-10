@@ -83,7 +83,7 @@ def _compute_local_confidence(
     reliability = float(getattr(data_quality, "reliability", 0.7) or 0.7)
     conf = local_conf * (0.5 + 0.5 * reliability)
 
-    return max(0.0, min(1.0, conf))
+    return max(0.0, min(1.0, conf))  # L-22: explicit edge clamp
 
 
 def decide(
@@ -192,9 +192,13 @@ def decide(
             raw_confidence = _compute_local_confidence(bp, suspicious_th, data_quality)
 
     # Cap confidence
+    # H-14 FIX: impossible contradictions must not be capped by failed DQ
     capped = False
     confidence = raw_confidence
-    if confidence > dq_cap:
+    if has_impossible:
+        confidence = max(confidence, 0.99)
+        dq_cap = 0.99
+    elif confidence > dq_cap:
         confidence = dq_cap
         capped = True
 
@@ -240,7 +244,8 @@ def mode_from_block_threshold(threshold: int) -> str:
     except (ValueError, TypeError):
         return DEFAULT_MODE
 
-    if t >= 90:
+    # M-22: explicit bands (avoid 89→90 cliff surprise in docs)
+    if t >= 85:
         return "permissive"
     if t < 60:
         return "strict"

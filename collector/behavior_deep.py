@@ -278,6 +278,10 @@ def _analyze_typing(behavior: dict) -> list:
     intervals = _safe_list(behavior.get("key_intervals"))
     clean = [float(x) for x in intervals if isinstance(x, (int, float)) and x > 0]
 
+    # M-05: paste events produce near-zero intervals — skip bot flags if paste observed
+    if behavior.get("paste_detected") or behavior.get("had_paste"):
+        return signals
+
     if len(clean) < 5:
         return signals
 
@@ -285,13 +289,13 @@ def _analyze_typing(behavior: dict) -> list:
     cov = _cov(clean)
 
     # -------- BOT --------
-    if mean_ms < 20:
+    if mean_ms < 15:  # M-05: was 20; paste residual can sit 15-25ms
         signals.append({
             "code": "TYPING_TOO_FAST",
             "base_strength": 0.70,
             "detail": f"Mean keystroke interval={mean_ms:.1f}ms (superhuman)",
         })
-    elif len(clean) >= 10 and cov < 0.15:
+    elif len(clean) >= 12 and cov < 0.12:  # M-05: stricter sample + CoV
         signals.append({
             "code": "TYPING_TOO_UNIFORM",
             "base_strength": 0.55,
@@ -351,7 +355,7 @@ def _analyze_scroll(behavior: dict, events: dict) -> list:
     if len(clean_v) >= 5:
         v_mean = _mean(clean_v)
         v_cov = _cov(clean_v)
-        if v_mean > 100 and v_cov < 0.20:
+        if v_mean > 100 and v_cov < 0.12:  # M-06: was 0.20 human FP on fast scroll
             signals.append({
                 "code": "SCROLL_CONSTANT_VELOCITY",
                 "base_strength": 0.45,
@@ -479,13 +483,13 @@ def _analyze_flagon(behavior: dict) -> list:
 
     # -------- Rage clicks --------
     rage = _safe_list(behavior.get("rage_clicks"))
-    if len(rage) >= 1:
-        # Even a single rage burst is suspicious
+    # M-07: single frustrated burst is human; require stronger pattern
+    if len(rage) >= 2 or (len(rage) == 1 and _safe_int((rage[0] if isinstance(rage[0], dict) else {}).get("count"), 0) >= 8):
         first = rage[0] if isinstance(rage[0], dict) else {}
         cnt = _safe_int(first.get("count"), 0)
         signals.append({
             "code": "RAGE_CLICK_BURST",
-            "base_strength": 0.60 if cnt >= 5 else 0.50,
+            "base_strength": 0.60 if cnt >= 8 else 0.45,
             "detail": f"{len(rage)} rage-click bursts (max count={cnt})",
         })
 
@@ -806,13 +810,14 @@ def _analyze_ml(behavior: dict, nav: dict, fp: dict, screen: dict) -> list:
     except Exception:
         return signals
 
-    if score >= 0.75:
+    # M-08: raise thresholds so presence-only vectors don't dominate
+    if score >= 0.82:
         signals.append({
             "code": "ML_FEATURE_ANOMALY",
             "base_strength": 0.75,
             "detail": f"ML feature score={score:.2f} (anomalous combination)",
         })
-    elif score >= 0.55:
+    elif score >= 0.65:
         signals.append({
             "code": "ML_FEATURE_SUSPICIOUS",
             "base_strength": 0.50,

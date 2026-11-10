@@ -136,7 +136,8 @@ def analyze_temporal_rhythm(heartbeats, total_duration_ms):
         return signals
 
     gaps_ms = _extract_gaps(heartbeats)
-    if len(gaps_ms) < 2:
+    # C-13 FIX: need at least 4 gaps for stable CoV; 2 gaps → random FP on short sessions
+    if len(gaps_ms) < 4:
         return signals
 
     # Filter extreme outliers (network hiccups)
@@ -183,14 +184,14 @@ def analyze_temporal_rhythm(heartbeats, total_duration_ms):
     except (ValueError, TypeError):
         duration = 0
 
-    if duration > 30000 and len(heartbeats) >= 4:
+    # H-16 FIX: reading an article can look like collapse; require longer session + stronger early activity
+    if duration >= 60000 and len(heartbeats) >= 4:
         half = len(heartbeats) // 2
         first_half = heartbeats[:half]
         second_half = heartbeats[half:]
         early = _sum_events(first_half)
         late = _sum_events(second_half)
-        # v4.1: only fire if early was active AND late had NO visible events
-        if early >= 10 and late == 0:
+        if early >= 30 and late == 0:
             signals.append(_make_signal(
                 "ENGAGEMENT_COLLAPSE",
                 f"Active early ({early}) then dead ({late})",

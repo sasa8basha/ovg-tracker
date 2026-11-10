@@ -49,7 +49,7 @@ CRITICAL_RULES = frozenset([
     "NIGHTMARE_DETECTED",
     "PHANTOM_DETECTED",
     "HONEYPOT_CLICK",
-    "HONEYPOT_FORM_FILL",
+    # "HONEYPOT_FORM_FILL",  # M-14: never emitted by tracker
     "HEADLESS_UA",
 
     # BotD — 100% impossible signals only
@@ -115,9 +115,12 @@ def _severity(code: str, default: str = "critical") -> str:
 
 
 def _make_reason(code: str, detail: str = "") -> dict:
+    # L-02: include numeric score for downstream consumers
+    strength = _base(code)
     return {
         "code": code,
-        "base_strength": _base(code),
+        "base_strength": strength,
+        "score": int(round(strength * 100)),
         "severity": _severity(code),
         "direction": "bot",
         "detail": detail or code,
@@ -262,7 +265,7 @@ def _iter_rebrowser(rb: dict) -> List[str]:
     return codes
 
 
-def _iter_trap_triggers(traps: dict) -> List[str]:
+def _iter_trap_triggers(traps: dict) -> List[str]:  # L-01: maps trap_triggers dict → registry codes
     codes: List[str] = []
     if not isinstance(traps, dict):
         return codes

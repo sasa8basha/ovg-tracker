@@ -75,6 +75,8 @@ def analyze_headers(headers, ua, http_version):
     is_safari = "safari" in ua_lower and "chrome" not in ua_lower
     is_mobile = "mobile" in ua_lower or "android" in ua_lower
     is_ios = "iphone" in ua_lower or "ipad" in ua_lower
+    # H-02: Electron apps use Chrome UA but typically omit sec-ch-ua
+    is_electron = "electron" in ua_lower
 
     chrome_major = 0
     m = re.search(r"chrome/(\d+)", ua_lower)
@@ -85,7 +87,10 @@ def analyze_headers(headers, ua, http_version):
             chrome_major = 0
 
     # ===== 1) Chrome/Edge >= 90 should send sec-ch-ua =====
-    if (is_chrome or is_edge) and chrome_major >= 90 and not is_ios:
+    # H-01 FIX: sec-ch-ua is HTTPS-only; skip on plain HTTP
+    proto = (h.get("x-forwarded-proto") or h.get("x-forwarded-protocol") or "").lower()
+    is_https = proto == "https" or h.get("cf-visitor", "").find("https") >= 0
+    if (is_chrome or is_edge) and chrome_major >= 90 and not is_ios and is_https and not is_electron:
         if "sec-ch-ua" not in h:
             signals.append(_make_signal(
                 "MISSING_SEC_CH_UA",
