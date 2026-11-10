@@ -11,24 +11,6 @@ from sqlalchemy.orm import Session
 from models import UserModel, VisitModel, CampaignModel
 
 
-def verify_campaign_access(campaign_id: int | None, user: UserModel, db: Session) -> CampaignModel | None:
-    """
-    Verify that campaign_id belongs to the current user.
-    Returns the CampaignModel if valid, None if campaign_id is None.
-    Raises HTTPException(404) if the campaign does not exist or is not owned by the user.
-    Prevents cross-user data leaks when campaign_id is supplied as a query parameter.
-    """
-    if campaign_id is None:
-        return None
-    c = db.query(CampaignModel).filter(
-        CampaignModel.id == campaign_id,
-        CampaignModel.user_id == user.id,
-    ).first()
-    if not c:
-        raise HTTPException(status_code=404, detail="الحملة مش موجودة")
-    return c
-
-
 # =========================================================
 # POPADS URL MACROS — 17 macros
 # =========================================================
@@ -78,19 +60,14 @@ def build_tracking_url(campaign: CampaignModel, origin: str) -> str:
 
     sep = "&" if "?" in base else "?"
     parts = [f"{key}={macro}" for key, (macro, _desc) in POPADS_URL_MACROS.items()]
-    # H-19: landing/hybrid CTAs to Adsterra must carry sub_id for revenue sync
-    param = getattr(campaign, "adsterra_tracking_param", None) or "sub_id"
-    if campaign.type in ("landing", "hybrid") and not any(p.startswith(f"{param}=") for p in parts):
-        parts.append(f"{param}=[CLICKID]")
     return base + sep + "&".join(parts)
 
 
 # =========================================================
 # MACRO EXTRACTION (shared by interstitial + collector_v3)
 # =========================================================
-MACRO_ALIASES = {  # L-26: canonical; collector_v3 keeps a copy — prefer import long-term
+MACRO_ALIASES = {
     "bid":              ("bid",),
-    "sub_id":           ("sub_id", "subid", "clickid", "click_id"),  # H-19
     "impression_id":    ("impressionid", "impid", "impression_id"),
     "website_id":       ("websiteid", "website_id"),
     "category_id":      ("categoryid", "category_id"),
@@ -182,14 +159,10 @@ def csv_safe(val):
 
 
 def _country_key(country_code, country_name):
-    # L-09: collapse Local/LO/XX into one bucket
     code = (country_code or "").strip().upper()
-    name = (country_name or "").strip()
-    if code in ("LO", "XX", "") or name.lower() in ("local", "unknown", ""):
-        return "LOCAL"
-    if code:
+    if code and code not in ("LO", "XX"):
         return code
-    return name or "Unknown"
+    return (country_name or "Unknown").strip() or "Unknown"
 
 
 def _parse_date(s):
@@ -248,12 +221,29 @@ def extract_zone_id_from_url(url: str) -> str:
     try:
         for k, v in parse_qs(parsed.query or "").items():
             kl = (k or "").lower().strip()
-            # websiteid is the primary key returned by PopAds for the zone
-            if kl in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z"):
+            if kl in ("zoneid", "zone_id", "zone", "z"):
                 if v and v[0]:
                     val = str(v[0]).strip()
-                    if val and len(val) <= 100 and val.lower() != "unknown":
+                    if val and len(val) <= 100:
                         return val
+    except Exception:
+        pass
+    try:
+        parts = [p for p in (parsed.path or "").split("/") if p]
+        for i, p in enumerate(parts):
+            pl = (p or "").lower().strip()
+            if pl in ("zone", "z", "zoneid") and i + 1 < len(parts):
+                nxt = parts[i + 1]
+                if nxt and len(nxt) <= 100:
+                    return nxt
+    except Exception:
+        pass
+    try:
+        parts = [p for p in (parsed.path or "").split("/") if p]
+        if parts:
+            first = parts[0]
+            if first.isdigit() and 4 <= len(first) <= 10:
+                return first
     except Exception:
         pass
     return ""

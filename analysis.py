@@ -185,7 +185,7 @@ TZ_BY_COUNTRY_CODE = {
     "NZ": {"pacific/auckland"},
 }
 
-LANG_COUNTRY_MAP = {  # M-12: 'en' intentionally omitted (global) — no false LANG_COUNTRY_MISMATCH
+LANG_COUNTRY_MAP = {
     "ar": {"EG", "SA", "AE", "KW", "QA", "BH", "OM", "JO", "LB", "SY", "IQ", "YE", "PS", "MA", "DZ", "TN", "LY", "SD"},
     "es": {"ES", "MX", "AR", "CO", "CL", "PE", "VE"}, "fr": {"FR", "BE", "CH", "CA"},
     "de": {"DE", "AT", "CH"}, "pt": {"PT", "BR"}, "ru": {"RU", "BY", "KZ"},
@@ -249,11 +249,8 @@ def extract_zone_id(url: str) -> str:
     try:
         parsed = urlparse(url or "")
         for k, v in parse_qs(parsed.query).items():
-            kl = (k or "").lower().strip()
-            if kl in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z") and v:
-                return v[0]
-    except Exception: 
-        pass
+            if k.lower() == "zoneid" and v: return v[0]
+    except Exception: pass
     return "unknown"
 
 
@@ -313,16 +310,9 @@ class EvidenceCollector:
 
 
 def _apply_items(ev, items):
-    # L-24: do not swallow malformed items silently
-    for item in items or []:
-        try:
-            code, sev, score, detail = item
-            if sev == "human":
-                ev.human(code, abs(score), detail)
-            else:
-                ev.risk(code, sev, score, detail)
-        except Exception as e:
-            print(f"[analysis] _apply_items skip bad item {item!r}: {e}")
+    for code, sev, score, detail in items:
+        if sev == "human": ev.human(code, abs(score), detail)
+        else: ev.risk(code, sev, score, detail)
 
 
 def calc_confidence(signals: list) -> float:
@@ -386,8 +376,8 @@ def is_wasted_impression(evidence_items: list, verdict: str) -> bool:
     return bool(codes & _WASTED_CODES)
 
 
-CODE_TO_SOURCE = {  # L-08: prefer collector.constants long-term; kept local for legacy analysis path
-    "WEBDRIVER_FLAG": "critical", "CDP_DETECTED": "high", "WINDOWS_UA_LINUX": "critical",  # H-13
+CODE_TO_SOURCE = {
+    "WEBDRIVER_FLAG": "critical", "CDP_DETECTED": "critical", "WINDOWS_UA_LINUX": "critical",
     "FIREFOX_CHROME_OBJ": "critical", "HEADLESS_UA": "critical", "UNTRUSTED_CLICK": "critical",
     "HONEYPOT_CLICK": "honeypot", "HONEYPOT_FORM_FILL": "honeypot", "IMPOSSIBLE_SPEED": "behavior_deep",
     "PUPPETEER_DETECTED": "automation", "PLAYWRIGHT_DETECTED": "automation", "SELENIUM_DETECTED": "automation",
@@ -455,13 +445,13 @@ def build_explainability_trace(evidence_items):
 # =========================================================
 # SIGNAL CHECKS
 # =========================================================
-def _check_critical(nav, fp, ua, platform, chrome_check=None):  # M-10 optional
+def _check_critical(nav, fp, ua, platform, chrome_check):
     items = []
     if _is_headless_ua(ua): items.append(("HEADLESS_UA", "critical", 100, f"Headless UA: {_safe_str(ua[:60], 60)}"))
     untrusted = safe_int(fp.get("_untrusted_clicks"), 0)
     if untrusted >= 1: items.append(("UNTRUSTED_CLICK", "critical", 100, f"{untrusted} JS-injected clicks"))
     if nav.get("webdriver") is True: items.append(("WEBDRIVER_FLAG", "critical", 100, "navigator.webdriver === true"))
-    if fp.get("cdp_detected") is True: items.append(("CDP_DETECTED", "high", 70, "CDP Runtime Detected"))  # H-13 align
+    if fp.get("cdp_detected") is True: items.append(("CDP_DETECTED", "critical", 100, "CDP Runtime Detected"))
     return items
 
 
@@ -495,16 +485,7 @@ def _check_fingerprint(fp, plugins_info, is_desktop_chrome, is_privacy_browser, 
     items = []
     plugin_count = safe_int(plugins_info.get("count"), -1, max_val=1000)
     if is_desktop_chrome and not is_privacy_browser and plugin_count == 0:
-        # M-09: only flag on Chrome < 92 (modern Chrome legitimately has 0 plugins)
-        major = 0
-        try:
-            import re as _re
-            m = _re.search(r"chrome/(\d+)", (ua or "").lower())
-            if m: major = int(m.group(1))
-        except Exception:
-            major = 0
-        if 0 < major < 92:
-            items.append(("PLUGINS_ZERO", "high", 60, f"Chrome {major}: 0 plugins"))
+        items.append(("PLUGINS_ZERO", "high", 60, "Chrome desktop: 0 plugins"))
     if is_desktop_chrome and not is_privacy_browser and chrome_check == "no_window_chrome":
         items.append(("CHROME_NO_OBJ", "high", 60, "Chrome UA: no window.chrome"))
 
@@ -595,11 +576,7 @@ def _check_screen(screen_dict, is_mobile_phone, is_tablet, is_desktop_chrome, is
     inner_w = safe_int(screen_dict.get("innerWidth"), 0)
     inner_h = safe_int(screen_dict.get("innerHeight"), 0)
 
-    # H-07 FIX: 800x600 alone is common on kiosks/old displays; require zero outer dims (headless)
-    outer_w = safe_int(screen_dict.get("outerWidth"), -1)
-    outer_h = safe_int(screen_dict.get("outerHeight"), -1)
-    if avail_w == 800 and avail_h == 600 and (outer_w == 0 or outer_h == 0):
-        items.append(("HEADLESS_VIEWPORT", "high", 70, "Default 800x600 + outer 0"))
+    if avail_w == 800 and avail_h == 600: items.append(("HEADLESS_VIEWPORT", "high", 70, "Default 800x600"))
     if avail_w == 0 or avail_h == 0: items.append(("VIEWPORT_ZERO", "medium", 50, "Viewport 0x0"))
     if is_mobile_phone and screen_w > 1920: items.append(("MOBILE_WIDE_SCREEN", "medium", 50, f"Mobile {screen_w}px"))
     if is_tablet and screen_w > 3840: items.append(("TABLET_WIDE_SCREEN", "medium", 40, f"Tablet {screen_w}px"))
@@ -620,13 +597,8 @@ def _check_os_mismatch(ua, platform):
     items = []
     if not platform: return items
 
-    pl = (platform or "").lower()
-    ua_l = (ua or "").lower()
-    if "windows nt" in ua_l and "win" not in pl and "linux" not in pl and "x11" not in pl:
+    if "windows nt" in ua and "win" not in platform and "linux" not in platform and "x11" not in platform:
         items.append(("OS_MISMATCH_WIN", "medium", 50, f"Windows UA + platform {_safe_str(platform, 30)}"))
-    # M-15: explicit Windows UA + Mac platform gap
-    if "windows nt" in ua_l and ("mac" in pl or "iphone" in pl or "ipad" in pl):
-        items.append(("OS_MISMATCH_WIN_MAC", "high", 60, f"Windows UA + Mac platform {_safe_str(platform, 30)}"))
     if ("mac os" in ua or "macintosh" in ua) and "mac" not in platform:
         items.append(("OS_MISMATCH_MAC", "medium", 50, f"macOS UA + platform {_safe_str(platform, 30)}"))
     # ✅ v3.3: Linux UA + Win32/Mac platform
@@ -738,10 +710,8 @@ def _check_behavior(behavior, events):
         if tp > 20 and dv < 0.01 and dc < 2: items.append(("ROBOTIC_LINEAR", "high", 60, f"Linear ({dc} turns)"))
 
     has_any = (mousemove > 5 or touchstart > 0 or scrolls > 0 or clicks > 0)
-    # C-03 FIX: Raise threshold to 15s and require desktop-like signals.
-    # Mobile readers often have no scroll/mouse for long periods → previous 8s caused massive FP.
-    is_desktop_like = mousemove > 0 or (safe_int(events.get("keydown"), 0) > 0)
-    if t_on_page > 15000 and not has_any and is_desktop_like:
+    
+    if t_on_page > 8000 and not has_any:
         items.append(("ZOMBIE", "high", 60, f"No interaction after {t_on_page}ms"))
         
     return items
@@ -762,7 +732,7 @@ def _check_behavior_deep(behavior, events):
     if clicks_before_move > 0 and touchstart == 0: items.append(("CLICK_BEFORE_MOVE", "high", 60, "Click before move"))
     if t_on_page > 5000 and visible_time > 0:
         ratio = visible_time / t_on_page
-        if ratio > 0.995 and mousemove == 0 and clicks == 0 and scrolls == 0 and touchstart == 0:  # L-03: was 0.98
+        if ratio > 0.98 and mousemove == 0 and clicks == 0 and scrolls == 0 and touchstart == 0:
             items.append(("IDLE_VISIBLE", "medium", 30, "Visible idle"))
 
     click_points = behavior.get("clicks_points") or behavior.get("click_points")
@@ -796,13 +766,10 @@ def _check_v3_signals(data, behavior, events, fp, ua):
         if total_events == 0: items.append(("ENGAGEMENT_ZERO", "medium", 40, f"Zero over {t_on_page/1000:.1f}s"))
         elif total_events <= 2 and t_on_page >= 45000: items.append(("ENGAGEMENT_VERY_LOW", "low", 25, f"Only {total_events} interactions"))
 
-    # C-02 FIX: Tracker never emits viewable_50pct_1s reliably (iframes/YouTube/etc).
-    # Disabled until real IntersectionObserver viewability is implemented in tracker.
-    # Previous logic caused false "Ad cloaking" on any page with ad load events.
-    # if ad_events:
-    #     loaded = any("loaded" in str(ev.get("event", "")) for ev in ad_events if isinstance(ev, dict))
-    #     visible = any("viewable_50pct_1s" in str(ev.get("event", "")) for ev in ad_events if isinstance(ev, dict))
-    #     if loaded and not visible and t_on_page > 30000: items.append(("AD_HIDDEN_AFTER_LOAD", "medium", 40, "Ad cloaking"))
+    if ad_events:
+        loaded = any("loaded" in str(ev.get("event", "")) for ev in ad_events if isinstance(ev, dict))
+        visible = any("viewable_50pct_1s" in str(ev.get("event", "")) for ev in ad_events if isinstance(ev, dict))
+        if loaded and not visible and t_on_page > 30000: items.append(("AD_HIDDEN_AFTER_LOAD", "medium", 40, "Ad cloaking"))
 
     if isinstance(milestones, dict):
         t_paint = milestones.get("t_first_paint")
@@ -839,13 +806,6 @@ def _check_human(behavior, events):
 
     if mousemove > 50 and scrolls > 5 and clicks > 2 and t_on_page > 15000:
         items.append(("HUMAN_RICH_INTERACTION", "human", -30, f"Rich interaction"))
-    # H-09 FIX: mobile users rarely get mousemove>50; accept touch-rich sessions as human
-    touch = safe_int(events.get("touchstart"), 0) + safe_int(events.get("touchmove"), 0)
-    if touch > 8 and scrolls > 2 and t_on_page > 12000:
-        items.append(("HUMAN_RICH_TOUCH", "human", -25, f"Rich touch interaction"))
-    form_fills = safe_int(events.get("form_fill"), 0) + safe_int(events.get("input"), 0)
-    if form_fills > 0 and t_on_page > 5000:
-        items.append(("HUMAN_FORM_FILL", "human", -15, "Form interaction"))  # L-04
     mouse_analysis = _safe_dict(behavior.get("mouse_analysis"))
     has_mouse = not mouse_analysis.get("too_few", True) and "total_points" in mouse_analysis
     if has_mouse:

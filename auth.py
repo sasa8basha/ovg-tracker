@@ -37,7 +37,7 @@ def password_strength(pw: str) -> tuple[bool, str]:
     if any(c.isupper() for c in pw): score += 1
     if any(c.isdigit() for c in pw): score += 1
     if any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?/~`" for c in pw): score += 1
-    if score < 3:  # L-20: require 3 character classes
+    if score < 2:
         return False, "كلمة المرور ضعيفة — لازم تحتوي على حرفين مختلفين على الأقل (كبير، صغير، رقم، رمز)"
     return True, ""
 
@@ -56,7 +56,6 @@ def make_token(user: UserModel) -> str:
     return f"{payload}.{sig}"
 
 def verify_token(token: str, db: Session = None):
-    # H-26: full per-session jti table is a future enhancement; token_version covers global revoke
     if not token: return None
     try:
         parts = token.split(".")
@@ -74,7 +73,7 @@ def verify_token(token: str, db: Session = None):
         if int(exp_str) < time.time(): return None
         user_id = int(user_id_str)
         if db is not None:
-            user = db.query(UserModel).filter(UserModel.id == user_id).first()  # M-55
+            user = db.query(UserModel).get(user_id)
             if not user: return None
             expected_version = int(user.token_version or 1)
             actual_version = int(version_str) if version_str else 1
@@ -88,7 +87,7 @@ def _optional_user(request: Request, db: Session):
     if token:
         uid = verify_token(token, db=db)
         if uid:
-            u = db.query(UserModel).filter(UserModel.id == uid).first()  # M-55
+            u = db.query(UserModel).get(uid)
             if u: return u
     key = request.query_params.get("key") or request.headers.get("x-api-key")
     if DASHBOARD_KEY and key == DASHBOARD_KEY:
@@ -102,8 +101,7 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> UserModel:
     return user
 
 def _hash_token(raw_token: str) -> str:
-    """HMAC-SHA256 with SECRET as key to prevent rainbow-table attacks on leaked token hashes."""
-    return hmac.new(SECRET.encode(), raw_token.encode(), hashlib.sha256).hexdigest()
+    return hashlib.sha256(raw_token.encode()).hexdigest()
 
 # =========================================================
 # OTP (One-Time Password) Logic

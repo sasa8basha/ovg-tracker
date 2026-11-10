@@ -131,7 +131,7 @@ def compute_pl(total: int, valid: int, wasted: int, buy_cpm: float, sell_cpm: fl
     profit = round(revenue - cost, 4)
     roi = round((profit / cost * 100.0), 2) if cost > 0 else 0.0
     effective_ratio = round(effective / total * 100.0, 2) if total > 0 else 0.0
-    needed_ratio = round(min(10000.0, max(0.0, (buy_cpm / sell_cpm) * 100.0)), 2)  # M-46 clamp
+    needed_ratio = round((buy_cpm / sell_cpm) * 100.0, 2)
 
     return {
         "cost": cost,
@@ -215,7 +215,7 @@ def compute_zone_score(profit: float, roi: float, bot_rate: float, wasted_rate: 
     safety_bots = max(0.0, 100.0 - bot_rate * 2.0)
     safety_wasted = max(0.0, 100.0 - wasted_rate * 1.67)
     safety_score = safety_bots * 0.70 + safety_wasted * 0.30
-    volume_score = min(100.0, total / 100.0)  # M-44: was /50 → S grade at 55 visits
+    volume_score = min(100.0, total / 50.0)
     if total >= 1000:
         stability_score = 100.0
     elif total >= 200:

@@ -6,12 +6,11 @@ import httpx
 from datetime import datetime, timedelta
 
 from database import SessionLocal
-from utils import stats_cache  # M-33
 from models import CampaignModel, VisitModel
 
 
 API_BASE = "https://api3.adsterratools.com/publisher"
-SYNC_DAYS_BACK = 1  # M-31/M-34: reduced from 3  # H-21: was 3 days → expensive
+SYNC_DAYS_BACK = 3
 
 
 def _sync_campaign_sync(campaign_id: int, api_key: str, db) -> dict:
@@ -52,26 +51,20 @@ def _sync_campaign_sync(campaign_id: int, api_key: str, db) -> dict:
             skipped += 1
             continue
         v.impressions = impressions
-        # H-22: never overwrite with lower revenue (non-monotonic API)
-        if revenue > float(v.revenue or 0):
-            v.revenue = round(revenue, 6)
+        v.revenue = round(revenue, 6)
         if clicks > 0:
             v.clicks = clicks
         updated += 1
 
     if updated > 0:
         db.commit()
-        try:
-            stats_cache.invalidate_prefix("stats:")
-        except Exception:
-            pass  # M-33
 
     return {"updated": updated, "skipped": skipped, "error": None, "items": len(items)}
 
 
 async def sync_adsterra_loop():
     while True:
-        await asyncio.sleep(1800)  # H-21: 5min → 30min
+        await asyncio.sleep(300)
         db = SessionLocal()
         try:
             campaigns = (

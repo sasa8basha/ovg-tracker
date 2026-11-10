@@ -6,7 +6,6 @@ import ipaddress
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from sqlalchemy import select
 
 from database import SessionLocal
 from models import IPIntelligence, VisitModel, IPReputationCache
@@ -38,38 +37,21 @@ def _safe_int(v):
         return None
 
 
-_mmdb_reader = None  # M-26: reuse open handle
-
-def _get_mmdb_reader():
-    global _mmdb_reader
-    if _mmdb_reader is not None:
-        return _mmdb_reader
-    try:
-        import maxminddb
-        _mmdb_reader = maxminddb.open_database(MMDB_PATH)
-    except Exception:
-        _mmdb_reader = False
-    return _mmdb_reader if _mmdb_reader is not False else None
-
 def _layer1_asn_geo(ip: str) -> Dict[str, Any]:
-    """Layer 1: ASN & hosting via local MMDB (M-26: cached reader)."""
+    """Layer 1: ASN & hosting via local MMDB."""
     if not _MAXMIND_OK:
         return {}
     try:
-        reader = _get_mmdb_reader()
-        if reader is None:
-            with maxminddb.open_database(MMDB_PATH) as reader:
-                data = reader.get(ip)
-        else:
+        with maxminddb.open_database(MMDB_PATH) as reader:
             data = reader.get(ip)
-        if not data:
-            return {}
-        return {
-            "asn": data.get("asn"),
-            "asn_description": data.get("asn_description") or data.get("autonomous_system_organization"),
-            "country": (data.get("country_code") or data.get("country", {}).get("iso_code") or "").upper()[:2] or None,
-            "is_hosting": bool(data.get("is_hosting", False)),
-        }
+            if not data:
+                return {}
+            return {
+                "asn": data.get("asn"),
+                "asn_description": data.get("asn_description") or data.get("autonomous_system_organization"),
+                "country": (data.get("country_code") or data.get("country", {}).get("iso_code") or "").upper()[:2] or None,
+                "is_hosting": bool(data.get("is_hosting", False)),
+            }
     except Exception as e:
         print(f"[IP-Intel-L1] MMDB fail for {ip}: {e}")
         return {}
@@ -140,27 +122,22 @@ def _layer3_rtt_gap(tcp_rtt: Optional[float], ws_echo: Optional[float]) -> Optio
     return {"is_proxied": False, "gap_ms": gap}
 
 
-def _layer4_behavioral(ip: str, db, campaign_id: int | None = None) -> List[Dict[str, str]]:
-    """Layer 4: cross-visit velocity & fingerprint reuse (C-14: prefer per-campaign)."""
+def _layer4_behavioral(ip: str, db) -> List[Dict[str, str]]:
+    """Layer 4: cross-visit velocity & fingerprint reuse."""
     reasons = []
     try:
         cutoff = datetime.utcnow() - timedelta(minutes=10)
-        q = db.query(VisitModel).filter(
+        count = db.query(VisitModel).filter(
             VisitModel.ip == ip,
             VisitModel.timestamp > cutoff,
-        )
-        if campaign_id is not None:
-            q = q.filter(VisitModel.campaign_id == campaign_id)
-        count = q.count()
-        # lower thresholds when scoped to a campaign (true multi-hit)
-        hi, mid = (25, 12) if campaign_id is not None else (80, 40)
-        if count >= hi:
+        ).count()
+        if count >= 20:
             reasons.append({
                 "source": "behavioral",
                 "reason": f"IP velocity: {count} visits/10min",
                 "severity": "high",
             })
-        elif count >= mid:
+        elif count >= 10:
             reasons.append({
                 "source": "behavioral",
                 "reason": f"IP velocity: {count} visits/10min",
@@ -176,7 +153,7 @@ async def _layer5_fallback(ip: str) -> Dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             r = await client.get(
-                f"https://ip-api.com/json/{ip}"
+                f"http://ip-api.com/json/{ip}"
                 f"?fields=status,countryCode,isp,as,proxy,hosting"
             )
             if r.status_code == 200:
@@ -208,7 +185,6 @@ async def classify_ip(
     ws_echo_ms: Optional[float] = None,
     db=None,
     force: bool = False,
-    campaign_id: int | None = None,
 ) -> Dict[str, Any]:
     """Classify an IP across 5 layers. Returns classification dict."""
     if not ip:
@@ -230,7 +206,7 @@ async def classify_ip(
         ).first()
 
         if cached and not force:
-            if (datetime.utcnow() - (cached.last_checked or datetime.utcnow())) < timedelta(hours=12):  # M-27: was 1h
+            if (datetime.utcnow() - (cached.last_checked or datetime.utcnow())) < timedelta(hours=1):
                 return {
                     "classification": cached.classification,
                     "risk_score": cached.risk_score or 0,
@@ -276,7 +252,7 @@ async def classify_ip(
                 classification = "proxy"
 
         # Layer 4: Behavioral
-        l4 = _layer4_behavioral(ip, db, campaign_id=campaign_id)
+        l4 = _layer4_behavioral(ip, db)
         if l4:
             all_reasons.extend(l4)
             for r in l4:
@@ -379,7 +355,7 @@ async def intelligence_worker_loop():
             await asyncio.sleep(30)
             db = SessionLocal()
             try:
-                subq = select(IPIntelligence.ip_address)
+                subq = db.query(IPIntelligence.ip_address).subquery()
                 rows = db.query(VisitModel.ip).filter(
                     VisitModel.ip.isnot(None),
                     VisitModel.ip.notin_(subq),
