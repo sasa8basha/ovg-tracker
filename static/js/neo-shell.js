@@ -91,12 +91,12 @@
   const NAV = {
     ar: [
       { group: 'التحليل', items: [
-        { id: 'dashboard',  label: 'لوحة التحكم', icon: 'dashboard',  href: '/v2/dashboard' },
-        { id: 'live',       label: 'المراقبة المباشرة', icon: 'live',       href: '/live' },
-        { id: 'radar',      label: 'الرادار',        icon: 'radar',      href: '/radar' },
+        { id: 'dashboard',  label: 'لوحة التحكم', icon: 'dashboard',  href: '/dashboard' },
+        { id: 'live',       label: 'Live Monitor', icon: 'live',       href: '/live' },
+        { id: 'radar',      label: 'Radar',        icon: 'radar',      href: '/radar' },
         { id: 'visits',     label: 'الزيارات',     icon: 'visits',     href: '/visits' },
         { id: 'labeling',   label: 'المراجعة',     icon: 'labeling',   href: '/labeling', badge: 'labeling' },
-        { id: 'sessions',   label: 'الجلسات',     icon: 'sessions',   href: '/sessions' },
+        { id: 'sessions',   label: 'Sessions',     icon: 'sessions',   href: '/sessions' },
       ]},
       { group: 'التحليل المتقدم', items: [
         { id: 'ip-lists', label: 'قوائم IP',          icon: 'shield', href: '/ip-lists' },
@@ -104,8 +104,8 @@
       ]},
       { group: 'الحملات', items: [
         { id: 'campaigns', label: 'كل الحملات',      icon: 'campaigns', href: '/campaigns' },
-        { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/v2/reports' },
-        { id: 'analytics', label: 'تحليل المناطق',  icon: 'analytics', href: '/zone-analytics' },
+        { id: 'smart',     label: 'التقارير الذكية', icon: 'money',     href: '/smart-reports' },
+        { id: 'analytics', label: 'Zone Analytics',  icon: 'analytics', href: '/zone-analytics' },
       ]},
       { group: 'التقارير والإثباتات', items: [
         { id: 'popads-report',   label: 'استرداد PopAds', icon: 'refund', href: '/popads-report' },
@@ -121,7 +121,7 @@
     ],
     en: [
       { group: 'Analyze', items: [
-        { id: 'dashboard',  label: 'Dashboard',    icon: 'dashboard',  href: '/v2/dashboard' },
+        { id: 'dashboard',  label: 'Dashboard',    icon: 'dashboard',  href: '/dashboard' },
         { id: 'live',       label: 'Live Monitor', icon: 'live',       href: '/live' },
         { id: 'radar',      label: 'Radar',        icon: 'radar',      href: '/radar' },
         { id: 'visits',     label: 'Visits',       icon: 'visits',     href: '/visits' },
@@ -134,7 +134,7 @@
       ]},
       { group: 'Campaigns', items: [
         { id: 'campaigns', label: 'All Campaigns',  icon: 'campaigns', href: '/campaigns' },
-        { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/v2/reports' },
+        { id: 'smart',     label: 'Smart Reports',  icon: 'money',     href: '/smart-reports' },
         { id: 'analytics', label: 'Zone Analytics', icon: 'analytics', href: '/zone-analytics' },
       ]},
       { group: 'Reports & Proofs', items: [
@@ -219,24 +219,12 @@
       }
     }
 
-    // L-13: pause dismiss on hover
-    let remaining = duration;
-    let start = Date.now();
-    let timer = setTimeout(hide, remaining);
-    function hide() {
+    setTimeout(() => {
       if (el.parentNode) {
         el.classList.add('neo-hiding');
         setTimeout(() => el.remove(), 200);
       }
-    }
-    el.addEventListener('mouseenter', () => {
-      clearTimeout(timer);
-      remaining -= (Date.now() - start);
-    });
-    el.addEventListener('mouseleave', () => {
-      start = Date.now();
-      timer = setTimeout(hide, Math.max(remaining, 800));
-    });
+    }, duration);
   }
 
   // =========================================================
@@ -723,9 +711,9 @@
     if (grade === 'F' || grade === 'D' || (trust !== undefined && trust < 40)) {
       actions.push({ id: 'blacklist', icon: 'ban', label: 'حظر فوري', cls: 'neo-danger', kbd: 'X' });
     }
-    actions.push({ id: 'pause', icon: 'pause', label: 'إيقاف 24 ساعة', cls: 'neo-warning', kbd: 'P' });
+    actions.push({ id: 'pause', icon: 'pause', label: 'Pause 24h', cls: 'neo-warning', kbd: 'P' });
     if (grade === 'S' || grade === 'A' || (trust !== undefined && trust > 70)) {
-      actions.push({ id: 'scale', icon: 'scale', label: 'زيادة 30%', cls: 'neo-success', kbd: '+' });
+      actions.push({ id: 'scale', icon: 'scale', label: 'Scale +30%', cls: 'neo-success', kbd: '+' });
     }
     actions.push({ id: 'details', icon: 'eye', label: 'التفاصيل', cls: '', kbd: '↵' });
 
@@ -755,13 +743,10 @@
 
     const rect = targetEl.getBoundingClientRect();
     const menuW = 200;
-    const menuH = Math.min(menu.offsetHeight || 200, 280);
     let left = rect.left - menuW - 8;
-    if (left < 8) left = Math.min(rect.right + 8, window.innerWidth - menuW - 8);
-    left = Math.max(8, Math.min(left, window.innerWidth - menuW - 8)); // L-15
+    if (left < 8) left = rect.right + 8;
     let top = rect.top;
-    if (top + menuH > window.innerHeight - 8) top = window.innerHeight - menuH - 8;
-    top = Math.max(8, top);
+    if (top + 200 > window.innerHeight) top = window.innerHeight - 210;
 
     menu.style.left = left + 'px';
     menu.style.top = top + 'px';
@@ -785,7 +770,7 @@
 
   async function applyZoneAction(targetEl, zoneId, action) {
     if (action === 'details') {
-      window.location.href = `/v2/reports?zone=${encodeURIComponent(zoneId)}`;
+      window.location.href = `/smart-reports?zone=${encodeURIComponent(zoneId)}`;
       return;
     }
 
@@ -802,7 +787,7 @@
         }),
       });
 
-      const actionLabels = { blacklist: 'حظر', pause: 'إيقاف', scale: 'زيادة 30%' };
+      const actionLabels = { blacklist: 'حظر', pause: 'Pause', scale: 'Scale +30%' };
       targetEl.classList.add('neo-action-applied');
 
       toast(`${actionLabels[action] || action} — ${zoneId}`, 'success', 5000, {
@@ -917,9 +902,7 @@
   // MOUNT
   // =========================================================
   async function mount(opts = {}) {
-    // L-12: prevent concurrent mount
-    if (S.mounted || S._mounting) return null;
-    S._mounting = true;
+    if (S.mounted) return null;
 
     S.active = opts.active || 'dashboard';
     S.lang = opts.lang || 'ar';
@@ -999,10 +982,10 @@
 
     refreshMoneyPulse();
     refreshAttention();
-    S.pulseTimer = setInterval(function(){ if (!document.hidden) refreshMoneyPulse(); }, 30000);  /* L-14 */
-    S.attentionTimer = setInterval(function(){ if (!document.hidden) refreshAttention(); }, 60000);  /* M-53 */
+    S.pulseTimer = setInterval(refreshMoneyPulse, 30000);
+    S.attentionTimer = setInterval(refreshAttention, 60000);
 
-    S.mounted = true; S._mounting = false;
+    S.mounted = true;
     return appRoot;
   }
 
