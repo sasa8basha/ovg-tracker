@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OVG · تحليل المناطق</title>
+  <title>OVG · Zone Analytics</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -222,7 +222,7 @@
 
   <div class="za-shell-skel" id="bootSkeleton">
     <div class="spinner"></div>
-    <div>جاري تحميل تحليل المناطق…</div>
+    <div>جاري تحميل Zone Analytics…</div>
   </div>
 
   <div id="neoAppRoot" style="display:none;">
@@ -230,7 +230,7 @@
 
       <div class="za-header">
         <div>
-          <h1 class="za-header-title">🚨 تحليل المناطق</h1>
+          <h1 class="za-header-title">🚨 Zone Analytics</h1>
           <div class="za-header-sub">تتبع اتجاه كل زون وكشف الـ anomalies في آخر 24 ساعة</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -261,7 +261,7 @@
               <tr>
                 <th>الزون</th>
                 <th class="neo-cell-center">Sparkline</th>
-                <th class="neo-cell-center">نسبة البوت</th>
+                <th class="neo-cell-center">Bot Rate</th>
                 <th class="neo-cell-center">Baseline</th>
                 <th class="neo-cell-center">آخر ساعة</th>
                 <th class="neo-cell-center">Z-score</th>
@@ -590,7 +590,7 @@
         await Neo.mount({
           active: 'analytics',
           lang: 'ar',
-          breadcrumb: [{ label: 'الحملات' }, { label: 'تحليل المناطق' }],
+          breadcrumb: [{ label: 'الحملات' }, { label: 'Zone Analytics' }],
         });
 
         document.getElementById('bootSkeleton').style.display = 'none';

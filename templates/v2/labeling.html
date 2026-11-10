@@ -383,12 +383,12 @@
                   <input type="checkbox" class="neo-table-checkbox" id="lblSelectAll">
                 </th>
                 <th>#</th>
-                <th class="neo-cell-center">النقاط</th>
-                <th class="neo-cell-center">الحكم</th>
-                <th>الدولة</th>
-                <th>المتصفح</th>
-                <th>رقم الشبكة</th>
-                <th>أقوى الأدلة</th>
+                <th class="neo-cell-center">Score</th>
+                <th class="neo-cell-center">Verdict</th>
+                <th>Country</th>
+                <th>Browser</th>
+                <th>ASN</th>
+                <th>Top Evidence</th>
                 <th class="neo-cell-center">Decision</th>
               </tr>
             </thead>
@@ -424,13 +424,13 @@
           <table class="neo-table">
             <thead>
               <tr>
-                <th>الكود</th>
-                <th>المصدر</th>
+                <th>Code</th>
+                <th>Source</th>
                 <th class="neo-cell-center" style="color: var(--neo-success);">TP</th>
                 <th class="neo-cell-center" style="color: var(--neo-danger);">FP</th>
-                <th class="neo-cell-center">غير مصنف</th>
+                <th class="neo-cell-center">Unlabeled</th>
                 <th class="neo-cell-center">Precision</th>
-                <th class="neo-cell-center">الحالة</th>
+                <th class="neo-cell-center">Status</th>
               </tr>
             </thead>
             <tbody id="lblRulesBody">
@@ -615,11 +615,6 @@
 
     async function bulkLabel(label) {
       if (LBL.selected.size === 0) return;
-      // H-12: enforce API max 200 client-side
-      if (LBL.selected.size > 200) {
-        Neo.toast('الحد الأقصى 200 زيارة في المرة', 'error');
-        return;
-      }
       const ids = Array.from(LBL.selected);
 
       try {

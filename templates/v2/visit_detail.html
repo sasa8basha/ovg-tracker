@@ -490,7 +490,7 @@
                   </svg>
                   <div class="vd-score-val">
                     <div class="vd-score-num" id="vdScore">0</div>
-                    <div class="vd-score-label">نقاط الخطر</div>
+                    <div class="vd-score-label">Risk Score</div>
                   </div>
                 </div>
                 <div class="vd-verdict-text" id="vdVerdictText">—</div>
@@ -501,7 +501,7 @@
                 <div class="vd-box-title">💰 الأرباح</div>
                 <div class="vd-kv-grid" style="grid-template-columns: 1fr 1fr 1fr;">
                   <div class="vd-kv">
-                    <div class="vd-kv-label">العطاء</div>
+                    <div class="vd-kv-label">BID</div>
                     <div class="vd-kv-value" id="vdBid" style="color: var(--neo-danger);">$0.00</div>
                   </div>
                   <div class="vd-kv">
@@ -539,13 +539,13 @@
                 <div class="vd-box-title">🌐 IP Intelligence</div>
                 <div class="vd-kv-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
                   <div class="vd-kv"><div class="vd-kv-label">IP</div><div class="vd-kv-value" id="vdIpIntelIp" style="font-size: 10px;">—</div></div>
-                  <div class="vd-kv"><div class="vd-kv-label">الدولة</div><div class="vd-kv-value" id="vdIpIntelCountry">—</div></div>
-                  <div class="vd-kv"><div class="vd-kv-label">مزود الخدمة</div><div class="vd-kv-value" id="vdIpIntelIsp" style="font-size: 10px;">—</div></div>
-                  <div class="vd-kv"><div class="vd-kv-label">رقم الشبكة</div><div class="vd-kv-value" id="vdIpIntelAsn">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Country</div><div class="vd-kv-value" id="vdIpIntelCountry">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">ISP</div><div class="vd-kv-value" id="vdIpIntelIsp" style="font-size: 10px;">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">ASN</div><div class="vd-kv-value" id="vdIpIntelAsn">—</div></div>
                 </div>
                 <div style="margin-top: var(--neo-sp-2);">
                   <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                    <span style="font-size: 10px; color: var(--neo-fg-tertiary);">نقاط الخطر</span>
+                    <span style="font-size: 10px; color: var(--neo-fg-tertiary);">Risk Score</span>
                     <span class="neo-mono" style="font-size: 12px; font-weight: 700;" id="vdIpRiskScore">0</span>
                   </div>
                   <div class="vd-risk-bar"><div class="vd-risk-bar-fill" id="vdIpRiskBar"></div></div>
@@ -562,11 +562,11 @@
                 <div class="vd-box-title">💻 الجهاز والبصمة</div>
                 <div class="vd-kv-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
                   <div class="vd-kv"><div class="vd-kv-label">OS</div><div class="vd-kv-value" id="vdOs">—</div></div>
-                  <div class="vd-kv"><div class="vd-kv-label">المتصفح</div><div class="vd-kv-value" id="vdBrowser">—</div></div>
-                  <div class="vd-kv"><div class="vd-kv-label">الجهاز</div><div class="vd-kv-value" id="vdDevice">—</div></div>
-                  <div class="vd-kv"><div class="vd-kv-label">الأجهزة</div><div class="vd-kv-value" id="vdHardware">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Browser</div><div class="vd-kv-value" id="vdBrowser">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Device</div><div class="vd-kv-value" id="vdDevice">—</div></div>
+                  <div class="vd-kv"><div class="vd-kv-label">Hardware</div><div class="vd-kv-value" id="vdHardware">—</div></div>
                   <div class="vd-kv" style="grid-column: span 2;"><div class="vd-kv-label">Canvas</div><div class="vd-kv-value" id="vdCanvas" style="font-size: 10px;">—</div></div>
-                  <div class="vd-kv" style="grid-column: span 2;"><div class="vd-kv-label">المنطقة</div><div class="vd-kv-value" id="vdZone">—</div></div>
+                  <div class="vd-kv" style="grid-column: span 2;"><div class="vd-kv-label">Zone</div><div class="vd-kv-value" id="vdZone">—</div></div>
                 </div>
               </div>
             </div>
@@ -579,7 +579,7 @@
             <div class="vd-box-title">🎯 القرار النهائي</div>
             <div class="vd-decision-row">
               <div class="vd-decision-box">
-                <div class="vd-decision-label">الحكم</div>
+                <div class="vd-decision-label">Verdict</div>
                 <div class="vd-decision-value" id="vdDecVerdict">—</div>
               </div>
               <div class="vd-decision-box">
@@ -640,7 +640,7 @@
                 <div class="vd-decision-value" id="vdDqCompleteness">—</div>
               </div>
               <div class="vd-decision-box">
-                <div class="vd-decision-label">الموثوقية</div>
+                <div class="vd-decision-label">Reliability</div>
                 <div class="vd-decision-value" id="vdDqReliability">—</div>
               </div>
               <div class="vd-decision-box">
@@ -656,7 +656,7 @@
               🔔 Signals (<span id="vdSigCount">0</span>)
               <div style="margin-right:auto;display:flex;gap:4px;">
                 <button class="neo-btn neo-btn-secondary neo-btn-xs" data-sig-filter="all" style="padding: 3px 10px;">الكل</button>
-                <button class="neo-btn neo-btn-ghost neo-btn-xs" data-sig-filter="bot" style="padding: 3px 10px;">بوت</button>
+                <button class="neo-btn neo-btn-ghost neo-btn-xs" data-sig-filter="bot" style="padding: 3px 10px;">Bot</button>
                 <button class="neo-btn neo-btn-ghost neo-btn-xs" data-sig-filter="human" style="padding: 3px 10px;">Human</button>
               </div>
             </div>

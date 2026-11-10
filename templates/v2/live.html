@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OVG · المراقبة المباشرة</title>
+  <title>OVG · Live Monitor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -472,7 +472,7 @@
 
   <div class="lv-shell-skel" id="bootSkeleton">
     <div class="spinner"></div>
-    <div>جاري تحميل المراقبة المباشرة…</div>
+    <div>جاري تحميل Live Monitor…</div>
   </div>
 
   <div id="neoAppRoot" style="display:none;">
@@ -481,7 +481,7 @@
       <div class="lv-header">
         <div>
           <h1 class="lv-header-title">
-            المراقبة المباشرة
+            Live Monitor
             <span class="lv-rec-badge"><span class="lv-rec-dot"></span> LIVE</span>
             <span class="lv-conn-badge off" id="lvConnBadge">⚪ غير متصل</span>
           </h1>
@@ -504,7 +504,7 @@
           <div class="lv-kpi-sub" id="lvKpiTodaySub">—</div>
         </div>
         <div class="lv-kpi" style="--kpi-color: var(--neo-danger);">
-          <div class="lv-kpi-label">نسبة البوت</div>
+          <div class="lv-kpi-label">Bot Rate</div>
           <div class="lv-kpi-value" id="lvKpiBotRate" style="color: var(--neo-danger);">0%</div>
           <div class="lv-kpi-sub" id="lvKpiBotSub">—</div>
         </div>
@@ -972,7 +972,7 @@
         await Neo.mount({
           active: 'live',
           lang: 'ar',
-          breadcrumb: [{ label: 'المراقبة المباشرة' }],
+          breadcrumb: [{ label: 'Live Monitor' }],
         });
 
         document.getElementById('bootSkeleton').style.display = 'none';

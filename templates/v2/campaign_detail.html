@@ -474,9 +474,9 @@
           <div class="cd-info-item"><div class="cd-info-label">المصدر</div><div class="cd-info-value" id="cdInfoSource">—</div></div>
           <div class="cd-info-item"><div class="cd-info-label">الوجهة</div><div class="cd-info-value" id="cdInfoDest">—</div></div>
           <div class="cd-info-item"><div class="cd-info-label">Buy CPM</div><div class="cd-info-value" id="cdInfoBuy">—</div></div>
-          <div class="cd-info-item"><div class="cd-info-label">بيع CPM</div><div class="cd-info-value" id="cdInfoSell">—</div></div>
-          <div class="cd-info-item"><div class="cd-info-label">رقم المنطقة</div><div class="cd-info-value" id="cdInfoZone">—</div></div>
-          <div class="cd-info-item"><div class="cd-info-label">مفتاح الحملة</div><div class="cd-info-value" id="cdInfoKey" style="font-size:10px;">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">Sell CPM</div><div class="cd-info-value" id="cdInfoSell">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">Zone ID</div><div class="cd-info-value" id="cdInfoZone">—</div></div>
+          <div class="cd-info-item"><div class="cd-info-label">Campaign Key</div><div class="cd-info-value" id="cdInfoKey" style="font-size:10px;">—</div></div>
         </div>
       </div>
 
@@ -503,11 +503,11 @@
             <span class="neo-field-hint">100-2000 ms</span>
           </div>
           <div class="neo-field">
-            <label class="neo-field-label">رقم حملة مصدر الترافيك</label>
+            <label class="neo-field-label">Traffic Source Campaign ID</label>
             <input type="text" id="cdAdvSourceId" class="neo-input" placeholder="e.g. 123456" maxlength="100">
           </div>
           <div class="neo-field" style="grid-column: 1 / -1;">
-            <label class="neo-field-label">ملاحظات</label>
+            <label class="neo-field-label">Notes</label>
             <textarea id="cdAdvNotes" class="neo-textarea" placeholder="ملاحظات داخلية..." maxlength="1000"></textarea>
           </div>
         </div>
@@ -839,11 +839,11 @@
               <div class="cd-kpi-value">${fmtInt(t.impressions)}</div>
             </div>
             <div class="cd-kpi">
-              <div class="cd-kpi-label">النقرات</div>
+              <div class="cd-kpi-label">Clicks</div>
               <div class="cd-kpi-value">${fmtInt(t.clicks)}</div>
             </div>
             <div class="cd-kpi">
-              <div class="cd-kpi-label">الإيرادات</div>
+              <div class="cd-kpi-label">Revenue</div>
               <div class="cd-kpi-value" style="color: var(--neo-success);">${fmtMoney4(t.revenue)}</div>
             </div>
             <div class="cd-kpi">

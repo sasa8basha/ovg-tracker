@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OVG · تفاصيل الجلسة</title>
+  <title>OVG · Session Detail</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -273,7 +273,7 @@
       <div id="sdError" style="display:none;text-align:center;padding:40px;color:var(--neo-danger);">
         <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
         <div id="sdErrorMsg" style="font-size:14px;margin-bottom:16px;">—</div>
-        <a href="/v2/sessions" class="neo-btn neo-btn-primary" style="text-decoration:none;">← رجوع للجلسات</a>
+        <a href="/v2/sessions" class="neo-btn neo-btn-primary" style="text-decoration:none;">← رجوع للـ Sessions</a>
       </div>
 
       <div id="sdContent" style="display:none;">
@@ -287,7 +287,7 @@
             </div>
             <div class="sd-header-sub" id="sdSub">—</div>
           </div>
-          <a href="/v2/sessions" class="neo-btn neo-btn-ghost neo-btn-sm" style="text-decoration:none;">← الجلسات</a>
+          <a href="/v2/sessions" class="neo-btn neo-btn-ghost neo-btn-sm" style="text-decoration:none;">← Sessions</a>
         </div>
 
         <div class="sd-kpis" id="sdKpis"></div>
@@ -423,9 +423,9 @@
 
       let html = `<div style="overflow-x:auto;"><table class="sd-hb-table">
         <thead><tr>
-          <th class="center">#</th><th>الوقت</th><th class="center">فجوة</th>
-          <th class="center">النقرات</th><th class="center">التمرير</th><th class="center">حركات</th>
-          <th class="center">مفاتيح</th><th class="center">مرئي</th><th class="center">مركز</th>
+          <th class="center">#</th><th>الوقت</th><th class="center">Gap</th>
+          <th class="center">Clicks</th><th class="center">Scrolls</th><th class="center">Moves</th>
+          <th class="center">Keys</th><th class="center">Visible</th><th class="center">Focused</th>
         </tr></thead><tbody>`;
 
       for (const hb of hbs) {
@@ -463,18 +463,18 @@
 
       document.getElementById('sdVisitBody').innerHTML = `
         <div class="sd-kv-grid" style="margin-bottom:var(--neo-sp-3);">
-          <div class="sd-kv"><div class="sd-kv-label">الحكم</div><div class="sd-kv-value" style="color:${visit.verdict === 'valid' ? 'var(--neo-success)' : visit.verdict === 'invalid' ? 'var(--neo-danger)' : 'var(--neo-warning)'};">${esc((visit.verdict || '').toUpperCase())}</div></div>
-          <div class="sd-kv"><div class="sd-kv-label">النقاط</div><div class="sd-kv-value">${visit.score}</div></div>
-          <div class="sd-kv"><div class="sd-kv-label">وقت الصفحة</div><div class="sd-kv-value">${esc(visit.time_on_page_human || '—')}</div></div>
-          <div class="sd-kv"><div class="sd-kv-label">الدولة</div><div class="sd-kv-value">${esc(visit.country || '—')}</div></div>
-          <div class="sd-kv"><div class="sd-kv-label">الجهاز</div><div class="sd-kv-value">${esc(visit.device || '—')}</div></div>
-          <div class="sd-kv"><div class="sd-kv-label">المتصفح</div><div class="sd-kv-value">${esc(visit.browser || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Verdict</div><div class="sd-kv-value" style="color:${visit.verdict === 'valid' ? 'var(--neo-success)' : visit.verdict === 'invalid' ? 'var(--neo-danger)' : 'var(--neo-warning)'};">${esc((visit.verdict || '').toUpperCase())}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Score</div><div class="sd-kv-value">${visit.score}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Time on Page</div><div class="sd-kv-value">${esc(visit.time_on_page_human || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Country</div><div class="sd-kv-value">${esc(visit.country || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Device</div><div class="sd-kv-value">${esc(visit.device || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Browser</div><div class="sd-kv-value">${esc(visit.browser || '—')}</div></div>
           <div class="sd-kv"><div class="sd-kv-label">OS</div><div class="sd-kv-value">${esc(visit.os || '—')}</div></div>
-          <div class="sd-kv"><div class="sd-kv-label">مزود الخدمة</div><div class="sd-kv-value">${esc(visit.isp || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">ISP</div><div class="sd-kv-value">${esc(visit.isp || '—')}</div></div>
           <div class="sd-kv"><div class="sd-kv-label">VPN</div><div class="sd-kv-value" style="color:${visit.is_vpn ? 'var(--neo-danger)' : 'var(--neo-success)'};">${visit.is_vpn ? 'YES' : 'NO'}</div></div>
           <div class="sd-kv"><div class="sd-kv-label">Honeypot</div><div class="sd-kv-value" style="color:${visit.is_honeypot_triggered ? 'var(--neo-danger)' : 'var(--neo-fg-muted)'};">${visit.is_honeypot_triggered ? 'TRIGGERED' : 'no'}</div></div>
           <div class="sd-kv"><div class="sd-kv-label">Canvas</div><div class="sd-kv-value" style="font-size:10px;">${esc(visit.canvas_hash || '—')}</div></div>
-          <div class="sd-kv"><div class="sd-kv-label">الأجهزة</div><div class="sd-kv-value">${esc(visit.hardware || '—')}</div></div>
+          <div class="sd-kv"><div class="sd-kv-label">Hardware</div><div class="sd-kv-value">${esc(visit.hardware || '—')}</div></div>
         </div>
         <div style="text-align:center;margin-top:var(--neo-sp-3);">
           <a href="/v2/visits/${visit.id}" class="neo-btn neo-btn-primary neo-btn-sm" style="text-decoration:none;">🔍 افتح صفحة الزيارة الكاملة</a>
@@ -613,7 +613,7 @@
           active: 'sessions',
           lang: 'ar',
           breadcrumb: [
-            { label: 'الجلسات', href: '/v2/sessions' },
+            { label: 'Sessions', href: '/v2/sessions' },
             { label: '#' + SD.sessionId.substring(0, 8) },
           ],
         });

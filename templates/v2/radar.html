@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OVG · رادار خطر الحظر</title>
+  <title>OVG · Ban Risk Radar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -261,7 +261,7 @@
 
   <div class="rd-shell-skel" id="bootSkeleton">
     <div class="spinner"></div>
-    <div>جاري تحميل الرادار…</div>
+    <div>جاري تحميل Radar…</div>
   </div>
 
   <div id="neoAppRoot" style="display:none;">
@@ -269,7 +269,7 @@
 
       <div class="rd-header">
         <div>
-          <h1 class="rd-header-title">🎯 رادار خطر الحظر</h1>
+          <h1 class="rd-header-title">🎯 Ban Risk Radar</h1>
           <div class="rd-header-sub">
             <span>مؤشر خطر حظر Adsterra — 6 عوامل</span>
             <span class="rd-last-updated" id="rdLastUpdated">—</span>
@@ -284,7 +284,7 @@
       <!-- Gauge Hero -->
       <div class="rd-hero" id="rdHero" style="display:none;">
         <div class="rd-gauge-wrap">
-          <svg class="rd-gauge" viewBox="0 0 280 280" aria-label="خطر الحظر Gauge">
+          <svg class="rd-gauge" viewBox="0 0 280 280" aria-label="Ban Risk Gauge">
             <g id="rdTicks"></g>
             <circle cx="140" cy="140" r="128" fill="none" stroke="var(--neo-border-default)" stroke-width="3" opacity="0.35"/>
             <g id="rdZoneSegments"></g>
@@ -312,7 +312,7 @@
             <div class="rd-qm-value" id="rdQmTotal">—</div>
           </div>
           <div class="rd-qm">
-            <div class="rd-qm-label">نسبة البوت</div>
+            <div class="rd-qm-label">Bot Rate</div>
             <div class="rd-qm-value" id="rdQmBot" style="color: var(--neo-danger);">—</div>
           </div>
           <div class="rd-qm">
@@ -320,7 +320,7 @@
             <div class="rd-qm-value" id="rdQmHuman" style="color: var(--neo-success);">—</div>
           </div>
           <div class="rd-qm">
-            <div class="rd-qm-label">المناطق</div>
+            <div class="rd-qm-label">Zones</div>
             <div class="rd-qm-value" id="rdQmZones">—</div>
           </div>
         </div>
@@ -579,7 +579,7 @@
               <div class="rd-factor-bar-fill" style="width: ${score}%; background: ${barColor};"></div>
             </div>
             <div class="rd-factor-score">
-              <span style="color: var(--neo-fg-tertiary);">الأمان</span>
+              <span style="color: var(--neo-fg-tertiary);">Safety</span>
               <span style="font-family: var(--neo-font-mono); font-weight: 800; color: ${barColor};">${score}%</span>
             </div>
           </div>
@@ -616,7 +616,7 @@
 
         <div class="neo-mb-4">
           <div class="neo-flex neo-justify-between neo-mb-1">
-            <span class="neo-text-xs neo-fg-tertiary">نقاط الأمان</span>
+            <span class="neo-text-xs neo-fg-tertiary">Safety Score</span>
             <span class="neo-mono neo-font-extrabold" style="color: ${barColor};">${factor.score}%</span>
           </div>
           <div style="height: 8px; background: var(--neo-bg-elevated); border-radius: 4px; overflow: hidden;">
@@ -703,7 +703,7 @@
         data: {
           labels,
           datasets: [{
-            label: 'خطر الحظر',
+            label: 'Ban Risk',
             data,
             borderColor: '#6366F1',
             backgroundColor: 'rgba(99,102,241,0.10)',
@@ -732,7 +732,7 @@
               cornerRadius: 6,
               displayColors: false,
               callbacks: {
-                label: (ctx) => 'خطر الحظر: ' + ctx.parsed.y,
+                label: (ctx) => 'Ban Risk: ' + ctx.parsed.y,
               },
             },
           },
@@ -852,7 +852,7 @@
         await Neo.mount({
           active: 'radar',
           lang: 'ar',
-          breadcrumb: [{ label: 'الرادار' }],
+          breadcrumb: [{ label: 'Radar' }],
         });
 
         document.getElementById('bootSkeleton').style.display = 'none';
