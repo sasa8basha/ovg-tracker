@@ -29,7 +29,6 @@ from collector.interstitial_template import INTERSTITIAL_HTML
 from collector.header_analyzer import analyze_headers
 from helpers import extract_zone_id_from_url, extract_macros
 
-# ✅ استيراد الفلتر السريع
 from collector.fast_ip_filter import check_ip_fast
 
 router = APIRouter()
@@ -106,7 +105,8 @@ def _extract_zone(payload_url: str, tracking_params: dict, campaign) -> tuple:
         for key in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z", "zn", "zid"):
             if key in tp_lower and tp_lower[key]:
                 val = str(tp_lower[key]).strip()[:100]
-                if val and not val.startswith("["):
+                # ✅ لو الماكرو مارجعش رقم (زي [WEBSITEID])، متسجلوش
+                if val and not val.startswith("[") and val.lower() not in ("websiteid", "zoneid", "unknown", "none"):
                     return val, f"macro_{key}"
     except Exception:
         pass
@@ -150,7 +150,6 @@ def _compute_cross_visit_signals(db: Session, client_ip: str, canvas_hash: str) 
 
 
 def _log_blocked_visit_in_background(campaign_id, session_id, client_ip, zone_id, reason, ua):
-    """تسجيل الزيارة المحظورة في الداتابيز بدون تعطيل سرعة الرد"""
     db = SessionLocal()
     try:
         visit = VisitModel(
@@ -218,9 +217,7 @@ async def precheck(
 
     client_ip = get_client_ip(request)
     
-    # =========================================================
-    # ⚡ FAST IP FILTER (Zero-Latency) — الفحص في الذاكرة
-    # =========================================================
+    # ⚡ 1. الفحص السريع من الذاكرة
     fast_check = check_ip_fast(client_ip)
     
     if fast_check["blocked"]:
@@ -240,16 +237,13 @@ async def precheck(
         )
         return {"action": "block", "url": None, "score": 100, "reasons": [reason]}
 
-    # =========================================================
-    # ⚡ API PROXY CHECK (خط دفاع تاني للـ Residential Proxies)
-    # =========================================================
+    # ⚡ 2. خط الدفاع التاني (بنستنى 250 مللي ثانية عشان نضمن الرد)
     try:
         from analysis import get_ip_info
         
-        # بنستنى 50 مللي ثانية بس، لو مجابش نتيجة بسرعة منعطلوش
-        ip_info = await asyncio.wait_for(get_ip_info(client_ip), timeout=0.050) 
+        ip_info = await asyncio.wait_for(get_ip_info(client_ip), timeout=0.250) 
         
-        if ip_info and (ip_info.get("security", {}).get("vpn") or ip_info.get("security", {}).get("proxy")):
+        if ip_info and (ip_info.get("security", {}).get("vpn") or ip_info.get("security", {}).get("proxy") or ip_info.get("type") == "hosting"):
             c = db.query(CampaignModel).filter(CampaignModel.campaign_key == payload.campaign_key).first()
             zone_id = _extract_zone(payload.url or "", payload.tracking_params or {}, c)[0]
             ua = str((payload.nav or {}).get("ua") or "")
@@ -264,10 +258,9 @@ async def precheck(
             )
             return {"action": "block", "url": None, "score": 100, "reasons": ["PROXY_VPN_API"]}
     except asyncio.TimeoutError:
-        pass  # لو الـ API اتأخر، كمّل عادي
+        pass
     except Exception:
-        pass  # لو حصل أي خطأ، كمّل عادي
-    # =========================================================
+        pass
 
     try:
         handshake_limiter.check(f"isc:{client_ip}")
