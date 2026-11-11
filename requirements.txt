@@ -10,6 +10,8 @@ python-dotenv>=1.0.0
 jinja2>=3.1.0
 httpx>=0.26.0
 user-agents>=2.2.0
+maxminddb>=2.6.0
+pytricia>=1.0.0
 
 # Migrations (P1 — replaces manual ALTER TABLE)
 alembic>=1.13.0,<2.0
