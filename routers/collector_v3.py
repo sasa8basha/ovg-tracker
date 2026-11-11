@@ -327,6 +327,10 @@ async def collect_handshake(
         raise HTTPException(404, "Collector disabled")
 
     client_ip = get_client_ip(request)
+    # ⚡ Fast IP Filter (Zero-Latency)
+from collector.fast_ip_filter import check_ip_fast
+if check_ip_fast(client_ip)["blocked"]:
+    return {"ok": False, "hide": True, "reason": "FAST_FILTER_BLOCK", "duplicate": False}
     handshake_limiter.check(client_ip)
     session_id = _validate_session_id(payload.session_id)
 
