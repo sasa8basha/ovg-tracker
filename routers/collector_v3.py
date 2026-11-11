@@ -1,34 +1,5 @@
 """
-routers/collector_v3.py — Collector v3 API (v4.2.2 — high-severity fixes)
-
-Fixes over v4.2.1:
-    - `_compute_fp_hash(fp, nav)` — now uses nav.language and nav.platform
-      instead of fp.get("language") which was always None. This makes
-      fingerprint hashes more diverse and prevents bots with same canvas
-      but different languages from being grouped.
-
-    - `_check_flood(ip, campaign_id, db)` — now filters by campaign.
-      CGNAT / shared ISP IPs could trigger rate limits across campaigns.
-      Filtering by campaign makes the limit per-campaign.
-
-    - Cross-visit counters now filtered by campaign_id:
-        same_ip_last_minute, same_canvas_ip_count, same_ip_canvas_count.
-      Prevents shared-IP false positives when a single IP hits multiple
-      campaigns with different visitors.
-
-    - `_finalize_stale_session` passes `None` (not `{}`) for headers.
-      Combined with the orchestrator fix, this prevents the
-      MISSING_SEC_CH_UA false positive on stale sessions.
-
-    - canvas_hash stored at 32 chars instead of 15+"..." for better
-      cross-visit matching accuracy.
-
-Previous (v4.2.1):
-    - Zone extraction: helpers → analysis → tracking_params → campaign default
-    - ip_info is persisted in session.meta at handshake time
-    - final processor reads ip_info from session.meta (no asyncio.run in threads)
-    - _fetch_ip_info_sync() for safe fallback
-    - stale_session_finalizer_loop() — converts stuck PENDING sessions
+routers/collector_v3.py — Collector v3 API (v4.3 — Fast IP Filter Integration)
 """
 import json
 import asyncio
@@ -57,6 +28,8 @@ from collector.filter_engine import evaluate_visit
 from collector.decision import mode_from_block_threshold
 from helpers import extract_zone_id_from_url
 
+# ✅ استيراد الفلتر السريع
+from collector.fast_ip_filter import check_ip_fast
 
 router = APIRouter()
 
@@ -139,7 +112,7 @@ def _extract_macros(tp: dict) -> dict:
 
 
 # =========================================================
-# Zone extraction — try everything before falling back
+# Zone extraction — Prioritize macros
 # =========================================================
 def _extract_zone_from_payload(url: str, tracking_params: dict, campaign) -> tuple:
     """Returns (zone_id, source)."""
@@ -261,18 +234,9 @@ def _resolve_campaign(campaign_key: str, db: Session):
 
 
 # =========================================================
-# FINGERPRINT HASH (v4.2.2 — uses nav.language + nav.platform)
+# FINGERPRINT HASH
 # =========================================================
 def _compute_fp_hash(fp: dict, nav: dict) -> str:
-    """
-    v4.2.2 FIX:
-      - Previously used fp.get("language") which was always None
-        (language lives on `nav`, not `fp`).
-      - Now includes nav.language AND nav.platform for proper diversity.
-      - Result: bots with same canvas but different languages are no
-        longer grouped together, and real users with distinct
-        language/platform combos get distinct hashes.
-    """
     import hashlib
     parts = [
         str(fp.get("canvas_hash") or ""),
@@ -287,16 +251,9 @@ def _compute_fp_hash(fp: dict, nav: dict) -> str:
 
 
 # =========================================================
-# FLOOD CHECK (v4.2.2 — filtered by campaign)
+# FLOOD CHECK
 # =========================================================
 def _check_flood(ip: str, campaign_id: int, db: Session):
-    """
-    v4.2.2 FIX: Filter by campaign_id.
-      Previously this was global per-IP, which triggered on CGNAT /
-      shared ISP networks (e.g. university, hotel WiFi) where dozens of
-      legit users hit different campaigns from the same IP.
-      Now the limit is per-campaign, per-IP.
-    """
     cutoff = datetime.utcnow() - timedelta(hours=1)
     if db.query(SessionModel).filter(
         SessionModel.ip == ip,
@@ -315,7 +272,7 @@ def _campaign_mode(campaign: CampaignModel) -> str:
 
 
 # =========================================================
-# HANDSHAKE — persists ip_info in session.meta
+# HANDSHAKE — Includes Fast IP Filter
 # =========================================================
 @router.post("/collect/handshake")
 async def collect_handshake(
@@ -327,10 +284,11 @@ async def collect_handshake(
         raise HTTPException(404, "Collector disabled")
 
     client_ip = get_client_ip(request)
-    # ⚡ Fast IP Filter (Zero-Latency)
-from collector.fast_ip_filter import check_ip_fast
-if check_ip_fast(client_ip)["blocked"]:
-    return {"ok": False, "hide": True, "reason": "FAST_FILTER_BLOCK", "duplicate": False}
+
+    # ⚡ Fast IP Filter (Zero-Latency) — يشتغل في أقل من 2ms
+    if check_ip_fast(client_ip)["blocked"]:
+        return {"ok": False, "hide": True, "reason": "FAST_FILTER_BLOCK", "duplicate": False}
+
     handshake_limiter.check(client_ip)
     session_id = _validate_session_id(payload.session_id)
 
@@ -348,7 +306,6 @@ if check_ip_fast(client_ip)["blocked"]:
     if not campaign:
         raise HTTPException(400, "invalid_campaign_key")
 
-    # v4.2.2: pass campaign.id for per-campaign flood check
     _check_flood(client_ip, campaign.id, db)
 
     try:
@@ -377,7 +334,6 @@ if check_ip_fast(client_ip)["blocked"]:
     verdict = "invalid" if blocked else "pending"
     score = precheck["score"] if blocked else 0
 
-    # v4.2.2: pass nav for proper fp_hash computation
     fp_hash = _compute_fp_hash(payload.fp or {}, payload.nav or {})
 
     session = SessionModel(
@@ -531,10 +487,6 @@ def _process_final_background(
         if "country_code" not in ip_info:
             ip_info["country_code"] = session.country_code or ""
 
-        # =========================================================
-        # v4.2.2 FIX: Cross-visit counters now filtered by campaign_id.
-        # Prevents CGNAT / shared-IP false positives.
-        # =========================================================
         recent_fp_count = 0
         same_ip_last_minute = 0
         same_canvas_ip_count = 0
@@ -551,7 +503,6 @@ def _process_final_background(
 
             canvas_raw = str((payload.fingerprint or {}).get("canvas_hash") or "")
             if len(canvas_raw) >= 15 and canvas_raw not in ("blocked", "Unknown"):
-                # Match against first 32 chars (v4.2.2 storage format)
                 canvas_key = canvas_raw[:32]
                 recent_fp_count = db.query(VisitModel).filter(
                     VisitModel.campaign_id == session.campaign_id,
@@ -703,9 +654,6 @@ def _process_final_background(
                 stats_cache.invalidate(f"stats:campaign:{session.campaign_id}")
             return
 
-        # =========================================================
-        # v4.2.2: canvas_hash stored at 32 chars (was 15+"...")
-        # =========================================================
         canvas_full = str(fp.get("canvas_hash", "") or "")
         canvas_stored = canvas_full[:32] if canvas_full and canvas_full not in ("blocked",) else "Unknown"
 
@@ -827,19 +775,6 @@ async def collect_final(
 # STALE SESSION FINALIZER
 # =========================================================
 def _finalize_stale_session(session_id: str) -> bool:
-    """
-    Finalize a session that never sent its final beacon.
-
-    Two paths:
-        A) Has heartbeats → feed them as synthetic final payload
-        B) No heartbeats + aged 120s+ → treat as DEAD (verdict=invalid)
-
-    v4.2.2 FIX:
-        Path A now passes `None` for headers (not `{}`). Combined with
-        the orchestrator's _collect_headers fix, this prevents the
-        MISSING_SEC_CH_UA false positive that was marking all stale
-        sessions as "invalid".
-    """
     db_check = SessionLocal()
     try:
         session = db_check.query(SessionModel).filter(
@@ -1000,7 +935,6 @@ def _finalize_stale_session(session_id: str) -> bool:
         "tracking_params": meta_macros if isinstance(meta_macros, dict) else {},
     }
 
-    # v4.2.2: pass None (not {}) — prevents MISSING_SEC_CH_UA false positive
     _process_final_background(session_id, payload_dict, client_ip, None, "1.1")
     return True
 
