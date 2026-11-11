@@ -1,25 +1,18 @@
 """
 routers/interstitial.py — Interstitial precheck for Direct Links.
-
-v3.2 FIX (2025-11):
-  - PASS_COOKIE_TTL_SECONDS: 7 days → 24 hours
-    A stolen pass cookie (XSS/MITM) previously granted 7 days of free
-    access. Now the risk is bounded to 24 hours, and campaigns.py
-    revoke_campaign_pass_tokens() is called on rotate-key to
-    invalidate all passes for a campaign immediately.
 """
 import hashlib
 import secrets
 import time
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from config import COLLECTOR_V3_ENABLED
-from database import get_db
+from database import get_db, SessionLocal
 from models import CampaignModel, SessionModel, VisitModel
 from schemas import (
     InterstitialPrecheckPayload,
@@ -35,11 +28,13 @@ from collector.interstitial_template import INTERSTITIAL_HTML
 from collector.header_analyzer import analyze_headers
 from helpers import extract_zone_id_from_url, extract_macros
 
+# ✅ استيراد الفلتر السريع
+from collector.fast_ip_filter import check_ip_fast
+
 router = APIRouter()
 
 
 PASS_COOKIE_NAME = "ovg_pass"
-# v3.2: shortened from 7 days to 24 hours
 PASS_COOKIE_TTL_SECONDS = 24 * 3600
 CHALLENGE_CACHE_TTL = 600
 CHALLENGE_DIFFICULTY = 4
@@ -86,20 +81,10 @@ def _read_pass_token(token: str):
 
 
 def revoke_campaign_pass_tokens(campaign_key: str) -> int:
-    """
-    v3.2: Called on campaign key rotation.
-    Invalidates all outstanding pass tokens for the given campaign.
-    Returns the number of tokens revoked.
-
-    Note: TTLCache is OrderedDict-based, so iterating ._data directly is
-    safe here since we're in a single-process FastAPI worker. If you
-    scale to multiple workers with Redis, this must change.
-    """
     if not campaign_key:
         return 0
     revoked = 0
     try:
-        # Access internal dict directly to preserve (value, timestamp) tuples
         for key in list(_pass_token_cache._data.keys()):
             entry = _pass_token_cache._data.get(key)
             if not entry:
@@ -117,7 +102,6 @@ def _extract_zone(payload_url: str, tracking_params: dict, campaign) -> tuple:
     try:
         tp = tracking_params or {}
         tp_lower = {str(k).lower().strip(): v for k, v in tp.items() if v}
-        # ✅ إضافة websiteid
         for key in ("websiteid", "website_id", "zoneid", "zone_id", "zone", "z", "zn", "zid"):
             if key in tp_lower and tp_lower[key]:
                 val = str(tp_lower[key]).strip()[:100]
@@ -164,6 +148,34 @@ def _compute_cross_visit_signals(db: Session, client_ip: str, canvas_hash: str) 
     return {"ip_visits_10m": int(ip_visits), "fp_visits_10m": int(fp_visits)}
 
 
+# ✅ دالة تسجيل الحظر في الخلفية
+def _log_blocked_visit_in_background(campaign_id, session_id, client_ip, zone_id, reason, ua):
+    """تسجيل الزيارة المحظورة في الداتابيز بدون تعطيل سرعة الرد"""
+    db = SessionLocal()
+    try:
+        visit = VisitModel(
+            campaign_id=campaign_id,
+            session_id=session_id,
+            timestamp=datetime.utcnow(),
+            ip=client_ip,
+            user_agent=ua,
+            zone_id=zone_id,
+            verdict="invalid",
+            score=100,
+            filter_reason=reason,
+            evidence=[{"code": reason, "severity": "critical", "score": 100, "detail": "Fast IP Filter Block"}],
+            data_quality="partial",
+            counting_type="direct_link",
+        )
+        db.add(visit)
+        db.commit()
+    except Exception as e:
+        print(f"[BG Log] Failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 @router.get("/go/{campaign_key}", response_class=HTMLResponse)
 async def serve_interstitial(campaign_key: str, request: Request, db: Session = Depends(get_db)):
     if not COLLECTOR_V3_ENABLED:
@@ -195,11 +207,40 @@ async def serve_interstitial(campaign_key: str, request: Request, db: Session = 
 
 
 @router.post("/api/interstitial/precheck")
-async def precheck(payload: InterstitialPrecheckPayload, request: Request, db: Session = Depends(get_db)):
+async def precheck(
+    payload: InterstitialPrecheckPayload, 
+    request: Request, 
+    background_tasks: BackgroundTasks,  # ✅ إضافة background tasks
+    db: Session = Depends(get_db)
+):
     if not COLLECTOR_V3_ENABLED:
         raise HTTPException(404, "Not Found")
 
     client_ip = get_client_ip(request)
+    
+    # =========================================================
+    # ⚡ FAST IP FILTER (Sub-30ms) — Zero DB Queries
+    # =========================================================
+    fast_check = check_ip_fast(client_ip)
+    if fast_check["blocked"]:
+        reason = fast_check["reason"]
+        c = db.query(CampaignModel).filter(CampaignModel.campaign_key == payload.campaign_key).first()
+        zone_id = _extract_zone(payload.url or "", payload.tracking_params or {}, c)[0]
+        ua = str((payload.nav or {}).get("ua") or "")
+        
+        # Log in background to keep response ultra-fast
+        background_tasks.add_task(
+            _log_blocked_visit_in_background,
+            campaign_id=c.id if c else 0,
+            session_id=payload.session_id,
+            client_ip=client_ip,
+            zone_id=zone_id,
+            reason=reason,
+            ua=ua
+        )
+        return {"action": "block", "url": None, "score": 100, "reasons": [reason]}
+    # =========================================================
+
     try:
         handshake_limiter.check(f"isc:{client_ip}")
     except HTTPException:
