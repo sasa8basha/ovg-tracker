@@ -117,6 +117,13 @@ async def update_all_feeds():
         db.rollback()
     finally:
         db.close()
+        
+    # ✅ التحديث الجديد: إبلاغ الفلتر السريع إن في داتا جديدة نزلت
+    try:
+        from collector.fast_ip_filter import reload_feeds_into_ram
+        reload_feeds_into_ram()
+    except Exception as e:
+        print(f"⚠️ Failed to reload fast filter: {e}")
 
 
 async def reputation_loader_loop():
