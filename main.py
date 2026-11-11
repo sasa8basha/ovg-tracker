@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+import os
 
 from config import ALLOWED_ORIGINS, ENV, DEBUG
 from database import engine, Base, run_data_seeding_and_backfills, apply_safe_migrations
@@ -15,6 +16,9 @@ from adsterra_sync import sync_adsterra_loop
 from ip_reputation_loader import reputation_loader_loop
 from ip_intelligence import intelligence_worker_loop
 from routers.collector_v3 import stale_session_finalizer_loop
+
+# ✅ استيراد الفلتر السريع
+from collector.fast_ip_filter import init_fast_filter
 
 from routers import (
     auth as auth_router, settings as settings_router,
@@ -41,6 +45,9 @@ bootstrap_admin()
 app = FastAPI(title="OVG Tracker — Neo", version="12.0", docs_url="/docs" if DEBUG else None)
 
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# ضمان وجود مجلد static
+os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -78,6 +85,9 @@ async def tracker_cors_middleware(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
+    # ✅ تشغيل الفلتر السريع (In-Memory)
+    init_fast_filter()
+
     asyncio.create_task(sync_adsterra_loop())
     asyncio.create_task(stale_session_finalizer_loop())
     asyncio.create_task(reputation_loader_loop())
