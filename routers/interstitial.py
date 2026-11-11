@@ -4,6 +4,7 @@ routers/interstitial.py — Interstitial precheck for Direct Links.
 import hashlib
 import secrets
 import time
+import asyncio
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, BackgroundTasks
@@ -148,7 +149,6 @@ def _compute_cross_visit_signals(db: Session, client_ip: str, canvas_hash: str) 
     return {"ip_visits_10m": int(ip_visits), "fp_visits_10m": int(fp_visits)}
 
 
-# ✅ دالة تسجيل الحظر في الخلفية
 def _log_blocked_visit_in_background(campaign_id, session_id, client_ip, zone_id, reason, ua):
     """تسجيل الزيارة المحظورة في الداتابيز بدون تعطيل سرعة الرد"""
     db = SessionLocal()
@@ -210,7 +210,7 @@ async def serve_interstitial(campaign_key: str, request: Request, db: Session = 
 async def precheck(
     payload: InterstitialPrecheckPayload, 
     request: Request, 
-    background_tasks: BackgroundTasks,  # ✅ إضافة background tasks
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     if not COLLECTOR_V3_ENABLED:
@@ -219,16 +219,16 @@ async def precheck(
     client_ip = get_client_ip(request)
     
     # =========================================================
-    # ⚡ FAST IP FILTER (Sub-30ms) — Zero DB Queries
+    # ⚡ FAST IP FILTER (Zero-Latency) — الفحص في الذاكرة
     # =========================================================
     fast_check = check_ip_fast(client_ip)
+    
     if fast_check["blocked"]:
         reason = fast_check["reason"]
         c = db.query(CampaignModel).filter(CampaignModel.campaign_key == payload.campaign_key).first()
         zone_id = _extract_zone(payload.url or "", payload.tracking_params or {}, c)[0]
         ua = str((payload.nav or {}).get("ua") or "")
         
-        # Log in background to keep response ultra-fast
         background_tasks.add_task(
             _log_blocked_visit_in_background,
             campaign_id=c.id if c else 0,
@@ -239,6 +239,34 @@ async def precheck(
             ua=ua
         )
         return {"action": "block", "url": None, "score": 100, "reasons": [reason]}
+
+    # =========================================================
+    # ⚡ API PROXY CHECK (خط دفاع تاني للـ Residential Proxies)
+    # =========================================================
+    try:
+        from analysis import get_ip_info
+        
+        # بنستنى 50 مللي ثانية بس، لو مجابش نتيجة بسرعة منعطلوش
+        ip_info = await asyncio.wait_for(get_ip_info(client_ip), timeout=0.050) 
+        
+        if ip_info and (ip_info.get("security", {}).get("vpn") or ip_info.get("security", {}).get("proxy")):
+            c = db.query(CampaignModel).filter(CampaignModel.campaign_key == payload.campaign_key).first()
+            zone_id = _extract_zone(payload.url or "", payload.tracking_params or {}, c)[0]
+            ua = str((payload.nav or {}).get("ua") or "")
+            background_tasks.add_task(
+                _log_blocked_visit_in_background,
+                campaign_id=c.id if c else 0,
+                session_id=payload.session_id,
+                client_ip=client_ip,
+                zone_id=zone_id,
+                reason="PROXY_VPN_API",
+                ua=ua
+            )
+            return {"action": "block", "url": None, "score": 100, "reasons": ["PROXY_VPN_API"]}
+    except asyncio.TimeoutError:
+        pass  # لو الـ API اتأخر، كمّل عادي
+    except Exception:
+        pass  # لو حصل أي خطأ، كمّل عادي
     # =========================================================
 
     try:
