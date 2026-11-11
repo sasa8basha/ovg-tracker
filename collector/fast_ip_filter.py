@@ -17,8 +17,15 @@ _VPN_DATACENTER_RADIX = None
 _MALICIOUS_IPS = set()
 _MMDB_READER = None
 
+# ✅ أسماء شركات الاستضافة المشهورة (لو ظهرت في اسم الشركة، يبقى داتا سنتر)
+DATACENTER_KEYWORDS = [
+    "digitalocean", "ovh", "hetzner", "amazon", "aws", "google", "microsoft",
+    "azure", "contabo", "vultr", "linode", "choopa", "leaseweb", "hostinger",
+    "namecheap", "godaddy", "colocation", "server", "hosting", "datacenter",
+    "cloud", "m247", "psychz", "quadranet", "cogent", "hurricane"
+]
+
 def reload_feeds_into_ram():
-    """تحديث القوائم في الذاكرة (بتتنفذ عند تشغيل السيرفر وكل ما تتحمل قوائم جديدة)"""
     global _VPN_DATACENTER_RADIX, _MALICIOUS_IPS
     
     db = SessionLocal()
@@ -53,7 +60,6 @@ def reload_feeds_into_ram():
         db.close()
 
 def init_fast_filter(mmdb_path="data/ip-index.mmdb"):
-    """تشغيل الفلتر وتحميل الداتا في الـ RAM"""
     global _MMDB_READER
     
     print("🚀 Initializing Fast IP Filter (In-Memory)...")
@@ -67,7 +73,6 @@ def init_fast_filter(mmdb_path="data/ip-index.mmdb"):
     reload_feeds_into_ram()
 
 def check_ip_fast(ip_str: str) -> dict:
-    """الفحص الصاروخي من الذاكرة"""
     if not ip_str:
         return {"blocked": False, "reason": ""}
 
@@ -97,7 +102,14 @@ def check_ip_fast(ip_str: str) -> dict:
                 if data.get("is_hosting") or data.get("is_anycast"):
                     return {"blocked": True, "reason": "DATACENTER_ASN_MMDB"}
                 
+                # فحص اسم الشركة والـ ASN
                 asn = str(data.get("asn", ""))
+                asn_desc = str(data.get("asn_description", "")).lower()
+                
+                # لو اسم الشركة فيه كلمة من كلمات الداتا سنتر
+                if any(kw in asn_desc for kw in DATACENTER_KEYWORDS):
+                    return {"blocked": True, "reason": f"DATACENTER_KEYWORD"}
+
                 DATACENTER_ASNS = {"AS16509", "AS14618", "AS8987", "AS396982", "AS15169", "AS8075", "AS13335", "AS14061", "AS24940", "AS16276"}
                 if asn in DATACENTER_ASNS:
                     return {"blocked": True, "reason": f"DATACENTER_ASN_{asn}"}
